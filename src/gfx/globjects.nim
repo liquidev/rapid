@@ -14,11 +14,16 @@ type
 
 type
   VertexBuffer* = object of GLObject
-    vertices: seq[float]
-    length, cap, icap: uint
     usage: VBOType
+    vertices: seq[float]
+    capacity, initcap: int
+    attrs: seq[tuple[size: int]]
   VBOType* = enum
     vboStatic, vboDynamic, vboStream
+  VertexAttrType* = enum
+    vaFloat
+  VertexAttrSize* = enum
+    vaSingle = 1, vaVec2 = 2, vaVec3 = 3, vaVec4 = 4
 
 var currentVBO*: GLuint
 
@@ -28,59 +33,69 @@ template with*(buf: VertexBuffer, stmts: untyped) =
   glBindBuffer(GL_ARRAY_BUFFER, currentVBO)
   stmts
   currentVBO = previousVBO
-  echo "end: " & $previousVBO
   glBindBuffer(GL_ARRAY_BUFFER, currentVBO)
+  echo buf
 
-proc realloc*(buf: VertexBuffer) =
+proc realloc*(buf: var VertexBuffer, usage: VBOType) =
+  buf.usage = usage
   with(buf):
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * buf.cap.int, nil, case buf.usage:
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * buf.capacity, nil, case usage:
+      of vboStream: GL_STREAM_DRAW
       of vboStatic: GL_STATIC_DRAW
-      of vboDynamic: GL_DYNAMIC_DRAW
-      of vboStream: GL_STREAM_DRAW)
+      of vboDynamic: GL_DYNAMIC_DRAW)
 
-proc update*(buf: VertexBuffer, index, length: int) =
-  ## Updates a fragment of the buffer's data.
+proc update*(buf: VertexBuffer, offset: int, size: int) =
   with(buf):
-    glBufferSubData(GL_ARRAY_BUFFER, sizeof(float) * index, sizeof(float) * length, buf.vertices[index].unsafeAddr)
-    echo currentVBO
+    glBufferSubData(GL_ARRAY_BUFFER,
+      sizeof(float) * offset, sizeof(float) * size,
+      buf.vertices[0].unsafeAddr)
+    discard
 
-proc add*[T](buf: var VertexBuffer, values: varargs[T]) =
-  ## Adds a vertex to the buffer. If the buffer is overflown, its size will be
-  ## increased by its initial capacity (but the buffer will not be reallocated).
-  if buf.length.int + values.len > buf.cap.int:
-    buf.cap += buf.icap
-    buf.vertices.setLen(buf.cap)
-  for i, v in values:
-    buf.vertices[buf.length.int] = values[i]
-    buf.length += 1
+proc len*(buf: VertexBuffer): int =
+  ## Returns the length of an attribute's data.
+  result = buf.vertices.len
 
-proc clear*(buf: var VertexBuffer) =
-  ## Clears any vertices from the buffer.
-  for i, v in buf.vertices:
-    buf.vertices[i] = 0.0
-  buf.length = 0
+proc add*(buf: var VertexBuffer, vertices: varargs[float]) =
+  ## Adds values to a specified parameter in the VBO.
+  # expand the buffer if necessary
+  if buf.len + vertices.len > buf.capacity:
+    buf.capacity += buf.initcap
+    buf.realloc(buf.usage)
+  # put the data into the array
+  for i, v in vertices:
+    buf.vertices.add(v)
 
-proc len*(buf: VertexBuffer): uint =
-  return buf.length
+proc attribs*(buf: var VertexBuffer, attribs: varargs[tuple[attrType: VertexAttrType, size: VertexAttrSize]]) =
+  proc typesize(t: VertexAttrType): int =
+    result = case t:
+      of vaFloat: sizeof(float)
 
-proc newVBO*(size: uint, usage: VBOType): VertexBuffer =
-  ## Creates a new VBO with the initial capacity of `size`.
-  ## The `usage` should be chosen accordingly to the usage of the VBO:
-  ##  - `vboStatic`, if the VBO's data isn't going to change, and the VBO's going to be used many times;
-  ##  - `vboStream`, if the VBO's data isn't going to change, and the VBO's going to be used a few times;
-  ##  - `vboDraw`, if the VBO's data is going to be modified repeatedly and used many times.
-  ## If usage is not chosen correctly, low performance may occur due to how OpenGL allocates memory for the buffer.
+  var stride = 0
+  for a in attribs:
+    stride += a.size.int * typesize(a.attrType)
+  var offset = 0
+  for i, a in attribs:
+    glEnableVertexAttribArray(i.GLuint)
+    glVertexAttribPointer(i.GLuint, a.size.int.GLint, case a.attrType:
+      of vaFloat: cGL_FLOAT,
+      false, stride.GLsizei, cast[pointer](offset))
+    let tsize = case a.attrType:
+      of vaFloat: sizeof(float)
+    offset += a.size.int * typesize(a.attrType)
+  echo stride
+
+proc clear*(buf: var VertexBuffer, location: int) =
+  buf.vertices.setLen(0)
+
+proc newVBO*(capacity: int, usage: VBOType): VertexBuffer =
   var vbo_id: GLuint
-  glGenBuffers(GLsizei(1), addr vbo_id)
+  glGenBuffers(1, addr vbo_id)
   var buf = VertexBuffer(
-    id: vbo_id,
-    vertices: newSeq[float](size),
-    cap: size, icap: size,
-    usage: usage
+    id: vbo_id, usage: usage,
+    initcap: capacity
   )
-  buf.realloc()
-
-  return buf
+  buf.realloc(usage)
+  result = buf
 
 ###
 # Vertex Attributes
@@ -88,28 +103,27 @@ proc newVBO*(size: uint, usage: VBOType): VertexBuffer =
 
 type
   VertexArray* = object of GLObject
-    atts: seq[tuple[loc: uint, number, size: int]]
-  VertexAttributeType* = enum
-    vaFloat, vaInt
 
 proc newVAO*(): VertexArray =
   var vao_id: GLuint
   glGenVertexArrays(1, addr vao_id)
   return VertexArray(
-    id: vao_id, atts: @[]
+    id: vao_id
   )
 
-proc add*(arr: var VertexArray, attribType: VertexAttributeType, location: uint, number: int) =
-  let glType = case attribType:
-    of vaInt: cGL_INT
-    of vaFloat: cGL_FLOAT
-  var offset = 0
-  for att in arr.atts: offset += att.size
-  arr.atts.add((location, number, number * sizeof(float)))
-  glBindVertexArray(arr.id)
-  glVertexAttribPointer(location.GLuint, number.GLint, glType, false, (number * sizeof(float)).GLsizei, cast[pointer](offset))
-  glEnableVertexAttribArray(location.GLuint)
-  glBindVertexArray(0)
+var currentVAO*: GLuint
+
+template with*(arr: VertexArray, stmts: untyped) =
+  let previousVAO = currentVAO
+  currentVAO = arr.id
+  glBindVertexArray(currentVAO)
+  stmts
+  currentVAO = previousVAO
+  glBindVertexArray(currentVAO)
+
+template use*(arr: VertexArray) =
+  currentVAO = arr.id
+  glBindVertexArray(currentVAO)
 
 ###
 # Shaders
@@ -208,10 +222,10 @@ type
 
 template toGLenum*(primitive: Primitive): untyped =
   case primitive:
-  of prPoints: GL_POINTS
-  of prLineStrip: GL_LINE_STRIP
-  of prLineLoop: GL_LINE_LOOP
-  of prLines: GL_LINES
-  of prTriStrip: GL_TRIANGLE_STRIP
-  of prTriFan: GL_TRIANGLE_FAN
-  of prTris: GL_TRIANGLES
+    of prPoints: GL_POINTS
+    of prLineStrip: GL_LINE_STRIP
+    of prLineLoop: GL_LINE_LOOP
+    of prLines: GL_LINES
+    of prTriStrip: GL_TRIANGLE_STRIP
+    of prTriFan: GL_TRIANGLE_FAN
+    of prTris: GL_TRIANGLES

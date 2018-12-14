@@ -18,26 +18,26 @@ A game engine written in Nim, optimized for rapid game development and prototypi
 ```wren
 var win = RWindow.new()
   .size(800, 600)
-  .open();
+  .open()
 
 win.loop(|ctx| {
-  ctx.clear(RColor.rgb(255, 255, 255));
-});
+  ctx.clear(RColor.rgb(255, 255, 255))
+})
 ```
 
 ### Drawing primitives
 ```wren
 var win = RWindow.new()
   .size(800, 600)
-  .open();
+  .open()
 
-win.loop(|ctx| {
-  ctx.clear(RColor.rgb(255, 255, 255));
-  ctx.color(RColor.blue);
-  ctx.begin(); // a draw operation must begin by clearing the vertex buffer
-  ctx.rect(32, 32, 64, 64);
-  ctx.draw(R.ptTris); // the R namespace contains various enums
-});
+win.loop { |ctx|
+  ctx.clear(RColor.rgb(255, 255, 255))
+  ctx.color(RColor.blue)
+  ctx.begin() // a draw operation must begin by clearing the vertex buffer
+  ctx.rect(32, 32, 64, 64)
+  ctx.draw(R.ptTris) // the R namespace contains various enums
+}
 ```
 
 Check out more examples in the `/examples` directory!

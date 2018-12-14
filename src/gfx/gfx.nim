@@ -19,7 +19,7 @@ const rDefaultFsh* = """
 out vec4 color;
 
 void main() {
-  color = vec4(1.0);
+  color = vec4(1.0, 1.0, 1.0, 1.0);
 }
 """
 
@@ -33,6 +33,7 @@ type
     vbo: VertexBuffer
   RGfxContext* = object
     gfx: RGfx
+    vao: VertexArray
     vbo: VertexBuffer
 
 ###
@@ -47,7 +48,8 @@ proc shader*(ctx: RGfxContext, shader: Program) =
   glUseProgram(shader.id)
 
 proc begin*(ctx: var RGfxContext) =
-  ctx.vbo.clear()
+  var vbo = ctx.vbo
+  vbo.clear(0)
 
 proc vertex*(ctx: var RGfxContext, x, y, z: float) =
   ctx.vbo.add(x, y, z)
@@ -56,18 +58,16 @@ template vertex*(ctx: var RGfxContext, x, y: float): untyped =
   ctx.vertex(x, y, 0.0)
 
 proc draw*(ctx: RGfxContext, primitive: Primitive) =
-  with(ctx.vbo):
-    ctx.vbo.update(0, ctx.vbo.len.int)
-    glDrawArrays(primitive.toGLenum, 0, GLsizei(ctx.vbo.len.int / 3))
-  discard
+  ctx.vbo.update(0, ctx.vbo.len)
+  with(ctx.vao):
+    glDrawArrays(primitive.toGLenum, 0, GLsizei(ctx.vbo.len / 3))
 
 proc openContext(gfx: RGfx): RGfxContext =
   var ctx = RGfxContext(
     gfx: gfx,
+    vao: gfx.vao,
     vbo: gfx.vbo
   )
-
-  ctx.shader(gfx.defaultProgram)
 
   return ctx
 
@@ -86,13 +86,19 @@ proc resize*(self: var RGfx, width, height: int) =
   self.height = height
 
 proc start*(self: var RGfx) =
-  glViewport(0, 0, GLint(self.width), GLint(self.height))
+  glViewport(0, 0, self.width.GLint, self.height.GLint)
   self.defaultProgram = newProgram(rDefaultVsh, rDefaultFsh)
   var vao = newVAO()
-  vao.add(vaFloat, 0, 3)
+  var vbo = newVBO(2048, vboDynamic)
+  with(vao):
+    with(vbo):
+      vbo.attribs(
+        (vaFloat, vaVec3)
+      )
   self.vao = vao
-  self.vbo = newVBO(2048, vboDynamic)
+  self.vbo = vbo
 
 proc render*(self: var RGfx, f: proc (ctx: var RGfxContext)) =
   var ctx = openContext(self)
+  ctx.shader(self.defaultProgram)
   f(ctx)

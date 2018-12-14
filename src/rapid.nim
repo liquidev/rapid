@@ -5,7 +5,7 @@
 ###
 
 import
-  #[GLAD]# glad/gl,
+  #[ GLAD ]# glad/gl,
   # low-level wrappers, boilerplate code
   gfx/color, gfx/globjects,
   # high-level code
