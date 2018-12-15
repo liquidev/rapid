@@ -11,6 +11,7 @@ type
     gfx: RGfx
     events: RWindowEvents
     gldebug: bool
+    fps, dt: float64
   RWindowEvents = object
     onChar: proc (character: string)
     onKeyDown: proc (key: Key, scancode: int32)
@@ -62,8 +63,6 @@ proc newRWindow*(title: string, width, height: int): RWindow =
   if not gladLoadGL(getProcAddress):
     quit "rd fatal: couldn't create gl context"
 
-  glfw.swapInterval(1)
-
   return rwin
 
 proc debug*(self: var RWindow, state: bool) =
@@ -75,7 +74,6 @@ proc debugCallback(
     length: GLsizei, message: ptr GLchar,
     userParam: pointer) {.stdcall.} =
   echo "rd/gl debug | type: " & $etype & "; severity: " & $severity & "; message: " & $message
-
 
 proc registerCallbacks(self: RWindow) =
   var win = self.glwindow
@@ -105,18 +103,26 @@ proc registerCallbacks(self: RWindow) =
     glEnable(GL_DEBUG_OUTPUT)
     glDebugMessageCallback(debugCallback, cast[pointer](0))
 
-proc loop*(self: RWindow, loopf: proc (ctx: var RGfxContext)) =
+proc loop*(self: var RWindow, loopf: proc (ctx: var RGfxContext)) =
   var win = self.glwindow
   self.registerCallbacks()
 
   var gfx = self.gfx
   gfx.start()
 
+  glfw.swapInterval(1)
+
+  var ptime: float64
   while not win.shouldClose:
+    self.dt = getTime() - ptime
+
     win.swapBuffers()
     glfw.pollEvents()
 
     gfx.render do (ctx: var RGfxContext):
       loopf(ctx)
+
+    ptime = getTime()
+    self.fps = 1 / self.dt
 
   glfw.terminate()

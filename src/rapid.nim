@@ -19,7 +19,6 @@ when isMainModule:
   win.loop do (ctx: var RGfxContext):
     ctx.clear(color(0, 0, 255))
     ctx.begin()
-    ctx.vertex(0.0, 1.0)   # top
-    ctx.vertex(-1.0, -1.0) # bottom left
-    ctx.vertex(1.0, -1.0)  # bottom right
+    ctx.color(color(255, 0, 0))
+    ctx.rect(32, 32, 48, 32)
     ctx.draw(prTris)

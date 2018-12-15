@@ -1,3 +1,5 @@
+import sequtils
+
 import ../glad/gl
 
 ###
@@ -79,7 +81,7 @@ proc attribs*(buf: var VertexBuffer, attribs: varargs[tuple[attrType: VertexAttr
       false, stride.GLsizei, cast[pointer](offset))
     offset += a.size.int * typesize(a.attrType)
 
-proc clear*(buf: var VertexBuffer, location: int) =
+proc clear*(buf: var VertexBuffer) =
   buf.vertices.setLen(0)
 
 proc newVBO*(capacity: int, usage: VBOType): VertexBuffer =
@@ -87,7 +89,8 @@ proc newVBO*(capacity: int, usage: VBOType): VertexBuffer =
   glGenBuffers(1, addr vbo_id)
   var buf = VertexBuffer(
     id: vbo_id, usage: usage,
-    initcap: capacity
+    initcap: capacity,
+    vertices: @[]
   )
   buf.realloc(usage)
   result = buf
