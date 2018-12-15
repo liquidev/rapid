@@ -5,23 +5,21 @@
 ###
 
 import
-  #[ GLAD ]# glad/gl,
+  # C libraries
+  glad/gl,
   # low-level wrappers, boilerplate code
   gfx/color, gfx/globjects,
   # high-level code
   gfx/gfx,
   gfx/window
 
-proc rGame*(game: proc ()) =
-  game()
-
 when isMainModule:
-  rGame do:
-    var win = newRWindow("Rapid Test Game", 800, 600)
-    win.loop do (ctx: var RGfxContext):
-      ctx.clear(color(0, 0, 255))
-      ctx.begin()
-      ctx.vertex(0.0, 0.5)
-      ctx.vertex(-0.5, -0.5)
-      ctx.vertex(0.5, 0.5)
-      ctx.draw(prTris)
+  var win = newRWindow("Rapid Test Game", 800, 600)
+  win.debug(true)
+  win.loop do (ctx: var RGfxContext):
+    ctx.clear(color(0, 0, 255))
+    ctx.begin()
+    ctx.vertex(0.0, 1.0)   # top
+    ctx.vertex(-1.0, -1.0) # bottom left
+    ctx.vertex(1.0, -1.0)  # bottom right
+    ctx.draw(prTris)

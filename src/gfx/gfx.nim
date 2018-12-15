@@ -3,8 +3,7 @@ import ../glad/gl
 import globjects
 import color
 
-const rDefaultVsh* = """
-#version 330 core
+const rDefaultVsh* = """#version 330 core
 
 layout (location = 0) in vec3 position;
 
@@ -13,8 +12,7 @@ void main() {
 }
 """
 
-const rDefaultFsh* = """
-#version 330 core
+const rDefaultFsh* = """#version 330 core
 
 out vec4 color;
 
@@ -35,6 +33,7 @@ type
     gfx: RGfx
     vao: VertexArray
     vbo: VertexBuffer
+    program: Program
 
 ###
 # Gfx Context
@@ -44,22 +43,23 @@ proc clear*(ctx: RGfxContext, color: RColor) =
   glClearColor(color.redf, color.greenf, color.bluef, color.alphaf)
   glClear(GL_COLOR_BUFFER_BIT)
 
-proc shader*(ctx: RGfxContext, shader: Program) =
-  glUseProgram(shader.id)
+proc shader*(ctx: var RGfxContext, shader: Program) =
+  ctx.program = shader
 
 proc begin*(ctx: var RGfxContext) =
   var vbo = ctx.vbo
   vbo.clear(0)
 
-proc vertex*(ctx: var RGfxContext, x, y, z: float) =
+proc vertex*(ctx: var RGfxContext, x, y, z: float32) =
   ctx.vbo.add(x, y, z)
 
-template vertex*(ctx: var RGfxContext, x, y: float): untyped =
+template vertex*(ctx: var RGfxContext, x, y: float32): untyped =
   ctx.vertex(x, y, 0.0)
 
 proc draw*(ctx: RGfxContext, primitive: Primitive) =
   ctx.vbo.update(0, ctx.vbo.len)
   with(ctx.vao):
+    glUseProgram(ctx.program.id)
     glDrawArrays(primitive.toGLenum, 0, GLsizei(ctx.vbo.len / 3))
 
 proc openContext(gfx: RGfx): RGfxContext =
@@ -68,6 +68,7 @@ proc openContext(gfx: RGfx): RGfxContext =
     vao: gfx.vao,
     vbo: gfx.vbo
   )
+  glViewport(0, 0, gfx.width.GLint, gfx.height.GLint)
 
   return ctx
 
@@ -86,7 +87,6 @@ proc resize*(self: var RGfx, width, height: int) =
   self.height = height
 
 proc start*(self: var RGfx) =
-  glViewport(0, 0, self.width.GLint, self.height.GLint)
   self.defaultProgram = newProgram(rDefaultVsh, rDefaultFsh)
   var vao = newVAO()
   var vbo = newVBO(2048, vboDynamic)

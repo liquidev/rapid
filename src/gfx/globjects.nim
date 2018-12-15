@@ -15,9 +15,8 @@ type
 type
   VertexBuffer* = object of GLObject
     usage: VBOType
-    vertices: seq[float]
+    vertices*: seq[float32]
     capacity, initcap: int
-    attrs: seq[tuple[size: int]]
   VBOType* = enum
     vboStatic, vboDynamic, vboStream
   VertexAttrType* = enum
@@ -34,7 +33,6 @@ template with*(buf: VertexBuffer, stmts: untyped) =
   stmts
   currentVBO = previousVBO
   glBindBuffer(GL_ARRAY_BUFFER, currentVBO)
-  echo buf
 
 proc realloc*(buf: var VertexBuffer, usage: VBOType) =
   buf.usage = usage
@@ -55,7 +53,7 @@ proc len*(buf: VertexBuffer): int =
   ## Returns the length of an attribute's data.
   result = buf.vertices.len
 
-proc add*(buf: var VertexBuffer, vertices: varargs[float]) =
+proc add*(buf: var VertexBuffer, vertices: varargs[float32]) =
   ## Adds values to a specified parameter in the VBO.
   # expand the buffer if necessary
   if buf.len + vertices.len > buf.capacity:
@@ -68,7 +66,7 @@ proc add*(buf: var VertexBuffer, vertices: varargs[float]) =
 proc attribs*(buf: var VertexBuffer, attribs: varargs[tuple[attrType: VertexAttrType, size: VertexAttrSize]]) =
   proc typesize(t: VertexAttrType): int =
     result = case t:
-      of vaFloat: sizeof(float)
+      of vaFloat: sizeof(float32)
 
   var stride = 0
   for a in attribs:
@@ -79,10 +77,7 @@ proc attribs*(buf: var VertexBuffer, attribs: varargs[tuple[attrType: VertexAttr
     glVertexAttribPointer(i.GLuint, a.size.int.GLint, case a.attrType:
       of vaFloat: cGL_FLOAT,
       false, stride.GLsizei, cast[pointer](offset))
-    let tsize = case a.attrType:
-      of vaFloat: sizeof(float)
     offset += a.size.int * typesize(a.attrType)
-  echo stride
 
 proc clear*(buf: var VertexBuffer, location: int) =
   buf.vertices.setLen(0)
