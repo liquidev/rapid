@@ -1,6 +1,6 @@
 from unicode import toUtf8
 
-import ../glad/gl
+import ../lib/glad/gl
 import glfw
 
 import gfx

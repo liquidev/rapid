@@ -1,6 +1,6 @@
 import sequtils
 
-import ../glad/gl
+import ../lib/glad/gl
 
 ###
 # Base OpenGL object

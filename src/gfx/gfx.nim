@@ -1,9 +1,10 @@
-import ../glad/gl
+import math
+
+import ../lib/glad/gl
 
 import globjects
 import color
-
-import ../math
+import ../rmath
 
 const rDefaultVsh* = """
 #version 330 core
@@ -60,9 +61,15 @@ type
   RGfxCoordSpace* = enum
     csNormalized, csAbsolute
 
+proc width*(ctx: RGfxContext): int =
+  result = ctx.gfx.width
+
+proc height*(ctx: RGfxContext): int =
+  result = ctx.gfx.height
+
 proc clear*(ctx: RGfxContext, color: RColor) =
   ## Clears the Gfx with the specified color.
-  glClearColor(color.redf, color.greenf, color.bluef, color.alphaf)
+  glClearColor(color.rf, color.gf, color.bf, color.af)
   glClear(GL_COLOR_BUFFER_BIT)
 
 proc shader*(ctx: var RGfxContext, shader: Program) =
@@ -108,8 +115,9 @@ proc vertex*(ctx: var RGfxContext, x, y: float32, z: float32 = 0.0) =
     # position
     dx, dy, dz,
     # color
-    col.redf.float32, col.greenf.float32, col.bluef.float32,
-    col.alphaf.float32)
+    col.rf.float32, col.gf.float32, col.bf.float32, col.af.float32,
+    # uv
+    ctx.texUV.u, ctx.texUV.v)
 
 proc tri*(ctx: var RGfxContext,
     ax, ay, az, bx, by, bz, cx, cy, cz: float32) =
@@ -141,8 +149,21 @@ proc quad*(ctx: var RGfxContext,
   ctx.tri(ax, ay, cx, cy, dx, dy)
 
 proc rect*(ctx: var RGfxContext, x, y, width, height: float32) =
-  ## Draws a 2D rectangle, at the specified coordinates, with the specified size.
+  ## Draws a 2D rectangle, with the top-left corner at the specified coordinates, with the specified size.
   ctx.quad(x + width, y, x, y, x, y + height, x + width, y + height)
+
+proc circle*(ctx: var RGfxContext, x, y, r: float32, precision: int = 0) =
+  ## Draws a 2D circle, with the center at the specified coordinates, with the specified size.
+  var p = precision
+  if precision == 0: p = int(6.28 * r / 8) # this is supposed to be an estimate, that's why PI isn't used here
+  for pt in 0..<p:
+    let
+      alpha = pt.float / p.float * (2 * PI)
+      beta = (pt.float + 1) / p.float * (2 * PI)
+    ctx.tri(
+      x, y,
+      x + cos(alpha) * r, y + sin(alpha) * r,
+      x + cos(beta) * r, y + sin(beta) * r)
 
 proc draw*(ctx: RGfxContext, primitive: Primitive = prTris) =
   ## Draws the primitive currently stored in the buffer.

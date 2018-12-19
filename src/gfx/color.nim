@@ -1,18 +1,18 @@
 type
   RColor* = object
-    redi*, greeni*, bluei*, alphai*: uint8
-    redf*, greenf*, bluef*, alphaf*: float
+    ri*, gi*, bi*, ai*: uint8
+    rf*, gf*, bf*, af*: float
 
 proc color*(r, g, b, a: uint8): RColor =
   return RColor(
-    redi: r, greeni: g, bluei: b, alphai: a,
-    redf: r.float / 255.0, greenf: g.float / 255.0, bluef: b.float / 255.0
+    ri: r, gi: g, bi: b, ai: a,
+    rf: r.float / 255.0, gf: g.float / 255.0, bf: b.float / 255.0, af: a.float / 255.0
   )
 
 proc color*(r, g, b, a: float): RColor =
   return RColor(
-    redi: r.uint8 * 255, greeni: g.uint8 * 255, bluei: b.uint8 * 255, alphai: a.uint8 * 255,
-    redf: r, greenf: g, bluef: b, alphaf: a
+    ri: r.uint8 * 255, gi: g.uint8 * 255, bi: b.uint8 * 255, ai: a.uint8 * 255,
+    rf: r, gf: g, bf: b, af: a
   )
 
 template color*(r, g, b, a: int): untyped =

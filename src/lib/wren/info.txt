@@ -1,0 +1,3 @@
+This is a slightly modified fork of the Nim-Wren wrapper by geotre.
+Here's a list of modifications made to the original repo:
+ - Removed examples

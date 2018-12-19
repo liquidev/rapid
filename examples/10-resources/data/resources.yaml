@@ -1,0 +1,44 @@
+%YAML 1.2
+---
+# texture configs
+texconf pixel: # the 'of' syntax is used for inheritance
+  interpMin: nearest
+  interpMag: nearest
+
+texconf ~ of pixel: {}
+
+# images
+img myImage: image.png ~pixel
+img anotherImage: image2.png # will use the default ~ texture config
+
+# sounds
+snd click: click.ogg
+# stream makes the music streamed from the disk, good for large sounds like music
+snd bgm: music.ogg stream
+
+# shader programs
+shp distort:
+  # multiple shaders of the same type can be loaded into one program
+  - vsh: $ # '$' means 'a default value'
+  - fsh: utils.fsh
+  - fsh: distort.fsh
+# can also be loaded using a shorthand notation:
+shp short: v($) f(utils.fsh) f(distort.fsh) # expands to the above
+
+# lifetimes
+life *: # the lifetime has all resources by default
+  - myImage
+  - click
+# this lifetime can be started using the Data#begin(lifetime: string) function
+life ingame:
+  - anotherImage
+  - distort
+
+# directory loading
+dir sprites:
+  path: sprites # the directory to load from
+  recursive: true
+  filter: # filters
+    - "*.png"
+  ident: default # ids, by default uses filename in snake_case
+  pattern: $f ~pixel # the substitution to do on the node's content; $f == file
