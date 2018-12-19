@@ -3,6 +3,7 @@ from unicode import toUtf8
 import ../lib/glad/gl
 import glfw
 
+import ../data/data
 import gfx
 
 type
@@ -25,25 +26,58 @@ type
     onMouseWheel: proc (x, y: float)
     onResize: proc (width, height: int)
     onClose: proc (): bool
+  RWindowBuilder = object
+    config: OpenglWindowConfig
 
 ###
 # RWindow
 ###
 
-proc newRWindow*(title: string, width, height: int): RWindow =
+proc newRWindow*(): RWindowBuilder =
   glfw.initialize()
 
-  var winconf = DefaultOpenglWindowConfig
-  winconf.size = (w: width, h: height)
-  winconf.title = title
+  var config = DefaultOpenglWindowConfig
+  config.bits = (r: 8, g: 8, b: 8, a: 8, stencil: 8, depth: 16)
+  config.version = glv33
 
-  winconf.bits = (r: 8, g: 8, b: 8, a: 8, stencil: 8, depth: 16)
-  winconf.version = glv33
-  var win = newWindow(winconf)
+  result = RWindowBuilder(config: config)
+
+proc size*(win: RWindowBuilder, width, height: int): RWindowBuilder =
+  var win = win
+  win.config.size = (width, height)
+  win
+
+proc title*(win: RWindowBuilder, title: string): RWindowBuilder =
+  var win = win
+  win.config.title = title
+  win
+
+proc resizable*(win: RWindowBuilder, resizable: bool): RWindowBuilder =
+  var win = win
+  win.config.resizable = resizable
+  win
+
+proc decorated*(win: RWindowBuilder, decorated: bool): RWindowBuilder =
+  var win = win
+  win.config.decorated = decorated
+  win
+
+proc focused*(win: RWindowBuilder, focused: bool): RWindowBuilder =
+  var win = win
+  win.config.focused = focused
+  win
+
+proc maximized*(win: RWindowBuilder, maximized: bool): RWindowBuilder =
+  var win = win
+  win.config.maximized = maximized
+  win
+
+proc open*(builder: RWindowBuilder): RWindow =
+  var win = newWindow(builder.config)
 
   var rwin = RWindow(
     glwindow: win,
-    gfx: newRGfx(width, height),
+    gfx: newRGfx(builder.config.size.w.int, builder.config.size.h.int),
     events: RWindowEvents(
       onChar: proc (character: string) = discard,
       onKeyDown: proc (key: Key, scancode: int32) = discard,
@@ -79,7 +113,7 @@ proc registerCallbacks(self: RWindow) =
   var win = self.glwindow
   win.charCb = proc (w: Window, codePoint: Rune) = self.events.onChar(codePoint.toUTF8())
   win.keyCb = proc (w: Window, key: Key, scancode: int32, action: KeyAction, mods: set[ModifierKey]) =
-    case action:
+    case action
     of kaDown: self.events.onKeyDown(key, scancode)
     of kaRepeat: self.events.onKeyRepeat(key, scancode)
     of kaUp: self.events.onKeyUp(key, scancode)
@@ -102,6 +136,13 @@ proc registerCallbacks(self: RWindow) =
   if self.gldebug:
     glEnable(GL_DEBUG_OUTPUT)
     glDebugMessageCallback(debugCallback, cast[pointer](0))
+
+proc load*(self: var RWindow, data: RData) =
+  self.gfx.load(data)
+
+proc render*(self: var RWindow, f: proc (ctx: var RGfxContext)) =
+  self.gfx.render do (ctx: var RGfxContext):
+    f(ctx)
 
 proc loop*(self: var RWindow, loopf: proc (ctx: var RGfxContext)) =
   var win = self.glwindow

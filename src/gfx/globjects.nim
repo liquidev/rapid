@@ -39,7 +39,7 @@ template with*(buf: VertexBuffer, stmts: untyped) =
 proc realloc*(buf: var VertexBuffer, usage: VBOType) =
   buf.usage = usage
   with(buf):
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * buf.capacity, nil, case usage:
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * buf.capacity, nil, case usage
       of vboStream: GL_STREAM_DRAW
       of vboStatic: GL_STATIC_DRAW
       of vboDynamic: GL_DYNAMIC_DRAW)
@@ -67,7 +67,7 @@ proc add*(buf: var VertexBuffer, vertices: varargs[float32]) =
 
 proc attribs*(buf: var VertexBuffer, attribs: varargs[tuple[attrType: VertexAttrType, size: VertexAttrSize]]) =
   proc typesize(t: VertexAttrType): int =
-    result = case t:
+    result = case t
       of vaFloat: sizeof(float32)
 
   var stride = 0
@@ -76,7 +76,7 @@ proc attribs*(buf: var VertexBuffer, attribs: varargs[tuple[attrType: VertexAttr
   var offset = 0
   for i, a in attribs:
     glEnableVertexAttribArray(i.GLuint)
-    glVertexAttribPointer(i.GLuint, a.size.int.GLint, case a.attrType:
+    glVertexAttribPointer(i.GLuint, a.size.int.GLint, case a.attrType
       of vaFloat: cGL_FLOAT,
       false, stride.GLsizei, cast[pointer](offset))
     offset += a.size.int * typesize(a.attrType)
@@ -219,7 +219,7 @@ type
     prTriStrip, prTriFan, prTris
 
 template toGLenum*(primitive: Primitive): untyped =
-  case primitive:
+  case primitive
     of prPoints: GL_POINTS
     of prLineStrip: GL_LINE_STRIP
     of prLineLoop: GL_LINE_LOOP

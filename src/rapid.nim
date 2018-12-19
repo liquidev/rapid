@@ -19,8 +19,13 @@ export
   gfx, window
 
 when isMainModule:
-  var win = newRWindow("Rapid Test Game", 800, 600)
+  var win = newRWindow()
+    .size(800, 600)
+    .title("rapid test game")
+    .open()
   win.debug(true)
+  var res = loadRData("examples/10-resources/data")
+  win.load(res)
   win.loop do (ctx: var RGfxContext):
     ctx.clear(color(0, 0, 0))
     ctx.begin()

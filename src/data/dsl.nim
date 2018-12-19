@@ -43,7 +43,7 @@ proc dTexconf(data: var RMetaData, ident, rest: string, node: YamlNode) =
     mipmaps: parent.mipmaps
   )
   for k, v in pairs(node):
-    case k.content:
+    case k.content
     of "interpMin": conf.interpMin = parseEnum[RTexInterp]("ti" & v.content.capitalizeAscii)
     of "interpMag": conf.interpMag = parseEnum[RTexInterp]("ti" & v.content.capitalizeAscii)
     of "mipmaps": conf.mipmaps = parseBool(v.content)
@@ -62,7 +62,7 @@ proc parseData*(rd: string): RMetaData =
           ident = matches[1]
           rest = matches[2]
           node = v
-        case rtype:
+        case rtype
         of "img": dImg(result, ident, node)
         of "texconf": dTexconf(result, ident, rest, node)
       else:

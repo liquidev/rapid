@@ -2,6 +2,7 @@ import math
 
 import ../lib/glad/gl
 
+import ../data/data
 import globjects
 import color
 import ../rmath
@@ -40,6 +41,7 @@ var rDefaultProgram*: Program
 type
   RGfx* = object
     width, height: int
+    data: RData
     defaultProgram: Program
     vao: VertexArray
     vbo: VertexBuffer
@@ -105,7 +107,7 @@ proc vertex*(ctx: var RGfxContext, x, y: float32, z: float32 = 0.0) =
   ## Adds a vertex with the specified coordinates.
   let col = ctx.colVertex
   var dx, dy, dz: float32
-  case ctx.space:
+  case ctx.space
   of csNormalized: dx = x; dy = y; dz = z
   of csAbsolute:
     dx = mapr(x, 0, ctx.gfx.width.float, -1, 1)
@@ -197,6 +199,9 @@ proc newRGfx*(width, height: int): RGfx =
 proc resize*(self: var RGfx, width, height: int) =
   self.width = width
   self.height = height
+
+proc load*(self: var RGfx, data: RData) =
+  self.data = data
 
 proc start*(self: var RGfx) =
   self.defaultProgram = newProgram(rDefaultVsh, rDefaultFsh)

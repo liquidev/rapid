@@ -4,12 +4,12 @@
 texconf pixel: # the 'of' syntax is used for inheritance
   interpMin: nearest
   interpMag: nearest
-
-texconf ~ of pixel: {}
+texconf smooth: {} # default settings when doesn't inherit
+texconf ~ of smooth: {} # texconfs can inherit from each other
 
 # images
 img myImage: image.png ~pixel
-img anotherImage: image2.png # will use the default ~ texture config
+img rapidLogo: logo-1024.png # will use the default ~ texture config
 
 # sounds
 snd click: click.ogg
@@ -40,5 +40,5 @@ dir sprites:
   recursive: true
   filter: # filters
     - "*.png"
-  ident: default # ids, by default uses filename in snake_case
+  ident: camelCase # ids, by default uses filename in camelCase
   pattern: $f ~pixel # the substitution to do on the node's content; $f == file
