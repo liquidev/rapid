@@ -15,7 +15,7 @@ A game engine written in Nim, optimized for rapid game development and prototypi
 *Note: At this point in time, these examples don't work. They're merely a draft of what I'd like the API to be in the end.*
 
 ### Opening a window
-```wren
+```dart
 var win = RWindow.new()
   .size(800, 600)
   .open()
@@ -26,7 +26,7 @@ win.loop(|ctx| {
 ```
 
 ### Drawing primitives
-```wren
+```dart
 var win = RWindow.new()
   .size(800, 600)
   .open()
@@ -45,12 +45,12 @@ Check out more examples in the `/examples` directory!
 ## Roadmap
 
 rapid is still largely unfinished, but here's a roadmap of its upcoming/completed features:
- - [ ] Object-oriented OpenGL wrapper (in progress)
+ - [x] Object-oriented OpenGL wrapper (in progress)
  - [ ] Simple-to-use Processing-like graphics context (in-progress)
    - [x] Colors
-   - [ ] Batch draw calls
+   - [x] Batched/queued draw calls
    - [ ] Simple shader API
  - [ ] Game resource management
-   - [ ] Clean resource loader definition DSL
+   - [x] Clean resource loader definition DSL (in progress)
    - [ ] Resource "lifetimes"
  - [ ] Wren bindings
