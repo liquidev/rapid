@@ -1,4 +1,4 @@
-import math
+import math, tables
 
 import ../lib/glad/gl
 
@@ -12,14 +12,15 @@ const rDefaultVsh* = """
 
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec4 color;
-layout (location = 2) in vec2 uv;
+layout (location = 2) in vec2 texUV;
 
 out vec4 vertexColor;
-out vec4 texUV;
+out vec2 uv;
 
 void main() {
   gl_Position = vec4(position, 1.0);
   vertexColor = color;
+  uv = texUV;
 }
 """
 
@@ -27,12 +28,17 @@ const rDefaultFsh* = """
 #version 330 core
 
 in vec4 vertexColor;
-in vec4 texUV;
+in vec2 uv;
+
+uniform bool texEnabled;
+uniform sampler2D tex;
 
 out vec4 color;
 
 void main() {
-  color = vec4(1.0, 1.0, 1.0, 1.0) * vertexColor;
+  vec4 texColor = vec4(1.0);
+  if (texEnabled) texColor = texture(tex, uv);
+  color = texColor * vertexColor;
 }
 """
 
@@ -42,9 +48,11 @@ type
   RGfx* = object
     width, height: int
     data: RData
-    defaultProgram: Program
     vao: VertexArray
     vbo: VertexBuffer
+
+    defaultProgram: Program
+    textures: TableRef[string, Texture2D]
 
 ###
 # Gfx Context
@@ -55,11 +63,14 @@ type
     gfx: RGfx
     vao: VertexArray
     vbo: VertexBuffer
-    # Properties
-    program: Program
+    # Vertex properties
+    space: RGfxCoordSpace
     colVertex, colTint: RColor
     texUV: tuple[u, v: float32]
-    space: RGfxCoordSpace
+    # Shader properties
+    program: Program
+    textureEnabled: bool
+    texture: Texture2D # this is called texture0 because of naming conflicts
   RGfxCoordSpace* = enum
     csNormalized, csAbsolute
 
@@ -87,6 +98,15 @@ proc tint*(ctx: var RGfxContext, color: RColor) =
   ## The tint is different from the vertex color, because unlike the vertex color, it doesn't affect the next vertex,
   ## but the whole rendered primitive.
   ctx.colTint = color
+
+proc texture*(ctx: var RGfxContext, texture: string) =
+  ## Sets the active texture to draw with.
+  ctx.texture = ctx.gfx.textures[texture]
+  ctx.textureEnabled = true
+
+proc texture*(ctx: var RGfxContext) =
+  ## Disables textures and draws with white.
+  ctx.textureEnabled = false
 
 proc uv*(ctx: var RGfxContext, u, v: float32) =
   ## Sets the UV coordinates for subsequent vertex calls.
@@ -123,8 +143,7 @@ proc vertex*(ctx: var RGfxContext, x, y: float32, z: float32 = 0.0) =
 
 proc tri*(ctx: var RGfxContext,
     ax, ay, az, bx, by, bz, cx, cy, cz: float32) =
-  ## Adds a triangle. Note that the points' winding direction *must* be counter-clockwise,
-  ## otherwise nothing will be drawn.
+  ## Adds a triangle.
   ctx.vertex(ax, ay, az)
   ctx.vertex(bx, by, bz)
   ctx.vertex(cx, cy, cz)
@@ -139,8 +158,7 @@ proc tri*(ctx: var RGfxContext,
 proc quad*(ctx: var RGfxContext,
     ax, ay, az, bx, by, bz,
     cx, cy, cz, dx, dy, dz: float32) =
-  ## Adds a quad. Note that the points' winding direction *must* be counter-clockwise,
-  ## otherwise nothing will be drawn.
+  ## Adds a quad.
   ctx.tri(ax, ay, az, bx, by, bz, cx, cy, cz)
   ctx.tri(ax, ay, az, cx, cy, cz, dx, dy, dz)
 
@@ -152,7 +170,7 @@ proc quad*(ctx: var RGfxContext,
 
 proc rect*(ctx: var RGfxContext, x, y, width, height: float32) =
   ## Draws a 2D rectangle, with the top-left corner at the specified coordinates, with the specified size.
-  ctx.quad(x + width, y, x, y, x, y + height, x + width, y + height)
+  ctx.quad(x, y, x + width, y, x + width, y + height, x, y + height)
 
 proc circle*(ctx: var RGfxContext, x, y, r: float32, precision: int = 0) =
   ## Draws a 2D circle, with the center at the specified coordinates, with the specified size.
@@ -172,8 +190,8 @@ proc draw*(ctx: RGfxContext, primitive: Primitive = prTris) =
   ## To draw a new primitive after calling this function, use `begin()`.
   ctx.vbo.update(0, ctx.vbo.len)
   with(ctx.vao):
-    glUseProgram(ctx.program.id)
-    glDrawArrays(primitive.toGLenum, 0, GLsizei(ctx.vbo.len / 9))
+    with(ctx.program):
+      glDrawArrays(primitive.toGLenum, 0, GLsizei(ctx.vbo.len / 9))
 
 proc openContext(gfx: RGfx): RGfxContext =
   var ctx = RGfxContext(
@@ -192,7 +210,7 @@ proc openContext(gfx: RGfx): RGfxContext =
 
 proc newRGfx*(width, height: int): RGfx =
   var gfx = RGfx(
-    width: width, height: height
+    width: width, height: height,
   )
   return gfx
 
@@ -202,9 +220,16 @@ proc resize*(self: var RGfx, width, height: int) =
 
 proc load*(self: var RGfx, data: RData) =
   self.data = data
+  self.textures = newTable[string, Texture2D]()
+  for name, img in data.images:
+    var tex = newTexture2D(
+      (img.width, img.height), img.data,
+      pfRgba, pfRgba, GL_UNSIGNED_BYTE
+    )
+    self.textures.add(name, tex)
 
 proc start*(self: var RGfx) =
-  self.defaultProgram = newProgram(rDefaultVsh, rDefaultFsh)
+  self.defaultProgram = newProgram(rDefaultVsh, rDefaultFsh).link()
   var vao = newVAO()
   var vbo = newVBO(8196, vboDynamic)
   with(vao):
@@ -216,6 +241,7 @@ proc start*(self: var RGfx) =
       )
   self.vao = vao
   self.vbo = vbo
+  glFrontFace(GL_CW)
 
 proc render*(self: var RGfx, f: proc (ctx: var RGfxContext)) =
   var ctx = openContext(self)

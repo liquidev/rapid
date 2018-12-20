@@ -2,17 +2,17 @@ import strutils, re
 
 import yaml/dom
 
+import ../gfx/globjects
+
 type
   RMetaData* = object
     images*: seq[RImgMeta]
     texconfs*: seq[RTexconfMeta]
   RImgMeta* = object
     id*, file*, texture*: string
-  RTexInterp* = enum
-    tiNearest, tiLinear
   RTexconfMeta* = object
     id*: string
-    interpMin*, interpMag*: RTexInterp
+    interpMin*, interpMag*: TexInterp
     mipmaps*: bool
 
 let
@@ -44,8 +44,8 @@ proc dTexconf(data: var RMetaData, ident, rest: string, node: YamlNode) =
   )
   for k, v in pairs(node):
     case k.content
-    of "interpMin": conf.interpMin = parseEnum[RTexInterp]("ti" & v.content.capitalizeAscii)
-    of "interpMag": conf.interpMag = parseEnum[RTexInterp]("ti" & v.content.capitalizeAscii)
+    of "interpMin": conf.interpMin = parseEnum[TexInterp]("ti" & v.content.capitalizeAscii)
+    of "interpMag": conf.interpMag = parseEnum[TexInterp]("ti" & v.content.capitalizeAscii)
     of "mipmaps": conf.mipmaps = parseBool(v.content)
   data.texconfs.add(conf)
 
@@ -68,8 +68,6 @@ proc parseData*(rd: string): RMetaData =
       else:
         raise newException(KeyError, "rd: a resdef key must be a valid definition (type ident ...)")
   except: raise
-
-  echo result
 
 when defined(testDataDSL):
   const sampleData = slurp("../../examples/10-resources/data/resources.yaml")

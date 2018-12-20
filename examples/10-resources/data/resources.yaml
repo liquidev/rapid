@@ -8,7 +8,7 @@ texconf smooth: {} # default settings when doesn't inherit
 texconf ~ of smooth: {} # texconfs can inherit from each other
 
 # images
-img myImage: image.png ~pixel
+# img myImage: image.png ~pixel # commented because slows down loading
 img rapidLogo: logo-1024.png # will use the default ~ texture config
 
 # sounds

@@ -14,7 +14,7 @@ A game engine written in Nim, optimized for rapid game development and prototypi
 
 ## Examples
 
-*Note: At this point in time, these examples don't work. They're merely a draft of what I'd like the API to be in the end.*
+*Note: At this point in time, most of these examples don't work. They're merely a draft of what I'd like the API to be in the end.*
 
 ### Opening a window
 ```dart
@@ -40,6 +40,47 @@ win.loop {|ctx|
   ctx.rect(32, 32, 64, 64)
   ctx.draw() // uses RGfx.prIndices by default
 }
+```
+
+### Loading data
+```yaml
+# data/resources.yaml
+%YAML 1.2
+---
+texconf ~: {} # default settings
+
+img logo: logo-1024.png
+```
+
+```dart
+var win = RWindow.new()
+  .size(800, 600)
+  .open()
+
+var data = RData.load() // takes an optional folder param
+win.load(data)
+
+win.loop {|ctx|
+  ctx.clear(RColor.rgb(255, 255, 255))
+  ctx.begin()
+  ctx.texture("logo") // uses identifiers from YAML
+  ctx.rectuv(0, 0, 1, 1)
+  ctx.rect(32, 32, 128, 128)
+  ctx.draw()
+}
+```
+
+### Using rapid in Nim
+The API is very similar to Wren, however, due to the lack of constructors, procedures must be used:
+```nim
+import rapid
+
+var win = newRWindow()
+  .size(800, 600)
+  .open()
+
+win.loop do (ctx: var RGfxContext):
+  ctx.clear(color(255, 255, 255))
 ```
 
 Check out more examples in the `/examples` directory!

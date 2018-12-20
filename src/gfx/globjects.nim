@@ -1,3 +1,7 @@
+## rapid - OpenGL wrapper
+## copyright (c) iLiquid, 2018
+## This module contains some OOP wrappers for OpenGL objects, to simplify coding.
+
 import sequtils
 
 import ../lib/glad/gl
@@ -131,6 +135,8 @@ type
   Shader* = object of GLObject
   VertexShader* = object of Shader
   FragmentShader* = object of Shader
+  ShaderType* = enum
+    stVert, stFrag
 
 proc newVertexShader*(sourceCode: string): VertexShader =
   ## Creates a new vertex shader from source code.
@@ -176,38 +182,92 @@ proc newFragmentShader*(sourceCode: string): FragmentShader =
 
 type
   Program* = object of GLObject
+    vertShaders, fragShaders: seq[GLuint]
+  UniformPrimitive =
+    float32 | int32 | uint32
+  UniformVec =
+    tuple[x, y: UniformPrimitive] | tuple[x, y, z: UniformPrimitive] | tuple[x, y, z, w: UniformPrimitive]
+  UniformType =
+    UniformPrimitive | UniformVec
 
-proc newProgram*(vsh: VertexShader, fsh: FragmentShader): Program =
+var currentProgram*: GLuint
+
+template with*(program: Program, stmts: untyped) =
+  let previousProgram = currentProgram
+  currentProgram = program.id
+  glUseProgram(currentProgram)
+  stmts
+  currentProgram = previousProgram
+  glUseProgram(currentProgram)
+
+proc use*(program: Program) =
+  currentProgram = program.id
+  glUseProgram(currentProgram)
+
+proc newProgram*(): Program =
   ## Creates a new shader program.
-  ## Note that this destroys the shaders in the process, so they can't be reused after that.
-
-  # create the program
   let prog_id = glCreateProgram()
-  glAttachShader(prog_id, vsh.id)
-  glAttachShader(prog_id, fsh.id)
-  glLinkProgram(prog_id)
-  # check for errors
-  var success: GLint
-  glGetProgramiv(prog_id, GL_LINK_STATUS, addr success)
-  if success != 1:
-    var len: GLint; glGetProgramiv(prog_id, GL_INFO_LOG_LENGTH, addr len)
-    var err = cast[ptr GLchar](alloc(len))
-    glGetProgramInfoLog(prog_id, len, addr len, err)
-    raise newException(LibraryError, $err)
-  # destroy the shaders
-  glDeleteShader(vsh.id)
-  glDeleteShader(fsh.id)
-  # return the program
   return Program(id: prog_id)
 
+proc attach*(program: Program, vsh: VertexShader): Program =
+  ## Attaches a vertex shader to the program.
+  var program = program
+  glAttachShader(program.id, vsh.id)
+  program.vertShaders.add(vsh.id)
+  program
+
+proc attach*(program: Program, fsh: FragmentShader): Program =
+  ## Attaches a fragment shader to the program.
+  var program = program
+  glAttachShader(program.id, fsh.id)
+  program.fragShaders.add(fsh.id)
+  program
+
+proc attach*(program: Program, shaderType: ShaderType, source: string): Program =
+  ## Creates and attaches a shader of type ``shaderType`` from ``source``.
+  case shaderType
+  of stVert: result = program.attach(newVertexShader(source))
+  of stFrag: result = program.attach(newFragmentShader(source))
+
+proc link*(program: Program): Program =
+  ## Links the program. Note that this destroys all of its attached shaders in the process, and they can't be reused.
+  glLinkProgram(program.id)
+  var success: GLint
+  glGetProgramiv(program.id, GL_LINK_STATUS, addr success)
+  if success != 1:
+    var len: GLint; glGetProgramiv(program.id, GL_INFO_LOG_LENGTH, addr len)
+    var err = cast[ptr GLchar](alloc(len))
+    glGetProgramInfoLog(program.id, len, addr len, err)
+    raise newException(LibraryError, $err)
+  for v in program.vertShaders: glDeleteShader(v)
+  for f in program.fragShaders: glDeleteShader(f)
+  result = program
+
+proc uniform*[T: UniformType](program: Program, name: string, value: T) =
+  let loc = glGetUniformLocation(program.id, name.cstring)
+  case T
+  of float32: glUniform1f(loc, value)
+  of tuple[x, y: float32]: glUniform2f(loc, value.x, value.y)
+  of tuple[x, y, z: float32]: glUniform3f(loc, value.x, value.y, value.z)
+  of tuple[x, y, z, w: float32]: glUniform4f(loc, value.x, value.y, value.z, value.w)
+  of int32: glUniform1i(loc, value)
+  of tuple[x, y: int32]: glUniform2i(loc, value.x, value.y)
+  of tuple[x, y, z: int32]: glUniform3i(loc, value.x, value.y, value.z)
+  of tuple[x, y, z, w: int32]: glUniform4i(loc, value.x, value.y, value.z, value.w)
+  of uint32: glUniform1i(loc, value)
+  of tuple[x, y: uint32]: glUniform2ui(loc, value.x, value.y)
+  of tuple[x, y, z: uint32]: glUniform3ui(loc, value.x, value.y, value.z)
+  of tuple[x, y, z, w: uint32]: glUniform4ui(loc, value.x, value.y, value.z, value.w)
+
+# TODO: Array uniforms
+
 proc newProgram*(vertSource, fragSource: string): Program =
-  ## Creates a new shader program.
-  ## This is an overload that accepts strings as parameters, to simplify coding and remove unneccessary \
-  ## type conversions.
-  return newProgram(
-    newVertexShader(vertSource),
-    newFragmentShader(fragSource)
-  )
+  ## Creates a new shader program with pre-attached vertex and fragment shaders,
+  ## which are built from ``vertSource`` and ``fragSource``.
+  ## Note that the shader still must be manually linked afterwards.
+  return newProgram()
+    .attach(newVertexShader(vertSource))
+    .attach(newFragmentShader(fragSource))
 
 ###
 # Primitives
@@ -227,3 +287,44 @@ template toGLenum*(primitive: Primitive): untyped =
     of prTriStrip: GL_TRIANGLE_STRIP
     of prTriFan: GL_TRIANGLE_FAN
     of prTris: GL_TRIANGLES
+
+###
+# Textures
+###
+
+type
+  Texture2D* = object of GLObject
+  PixFormat* = enum
+    pfRgb = GL_RGB
+    pfRgba = GL_RGBA
+  TexWrap* = enum
+    twRepeat, twMirrorRepeat, twClampEdge, twClampBorder
+  TexInterp* = enum
+    tiNearest, tiLinear
+
+var currentTexture*: GLuint
+
+template with*(texture: Texture2D, stmts: untyped) =
+  let previousTexture = currentTexture
+  currentTexture = texture.id
+  glBindTexture(GL_TEXTURE_2D, currentTexture)
+  stmts
+  currentTexture = previousTexture
+  glBindTexture(GL_TEXTURE_2D, currentTexture)
+
+proc newTexture2D*(
+    size: tuple[width, height: int], data: string,
+    internalFmt: PixFormat, fmt: PixFormat, dataType: GLenum): Texture2D =
+  var texture_id: GLuint
+  glGenTextures(1, addr texture_id)
+  var texture = Texture2D(id: texture_id)
+  with(texture):
+    glTexImage2D(
+      GL_TEXTURE_2D, 0, internalFmt.GLint,
+      size.width.GLsizei, size.height.GLsizei, 0,
+      fmt.GLenum, dataType, data.cstring)
+  result = texture
+
+proc genMipmap*(tex: Texture2D) =
+  with(tex):
+    glGenerateMipmap(GL_TEXTURE_2D)

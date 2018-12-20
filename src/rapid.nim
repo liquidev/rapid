@@ -27,10 +27,10 @@ when isMainModule:
   var res = loadRData("examples/10-resources/data")
   win.load(res)
   win.loop do (ctx: var RGfxContext):
-    ctx.clear(color(0, 0, 0))
+    ctx.clear(color(16, 16, 16))
     ctx.begin()
-    ctx.color(color(0, 255, 0))
-    ctx.circle(ctx.width / 4, ctx.height / 4, 64)
+    #ctx.color(color(0, 255, 0))
+    #ctx.circle(ctx.width / 4, ctx.height / 4, 64)
     ctx.color(color(255, 0, 255))
     ctx.rect(32, 32, 128, 64)
     ctx.draw(prTris)
