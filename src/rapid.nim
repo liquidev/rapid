@@ -21,6 +21,7 @@ export
 when isMainModule:
   var win = newRWindow()
     .size(800, 600)
+    #.resizable(true)
     .title("rapid test game")
     .open()
   win.debug(true)
@@ -32,5 +33,6 @@ when isMainModule:
     #ctx.color(color(0, 255, 0))
     #ctx.circle(ctx.width / 4, ctx.height / 4, 64)
     ctx.color(color(255, 0, 255))
+    ctx.texture("rapidLogo")
     ctx.rect(32, 32, 128, 64)
-    ctx.draw(prTris)
+    ctx.draw()

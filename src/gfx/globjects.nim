@@ -20,11 +20,11 @@ type
 
 type
   VertexBuffer* = object of GLObject
-    usage: VBOType
-    vertices*: seq[float32]
+    usage: BufferUsage
+    vertices: seq[float32]
     capacity, initcap: int
-  VBOType* = enum
-    vboStatic, vboDynamic, vboStream
+  BufferUsage* = enum
+    bufStatic, bufDynamic, bufStream
   VertexAttrType* = enum
     vaFloat
   VertexAttrSize* = enum
@@ -40,27 +40,28 @@ template with*(buf: VertexBuffer, stmts: untyped) =
   currentVBO = previousVBO
   glBindBuffer(GL_ARRAY_BUFFER, currentVBO)
 
-proc realloc*(buf: var VertexBuffer, usage: VBOType) =
+proc realloc*(buf: var VertexBuffer, usage: BufferUsage) =
+  ## Reallocates the buffer's memory.
   buf.usage = usage
   with(buf):
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * buf.capacity, nil, case usage
-      of vboStream: GL_STREAM_DRAW
-      of vboStatic: GL_STATIC_DRAW
-      of vboDynamic: GL_DYNAMIC_DRAW)
+      of bufStream: GL_STREAM_DRAW
+      of bufStatic: GL_STATIC_DRAW
+      of bufDynamic: GL_DYNAMIC_DRAW)
 
 proc update*(buf: VertexBuffer, offset: int, size: int) =
+  ## Updates a chunk of the buffer's memory.
   with(buf):
     glBufferSubData(GL_ARRAY_BUFFER,
       sizeof(float) * offset, sizeof(float) * size,
       buf.vertices[0].unsafeAddr)
-    discard
 
 proc len*(buf: VertexBuffer): int =
-  ## Returns the length of an attribute's data.
+  ## Returns the length of the buffer's data.
   result = buf.vertices.len
 
 proc add*(buf: var VertexBuffer, vertices: varargs[float32]) =
-  ## Adds values to a specified parameter in the VBO.
+  ## Adds values to the VBO. This doesn't update any GPU memory!
   # expand the buffer if necessary
   if buf.len + vertices.len > buf.capacity:
     buf.capacity += buf.initcap
@@ -70,6 +71,7 @@ proc add*(buf: var VertexBuffer, vertices: varargs[float32]) =
     buf.vertices.add(v)
 
 proc attribs*(buf: var VertexBuffer, attribs: varargs[tuple[attrType: VertexAttrType, size: VertexAttrSize]]) =
+  ## Sets the vertex attributes for this VBO.
   proc typesize(t: VertexAttrType): int =
     result = case t
       of vaFloat: sizeof(float32)
@@ -86,9 +88,11 @@ proc attribs*(buf: var VertexBuffer, attribs: varargs[tuple[attrType: VertexAttr
     offset += a.size.int * typesize(a.attrType)
 
 proc clear*(buf: var VertexBuffer) =
+  ## Clears the vertex buffer. This doesn't update any GPU memory!
   buf.vertices.setLen(0)
 
-proc newVBO*(capacity: int, usage: VBOType): VertexBuffer =
+proc newVBO*(capacity: int, usage: BufferUsage): VertexBuffer =
+  ## Creates a new VBO with the specified capacity, and allocates memory for it.
   var vbo_id: GLuint
   glGenBuffers(1, addr vbo_id)
   var buf = VertexBuffer(
@@ -100,7 +104,77 @@ proc newVBO*(capacity: int, usage: VBOType): VertexBuffer =
   result = buf
 
 ###
-# Vertex Attributes
+# Element Buffers
+###
+
+type
+  ElementBuffer* = object of GLObject
+    usage: BufferUsage
+    indices: seq[uint32]
+    initcap, capacity: int
+
+var currentEBO*: GLuint
+
+template with*(buf: ElementBuffer, stmts: untyped) =
+  let previousEBO = currentEBO
+  currentEBO = buf.id
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, currentEBO)
+  stmts
+  currentEBO = previousEBO
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, currentEBO)
+
+proc use*(buf: ElementBuffer) =
+  currentEBO = buf.id
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, currentEBO)
+
+proc realloc*(buf: var ElementBuffer, usage: BufferUsage) =
+  ## Reallocates the buffer's memory.
+  buf.usage = usage
+  with(buf):
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32) * buf.capacity, nil, case usage
+      of bufStream: GL_STREAM_DRAW
+      of bufStatic: GL_STATIC_DRAW
+      of bufDynamic: GL_DYNAMIC_DRAW)
+
+proc update*(buf: ElementBuffer, offset: int, size: int) =
+  ## Updates a chunk of the buffer's memory.
+  with(buf):
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER,
+      sizeof(float) * offset, sizeof(float) * size,
+      buf.indices[0].unsafeAddr)
+
+proc len*(buf: ElementBuffer): int =
+  ## Returns the length of the buffer's data.
+  result = buf.indices.len
+
+proc add*(buf: var ElementBuffer, indices: varargs[uint32]) =
+  ## Adds values to the EBO. This doesn't send anything to the GPU!
+  # expand the buffer if necessary
+  if buf.len + indices.len > buf.capacity:
+    buf.capacity += buf.initcap
+    buf.realloc(buf.usage)
+  # put the data into the array
+  for i, e in indices:
+    buf.indices.add(e)
+
+proc clear*(buf: var ElementBuffer) =
+  ## Clears the EBO. This doesn't send anything to the GPU!
+  buf.indices.setLen(0)
+
+proc newEBO*(capacity: int, usage: BufferUsage): ElementBuffer =
+  ## Creates a new EBO with the specified capacity, and allocates memory for it.
+  var ebo_id: GLuint
+  glGenBuffers(1, addr ebo_id)
+  var buf = ElementBuffer(
+    id: ebo_id, usage: usage,
+    initcap: capacity,
+    indices: @[]
+  )
+  buf.realloc(usage)
+  result = buf
+
+###
+# Vertex Arrays
 ###
 
 type
@@ -183,12 +257,6 @@ proc newFragmentShader*(sourceCode: string): FragmentShader =
 type
   Program* = object of GLObject
     vertShaders, fragShaders: seq[GLuint]
-  UniformPrimitive =
-    float32 | int32 | uint32
-  UniformVec =
-    tuple[x, y: UniformPrimitive] | tuple[x, y, z: UniformPrimitive] | tuple[x, y, z, w: UniformPrimitive]
-  UniformType =
-    UniformPrimitive | UniformVec
 
 var currentProgram*: GLuint
 
@@ -243,21 +311,34 @@ proc link*(program: Program): Program =
   for f in program.fragShaders: glDeleteShader(f)
   result = program
 
-proc uniform*[T: UniformType](program: Program, name: string, value: T) =
-  let loc = glGetUniformLocation(program.id, name.cstring)
-  case T
-  of float32: glUniform1f(loc, value)
-  of tuple[x, y: float32]: glUniform2f(loc, value.x, value.y)
-  of tuple[x, y, z: float32]: glUniform3f(loc, value.x, value.y, value.z)
-  of tuple[x, y, z, w: float32]: glUniform4f(loc, value.x, value.y, value.z, value.w)
-  of int32: glUniform1i(loc, value)
-  of tuple[x, y: int32]: glUniform2i(loc, value.x, value.y)
-  of tuple[x, y, z: int32]: glUniform3i(loc, value.x, value.y, value.z)
-  of tuple[x, y, z, w: int32]: glUniform4i(loc, value.x, value.y, value.z, value.w)
-  of uint32: glUniform1i(loc, value)
-  of tuple[x, y: uint32]: glUniform2ui(loc, value.x, value.y)
-  of tuple[x, y, z: uint32]: glUniform3ui(loc, value.x, value.y, value.z)
-  of tuple[x, y, z, w: uint32]: glUniform4ui(loc, value.x, value.y, value.z, value.w)
+template uloc() {.dirty.} =
+  let loc = glGetUniformLocation(prog.id, name)
+
+# TODO: use macros for this
+proc uniform*(prog: Program, name: string, v: float32) =
+  uloc(); with(prog): glUniform1f(loc, v)
+proc uniform*(prog: Program, name: string, v: tuple[x, y: float32]) =
+  uloc(); with(prog): glUniform2f(loc, v.x, v.y)
+proc uniform*(prog: Program, name: string, v: tuple[x, y, z: float32]) =
+  uloc(); with(prog): glUniform3f(loc, v.x, v.y, v.z)
+proc uniform*(prog: Program, name: string, v: tuple[x, y, z, w: float32]) =
+  uloc(); with(prog): glUniform4f(loc, v.x, v.y, v.z, v.w)
+proc uniform*(prog: Program, name: string, v: int32) =
+  uloc(); with(prog): glUniform1i(loc, v)
+proc uniform*(prog: Program, name: string, v: tuple[x, y: int32]) =
+  uloc(); with(prog): glUniform2i(loc, v.x, v.y)
+proc uniform*(prog: Program, name: string, v: tuple[x, y, z: int32]) =
+  uloc(); with(prog): glUniform3i(loc, v.x, v.y, v.z)
+proc uniform*(prog: Program, name: string, v: tuple[x, y, z, w: int32]) =
+  uloc(); with(prog): glUniform4i(loc, v.x, v.y, v.z, v.w)
+proc uniform*(prog: Program, name: string, v: uint32) =
+  uloc(); with(prog): glUniform1ui(loc, v)
+proc uniform*(prog: Program, name: string, v: tuple[x, y: uint32]) =
+  uloc(); with(prog): glUniform2ui(loc, v.x, v.y)
+proc uniform*(prog: Program, name: string, v: tuple[x, y, z: uint32]) =
+  uloc(); with(prog): glUniform3ui(loc, v.x, v.y, v.z)
+proc uniform*(prog: Program, name: string, v: tuple[x, y, z, w: uint32]) =
+  uloc(); with(prog): glUniform4ui(loc, v.x, v.y, v.z, v.w)
 
 # TODO: Array uniforms
 
@@ -328,3 +409,26 @@ proc newTexture2D*(
 proc genMipmap*(tex: Texture2D) =
   with(tex):
     glGenerateMipmap(GL_TEXTURE_2D)
+
+proc `wrap=`*(tex: Texture2D, wrapping: TexWrap) =
+  with(tex):
+    let enumWrapping = case wrapping:
+      of twRepeat: GL_REPEAT
+      of twMirrorRepeat: GL_MIRRORED_REPEAT
+      of twClampEdge: GL_CLAMP_TO_EDGE
+      of twClampBorder: GL_CLAMP_TO_BORDER
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, enumWrapping.GLint)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, enumWrapping.GLint)
+
+proc toGLenum(e: TexInterp): GLenum =
+  result = case e:
+    of tiNearest: GL_NEAREST
+    of tiLinear: GL_LINEAR
+
+proc `minFilter=`*(tex: Texture2D, filter: TexInterp) =
+  with(tex):
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter.toGLenum.GLint)
+
+proc `magFilter=`*(tex: Texture2D, filter: TexInterp) =
+  with(tex):
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter.toGLenum.GLint)

@@ -113,33 +113,33 @@ proc debugCallback(
     userParam: pointer) {.stdcall.} =
   echo "rd/gl debug | type: " & $etype & "; severity: " & $severity & "; message: " & $message
 
-proc registerCallbacks(self: RWindow) =
+proc registerCallbacks(self: ptr RWindow) =
   var win = self.glwindow
-  self.glwindow.charCb = proc (w: Window, codePoint: Rune) = self.events.onChar(codePoint.toUTF8())
+  win.charCb = proc (w: Window, codePoint: Rune) = self.events.onChar(codePoint.toUTF8())
   win.keyCb = proc (w: Window, key: Key, scancode: int32, action: KeyAction, mods: set[ModifierKey]) =
     case action
     of kaDown: self.events.onKeyDown(key, scancode)
     of kaRepeat: self.events.onKeyRepeat(key, scancode)
     of kaUp: self.events.onKeyUp(key, scancode)
-  self.glwindow.mouseButtonCb = proc (w: Window, button: MouseButton, pressed: bool, modKeys: set[ModifierKey]) =
+  win.mouseButtonCb = proc (w: Window, button: MouseButton, pressed: bool, modKeys: set[ModifierKey]) =
     if pressed: self.events.onMousePress(button)
     else: self.events.onMouseRelease(button)
-  self.glwindow.cursorPositionCb = proc (w: Window, pos: tuple[x, y: float64]) = self.events.onMouseMove(pos.x, pos.y)
-  self.glwindow.cursorEnterCb = proc (w: Window, entered: bool) =
+  win.cursorPositionCb = proc (w: Window, pos: tuple[x, y: float64]) = self.events.onMouseMove(pos.x, pos.y)
+  win.cursorEnterCb = proc (w: Window, entered: bool) =
     if entered: self.events.onMouseEnter()
     else: self.events.onMouseLeave()
-  self.glwindow.scrollCb = proc (w: Window, off: tuple[x, y: float64]) = self.events.onMouseWheel(off.x, off.y)
-  self.glwindow.windowCloseCb = proc (w: Window) =
+  win.scrollCb = proc (w: Window, off: tuple[x, y: float64]) = self.events.onMouseWheel(off.x, off.y)
+  win.windowCloseCb = proc (w: Window) =
     let close = self.events.onClose()
     win.shouldClose = close
-  self.glwindow.windowSizeCb = proc (w: Window, size: tuple[w, h: int32]) =
-    var wg = self.gfx
-    wg.resize(size.w, size.h)
+  win.windowSizeCb = proc (w: Window, size: tuple[w, h: int32]) =
+    self.gfx.resize(size.w, size.h)
     self.events.onResize(size.w, size.h)
 
   if self.gldebug:
     glEnable(GL_DEBUG_OUTPUT)
     glDebugMessageCallback(debugCallback, cast[pointer](0))
+
 
 proc load*(self: var RWindow, data: RData) =
   self.gfx.load(data)
@@ -150,7 +150,7 @@ proc render*(self: var RWindow, f: proc (ctx: var RGfxContext)) =
 
 proc loop*(self: var RWindow, loopf: proc (ctx: var RGfxContext)) =
   var win = self.glwindow
-  registerCallbacks(self)
+  registerCallbacks(addr self)
 
   var gfx = self.gfx
 
