@@ -13,6 +13,7 @@ type
   RTexconfMeta* = object
     id*: string
     interpMin*, interpMag*: TexInterp
+    wrap*: TexWrap
     mipmaps*: bool
 
 let
@@ -31,6 +32,7 @@ proc dTexconf(data: var RMetaData, ident, rest: string, node: YamlNode) =
   var parent = RTexconfMeta(
     id: "__rd__",
     interpMin: tiLinear, interpMag: tiLinear,
+    wrap: twRepeat,
     mipmaps: true
   )
   if rest =~ reInherit:
@@ -40,12 +42,14 @@ proc dTexconf(data: var RMetaData, ident, rest: string, node: YamlNode) =
   var conf = RTexconfMeta(
     id: ident,
     interpMin: parent.interpMin, interpMag: parent.interpMag,
+    wrap: parent.wrap,
     mipmaps: parent.mipmaps
   )
   for k, v in pairs(node):
     case k.content
     of "interpMin": conf.interpMin = parseEnum[TexInterp]("ti" & v.content.capitalizeAscii)
     of "interpMag": conf.interpMag = parseEnum[TexInterp]("ti" & v.content.capitalizeAscii)
+    of "wrap": conf.wrap = parseEnum[TexWrap]("tw" & v.content.capitalizeAscii)
     of "mipmaps": conf.mipmaps = parseBool(v.content)
   data.texconfs.add(conf)
 

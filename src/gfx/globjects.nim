@@ -2,9 +2,19 @@
 ## copyright (c) iLiquid, 2018
 ## This module contains some OOP wrappers for OpenGL objects, to simplify coding.
 
-import sequtils
+import sequtils, tables
 
 import ../lib/glad/gl
+
+###
+# Helper primitive types
+###
+
+type
+  Scalar*[T] = T
+  Vec2*[T] = tuple[x, y: T]
+  Vec3*[T] = tuple[x, y, z: T]
+  Vec4*[T] = tuple[x, y, z, w: T]
 
 ###
 # Base OpenGL object
@@ -257,6 +267,7 @@ proc newFragmentShader*(sourceCode: string): FragmentShader =
 type
   Program* = object of GLObject
     vertShaders, fragShaders: seq[GLuint]
+    uniformLocations: TableRef[string, GLint]
 
 var currentProgram*: GLuint
 
@@ -275,7 +286,10 @@ proc use*(program: Program) =
 proc newProgram*(): Program =
   ## Creates a new shader program.
   let prog_id = glCreateProgram()
-  return Program(id: prog_id)
+  result = Program(
+    id: prog_id,
+    uniformLocations: newTable[string, GLint]()
+  )
 
 proc attach*(program: Program, vsh: VertexShader): Program =
   ## Attaches a vertex shader to the program.
@@ -312,32 +326,37 @@ proc link*(program: Program): Program =
   result = program
 
 template uloc() {.dirty.} =
-  let loc = glGetUniformLocation(prog.id, name)
+  var loc: GLint
+  if name in prog.uniformLocations:
+    loc = prog.uniformLocations[name]
+  else:
+    loc = glGetUniformLocation(prog.id, name)
+    prog.uniformLocations.add(name, loc)
 
 # TODO: use macros for this
-proc uniform*(prog: Program, name: string, v: float32) =
-  uloc(); with(prog): glUniform1f(loc, v)
-proc uniform*(prog: Program, name: string, v: tuple[x, y: float32]) =
+proc uniform*(prog: Program, name: string, v: Scalar[float32]) =
+  uloc(); with(prog): glUniform1f(loc, GLfloat v)
+proc uniform*(prog: Program, name: string, v: Vec2[float32]) =
   uloc(); with(prog): glUniform2f(loc, v.x, v.y)
-proc uniform*(prog: Program, name: string, v: tuple[x, y, z: float32]) =
+proc uniform*(prog: Program, name: string, v: Vec3[float32]) =
   uloc(); with(prog): glUniform3f(loc, v.x, v.y, v.z)
-proc uniform*(prog: Program, name: string, v: tuple[x, y, z, w: float32]) =
+proc uniform*(prog: Program, name: string, v: Vec4[float32]) =
   uloc(); with(prog): glUniform4f(loc, v.x, v.y, v.z, v.w)
-proc uniform*(prog: Program, name: string, v: int32) =
-  uloc(); with(prog): glUniform1i(loc, v)
-proc uniform*(prog: Program, name: string, v: tuple[x, y: int32]) =
+proc uniform*(prog: Program, name: string, v: Scalar[int32]) =
+  uloc(); with(prog): glUniform1i(loc, GLint v)
+proc uniform*(prog: Program, name: string, v: Vec2[int32]) =
   uloc(); with(prog): glUniform2i(loc, v.x, v.y)
-proc uniform*(prog: Program, name: string, v: tuple[x, y, z: int32]) =
+proc uniform*(prog: Program, name: string, v: Vec3[int32]) =
   uloc(); with(prog): glUniform3i(loc, v.x, v.y, v.z)
-proc uniform*(prog: Program, name: string, v: tuple[x, y, z, w: int32]) =
+proc uniform*(prog: Program, name: string, v: Vec4[int32]) =
   uloc(); with(prog): glUniform4i(loc, v.x, v.y, v.z, v.w)
-proc uniform*(prog: Program, name: string, v: uint32) =
-  uloc(); with(prog): glUniform1ui(loc, v)
-proc uniform*(prog: Program, name: string, v: tuple[x, y: uint32]) =
+proc uniform*(prog: Program, name: string, v: Scalar[uint32]) =
+  uloc(); with(prog): glUniform1ui(loc, GLuint v)
+proc uniform*(prog: Program, name: string, v: Vec2[uint32]) =
   uloc(); with(prog): glUniform2ui(loc, v.x, v.y)
-proc uniform*(prog: Program, name: string, v: tuple[x, y, z: uint32]) =
+proc uniform*(prog: Program, name: string, v: Vec3[uint32]) =
   uloc(); with(prog): glUniform3ui(loc, v.x, v.y, v.z)
-proc uniform*(prog: Program, name: string, v: tuple[x, y, z, w: uint32]) =
+proc uniform*(prog: Program, name: string, v: Vec4[uint32]) =
   uloc(); with(prog): glUniform4ui(loc, v.x, v.y, v.z, v.w)
 
 # TODO: Array uniforms
@@ -391,6 +410,10 @@ template with*(texture: Texture2D, stmts: untyped) =
   glBindTexture(GL_TEXTURE_2D, currentTexture)
   stmts
   currentTexture = previousTexture
+  glBindTexture(GL_TEXTURE_2D, currentTexture)
+
+proc use*(texture: Texture2D) =
+  currentTexture = texture.id
   glBindTexture(GL_TEXTURE_2D, currentTexture)
 
 proc newTexture2D*(

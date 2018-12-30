@@ -6,6 +6,7 @@ import ../data/data
 import globjects
 import color
 import ../rmath
+import ../scripting/autowren
 
 const rDefaultVsh* = """
 #version 330 core
@@ -100,18 +101,18 @@ proc shader*(ctx: var RGfxContext, shader: Program) =
   ## Uses the specified shader program.
   ctx.program = shader
 
-proc uniform*(ctx: RGfxContext, name: string, value: float32) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y: float32]) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y, z: float32]) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y, z, w: float32]) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: int32) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y: int32]) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y, z: int32]) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y, z, w: int32]) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: uint32) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y: uint32]) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y, z: uint32]) = ctx.program.uniform(name, value)
-proc uniform*(ctx: RGfxContext, name: string, value: tuple[x, y, z, w: uint32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Scalar[float32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec2[float32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec3[float32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec4[float32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Scalar[int32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec2[int32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec3[int32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec4[int32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Scalar[uint32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec2[uint32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec3[uint32]) = ctx.program.uniform(name, value)
+proc uniform*(ctx: RGfxContext, name: string, value: Vec4[uint32]) = ctx.program.uniform(name, value)
 
 proc color*(ctx: var RGfxContext, color: RColor) =
   ## Sets the vertex color for subsequent `vertex()` calls.
@@ -123,28 +124,28 @@ proc colors*(ctx: var RGfxContext, colors: varargs[RColor]) =
 
 proc tint*(ctx: var RGfxContext, color: RColor) =
   ## Sets the tint color for subsequent `draw()` calls.
-  ## The tint is different from the vertex color, because unlike the vertex color, it doesn't affect the next vertex,
-  ## but the whole rendered primitive.
+  ## The tint is different from the vertex color, because unlike the vertex color, it's passed to the fragment shader.
   ctx.colTint = color
 
 proc texture*(ctx: var RGfxContext, texture: string) =
   ## Sets the active texture to draw with.
   ctx.texture = ctx.gfx.textures[texture]
-  ctx.textureEnabled = true
-  ctx.uniform("texture0e", 1'i32)
+  glActiveTexture(GL_TEXTURE0)
+  ctx.texture.use()
+  ctx.uniform("texEnabled", 1'i32)
 
 proc texture*(ctx: var RGfxContext) =
   ## Disables textures and draws with white.
-  ctx.textureEnabled = false
-  ctx.uniform("texture0e", 0'i32)
+  glActiveTexture(GL_TEXTURE0)
+  ctx.uniform("texEnabled", 0'i32)
 
 proc uv*(ctx: var RGfxContext, u, v: float32) =
   ## Sets the UV coordinates for subsequent vertex calls.
   ctx.texUV = (u, v)
 
-proc uvs*(ctx: var RGfxContext, uvs: varargs[tuple[u, v: float32]]) =
+proc uvs*(ctx: var RGfxContext, uvs: varargs[tuple[u, v: float]]) =
   ## Queues UV coordinates for vertices.
-  for uv in uvs: ctx.texUVq.addLast(uv)
+  for uv in uvs: ctx.texUVq.addLast((float32 uv.u, float32 uv.v))
 
 proc coordSpace*(ctx: var RGfxContext, space: RGfxCoordSpace) =
   ## Sets the vertex coordinate space.
@@ -266,7 +267,6 @@ proc draw*(ctx: RGfxContext, primitive: RPrimitive = rpIndexedTris) =
           else: GL_TRIANGLES, 0, GLsizei(ctx.vbo.len / 9))
       of rpIndexedTris, rpIndexedLines:
         ctx.ebo.update(0, ctx.ebo.len)
-        echo glGetError()
         ctx.ebo.use()
         glDrawElements(case primitive:
           of rpIndexedTris: GL_TRIANGLES
@@ -278,6 +278,7 @@ proc openContext(gfx: RGfx): RGfxContext =
     gfx: gfx,
     vao: gfx.vao, vbo: gfx.vbo, ebo: gfx.ebo,
     colVertex: color(255, 255, 255), colTint: color(255, 255, 255),
+    texUVq: initDeque[tuple[u, v: float32]](),
     space: csAbsolute
   )
   glViewport(0, 0, gfx.width.GLint, gfx.height.GLint)
@@ -305,8 +306,11 @@ proc load*(self: var RGfx, data: RData) =
       (img.width, img.height), img.data,
       pfRgba, pfRgba, GL_UNSIGNED_BYTE
     )
-    with(tex):
-      glTexParameteriv(GL_TEXTURE_MIN_FILTER, )
+    var conf = img.config
+    tex.minFilter = conf.interpMin
+    tex.magFilter = conf.interpMag
+    tex.wrap = conf.wrap
+    if conf.mipmaps: tex.genMipmap()
     self.textures.add(name, tex)
 
 proc start*(self: var RGfx) =
@@ -325,9 +329,14 @@ proc start*(self: var RGfx) =
   self.vao = vao
   self.vbo = vbo
   self.ebo = ebo
-  glFrontFace(GL_CW)
+
+  glFrontFace(GL_CW) # more convenient to work with
+
+  glEnable(GL_BLEND)
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
 proc render*(self: var RGfx, f: proc (ctx: var RGfxContext)) =
   var ctx = openContext(self)
-  ctx.shader(self.defaultProgram)
+  shader(ctx, self.defaultProgram)
+  texture(ctx)
   f(ctx)
