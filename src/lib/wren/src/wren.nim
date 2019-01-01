@@ -36,18 +36,10 @@ proc register* (vm: ptr WrenVM, className, signature: string, fn: WrenForeignMet
 proc defaultConfig*: ptr WrenConfiguration =
   result = emptyConfig()
 
-  result.reallocateFn = proc (
-    memory: pointer; newSize: csize
-  ): pointer {.cdecl.} =
-    # later use dealloc(a)  ??
-    # might need to used shared mem (allocShared ?)
-    var a = realloc(memory, newSize)
-    return a
-
   result.writeFn = proc (vm: ptr WrenVM, s: cstring) {.cdecl.} =
     if s != "\n":
       echo "[echo]  \"", s, "\""
-  
+
   result.loadModuleFn = proc (vm: ptr WrenVM, name: cstring): cstring {.cdecl.} =
     let path = "./" & $name & ".wren"
     echo "[load]  loading module: ", path, "..."
@@ -56,7 +48,7 @@ proc defaultConfig*: ptr WrenConfiguration =
     return code
 
   result.errorFn = proc (
-    vm: ptr WrenVM, 
+    vm: ptr WrenVM,
     errorType: WrenErrorType,
     module: cstring,
     line: cint,
@@ -67,10 +59,10 @@ proc defaultConfig*: ptr WrenConfiguration =
     echo "[" & $line & "] " & mo & " ->  " & msg
 
   result.bindForeignMethodFn = proc (
-    vm: ptr WrenVM, 
-    module: cstring, 
-    className: cstring, 
-    isStatic: bool, 
+    vm: ptr WrenVM,
+    module: cstring,
+    className: cstring,
+    isStatic: bool,
     signature: cstring
   ): WrenForeignMethodFn {.cdecl.} =
     let ps = procString($className, $signature)
@@ -84,9 +76,3 @@ proc defaultConfig*: ptr WrenConfiguration =
       return nil
 
     return vmModules[vm][ps]
-
-
-proc runScript* (vm: ptr WrenVM, path: string) =
-  let script = readFile(path)
-  let result = interpret(vm, script)
-  if result != WREN_RESULT_SUCCESS: quit "[!!!!]  Script failed to compile"
