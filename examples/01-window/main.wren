@@ -9,6 +9,6 @@ var win = RWindow.new()
 
 // the main loop is started using win.loop
 win.loop {|ctx| // ctx is an RGfxContext, which is used for drawing
-  // clearing the window is as simple as this:
+  // clearing the window with a solid color is as simple as this:
   ctx.clear(RColor.rgb(255, 255, 255))
 }
