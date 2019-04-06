@@ -1,20 +1,20 @@
-## Package
+#~~
+# Package
+#~~
 
-version       = "0.1.0"
-author        = "iLiquid"
-description   = "Game engine optimized for rapid development and prototyping"
-license       = "MIT"
-srcDir        = "src"
-bin           = @["rapid"]
+version =
+  "0.1.0"
+author =
+  "iLiquid"
+description =
+  "A game engine for rapid development and easy prototyping"
+license =
+  "MIT"
+srcDir =
+  "src"
 
+#~~
+# Dependencies
+#~~
 
-## Dependencies
-
-# Nim
-requires "nim >= 0.19.0"
-
-# Data
-requires "yaml >= 0.11.0"
-
-# Multimedia
-requires "nimPNG >= 0.2.4"
+requires "nim >= 0.19.9"

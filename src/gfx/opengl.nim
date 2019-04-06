@@ -4,8 +4,5 @@
 # copyright (c) 2018, iLiquid
 #~~
 
-import lib/glfw/glfw
-
-import gfx/window
-
-export window
+type
+  GLError* = object of Exception
