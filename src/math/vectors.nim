@@ -5,4 +5,4 @@
 #~~
 
 type
-  GLError* = object of Exception
+  RPoint* = tuple[x, y: float]

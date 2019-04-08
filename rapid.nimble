@@ -18,3 +18,5 @@ srcDir =
 #~~
 
 requires "nim >= 0.19.9"
+
+requires "glm >= 1.1.1"

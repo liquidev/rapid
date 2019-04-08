@@ -1,7 +1,7 @@
 #~~
 # rapid
 # a game engine optimized for rapid prototyping
-# copyright (c) 2018, iLiquid
+# copyright (c) 2019, iLiquid
 #~~
 
 ## This module has everything related to windows.
@@ -12,11 +12,13 @@ import tables
 import times
 import unicode
 
+import ../debug
 import ../lib/glad/gl
 from ../lib/glfw/glfw import nil
 import opengl
 
 export glfw.Key
+export glfw.ModifierKey
 export glfw.MouseButton
 export times.cpuTime
 export unicode.Rune
@@ -29,22 +31,39 @@ type
   InitErrorKind = enum
     ieOK = "Init successful"
     ieGlfwInitFailed = "Failed to initialize GLFW"
+    ieGladLoadFailed = "Failed to load OpenGL procs"
   GLFWError* = object of Exception
     code: int
 
-proc initGl(): InitErrorKind =
+proc initGlfw(): InitErrorKind =
   if glfw.init() == 0:
     return ieGlfwInitFailed
   addQuitProc() do:
     glfw.terminate()
-  discard glfw.setErrorCallback() do (errCode: int32, msg: cstring) {.cdecl.}:
+  discard glfw.setErrorCallback() do (errCode: int32, msg: cstring):
     var err = newException(GLFWError, $msg)
     err.code = int errCode
     raise err
   return ieOK
 
+proc onGlDebug(source, kind: GLenum, id: GLuint, severity: GLenum,
+               length: GLsizei, msgPtr: ptr GLchar,
+               userParam: pointer) {.stdcall.} =
+  var msg = newString(length)
+  copyMem(msg[0].unsafeAddr, msgPtr, length)
+  debug("GL | kind ", kind, ", severity ", severity, ": ", msg)
+
+proc initGl(win: glfw.Window): InitErrorKind =
+  glfw.makeContextCurrent(win)
+  if not gladLoadGL(glfw.getProcAddress):
+    return ieGladLoadFailed
+  if GLAD_GL_KHR_debug:
+    glEnable(GL_DEBUG_OUTPUT)
+    glDebugMessageCallback(onGlDebug, nil)
+  return ieOK
+
 #~~
-# Windows
+# Window building
 #~~
 
 type
@@ -58,56 +77,15 @@ type
   #~~
   # Events
   #~~
-  # Gosh, turning a callback-based event system into an event queue and back is
-  # a pain. Why, GLFW, why!?
-  # This is needed to satisfy Nim's memory safety constrains, even though using
-  # callbacks directly in this circumstance would be perfectly memory safe.
-  # PRs aiming to improve this are very welcome.
-  #~~
-  WindowEventKind = enum
-    wevCharMods
-    wevCursorEnter
-    wevCursorMove
-    wevFilesDropped
-    wevKey
-    wevMouseButton
-    wevScroll
-    wevWindowClose
-    wevWindowSize
-  WindowEvent = object
-    case kind: WindowEventKind
-    of wevCharMods:
-      modsRune: Rune
-      charMods: int
-    of wevCursorEnter:
-      cursorEntered: bool
-    of wevCursorMove:
-      posX, posY: float
-    of wevFilesDropped:
-      filenames: seq[string]
-    of wevKey:
-      keyAction: glfw.KeyAction
-      key: glfw.Key
-      keyScancode: int
-      keyMods: int
-    of wevMouseButton:
-      buttonAction: glfw.KeyAction
-      button: glfw.MouseButton
-      buttonMods: int
-    of wevScroll:
-      scrollX, scrollY: float
-    of wevWindowSize:
-      width, height: Natural
-    else: discard
-  RCharFn* = proc (win: var RWindow, rune: Rune)
-  RCursorEnterFn* = proc (win: var RWindow)
-  RCursorMoveFn* = proc (win: var RWindow, x, y: float)
-  RFilesDroppedFn* = proc (win: var RWindow, filenames: seq[string])
-  RKeyFn* = proc (win: var RWindow, key: glfw.Key, scancode: int, mods: int)
-  RMouseFn* = proc (win: var RWindow, button: glfw.MouseButton, mods: int)
-  RScrollFn* = proc (win: var RWindow, x, y: float)
-  RCloseFn* = proc (win: var RWindow): bool
-  RResizeFn* = proc (win: var RWindow, width, height: Natural)
+  RCharFn* = proc (win: RWindow, rune: Rune, mods: int)
+  RCursorEnterFn* = proc (win: RWindow)
+  RCursorMoveFn* = proc (win: RWindow, x, y: float)
+  RFilesDroppedFn* = proc (win: RWindow, filenames: seq[string])
+  RKeyFn* = proc (win: RWindow, key: glfw.Key, scancode: int, mods: int)
+  RMouseFn* = proc (win: RWindow, button: glfw.MouseButton, mods: int)
+  RScrollFn* = proc (win: RWindow, x, y: float)
+  RCloseFn* = proc (win: RWindow): bool
+  RResizeFn* = proc (win: RWindow, width, height: Natural)
   WindowCallbacks = object
     onChar: seq[RCharFn]
     onCursorEnter, onCursorLeave: seq[RCursorEnterFn]
@@ -122,127 +100,126 @@ type
   # Windows
   #~~
   RWindowObj = object
-    id: int
     handle: glfw.Window
-    options: ref WindowOptions
     callbacks: WindowCallbacks
   RWindow* = ref RWindowObj
 
 using
   wopt: WindowOptions
 
-var glInitialized = false
+var
+  glfwInitialized, glInitialized = false
 
 proc initRWindow*(): WindowOptions =
-  if not glInitialized:
-    let status = initGl()
+  ## Initializes a new ``RWindow``.
+  if not glfwInitialized:
+    let status = initGlfw()
     if status != ieOK:
-      quit($status, int(status))
-    glInitialized = true
+      raise newException(GLFWError, $status)
+    glfwInitialized = true
   result = WindowOptions(
     width: 800, height: 600,
-    title: "rapid"
+    title: "rapid",
+    resizable: true, visible: true,
+    decorated: true, focused: true,
+    floating: false, maximized: false
   )
 
 proc size*(wopt; width, height: int): WindowOptions =
+  ## Builds the window with size ``width × height``.
   result = wopt
   result.width = width
   result.height = height
 
 proc title*(wopt; title: string): WindowOptions =
+  ## Builds the window with the specified title.
   result = wopt
   result.title = title
 
-template builderBool(param: untyped): untyped {.dirty.} =
+template builderBool(param: untyped, doc: untyped): untyped {.dirty.} =
   proc param*(wopt; param: bool): WindowOptions =
+    doc
     result = wopt
     result.param = param
-builderBool(resizable)
-builderBool(visible)
-builderBool(decorated)
-builderBool(focused)
-builderBool(floating)
-builderBool(maximized)
-
-# ugh global state
-# unfortunately, this is required because of Nim's memory safety constrains
-var windowEvents: seq[Deque[WindowEvent]]
+builderBool(resizable):
+  ## Defines if the built window will be resizable.
+builderBool(visible):
+  ## Defines if the built window will be visible.
+builderBool(decorated):
+  ## Defines if the built window will be decorated.
+builderBool(focused):
+  ## Defines if the built window will be focused.
+builderBool(floating):
+  ## Defines if the built window will float (stay on top of other windows).
+builderBool(maximized):
+  ## Defines if the built window will be maximized.
 
 proc glfwCallbacks(win: var RWindow) =
-  let id = win.id
+  win.callbacks = WindowCallbacks()
+  template run(name, body: untyped): untyped {.dirty.} =
+    let win = cast[RWindow](glfw.getWindowUserPointer(w))
+    for fn in win.callbacks.name: body
   discard glfw.setCharModsCallback(win.handle,
-    proc (w: glfw.Window, ch: cuint, mods: int32) {.cdecl.} =
-      windowEvents[id].addLast(WindowEvent(
-        kind: wevCharMods,
-        modsRune: Rune(ch),
-        charMods: mods
-      ))
+    proc (w: glfw.Window, uchar: cuint, mods: int32) =
+      run(onChar): fn(win, Rune(uchar), int mods)
   )
   discard glfw.setCursorEnterCallback(win.handle,
-    proc (w: glfw.Window, entered: int32) {.cdecl.} =
-      windowEvents[id].addLast(WindowEvent(
-        kind: wevCursorEnter,
-        cursorEntered: entered == 1
-      ))
+    proc (w: glfw.Window, entered: int32) =
+      if entered == 1:
+        run(onCursorEnter, fn(win))
+      else:
+        run(onCursorLeave, fn(win))
   )
   discard glfw.setCursorPosCallback(win.handle,
-    proc (w: glfw.Window, x, y: cdouble) {.cdecl.} =
-      windowEvents[id].addLast(WindowEvent(
-        kind: wevCursorMove,
-        posX: x, posY: y
-      ))
+    proc (w: glfw.Window, x, y: cdouble) =
+      run(onCursorMove, fn(win, x, y))
   )
   discard glfw.setDropCallback(win.handle,
-    proc (w: glfw.Window, n: int32, files: cstringArray) {.cdecl.} =
-      windowEvents[id].addLast(WindowEvent(
-        kind: wevFilesDropped,
-        filenames: cstringArrayToSeq(files, n)
-      ))
+    proc (w: glfw.Window, n: int32, files: cstringArray) =
+      run(onFilesDropped, fn(win, cstringArrayToSeq(files, n)))
   )
   discard glfw.setKeyCallback(win.handle,
-    proc (w: glfw.Window, key, scan, action, mods: int32) {.cdecl.} =
-      windowEvents[id].addLast(WindowEvent(
-        kind: wevKey,
-        keyAction: glfw.KeyAction(action),
-        key: glfw.Key(key),
-        keyScancode: scan,
-        keyMods: mods
-      ))
+    proc (w: glfw.Window, key, scan, action, mods: int32) =
+      case glfw.KeyAction(action)
+      of glfw.kaDown:
+        run(onKeyPress, fn(win, glfw.Key(key), int scan, int mods))
+      of glfw.kaUp:
+        run(onKeyRelease, fn(win, glfw.Key(key), int scan, int mods))
+      of glfw.kaRepeat:
+        run(onKeyRepeat, fn(win, glfw.Key(key), int scan, int mods))
   )
   discard glfw.setMouseButtonCallback(win.handle,
-    proc (w: glfw.Window, button, action, mods: int32) {.cdecl.} =
-      windowEvents[id].addLast(WindowEvent(
-        kind: wevMouseButton,
-        buttonAction: glfw.KeyAction(action),
-        button: glfw.MouseButton(button),
-        buttonMods: mods
-      ))
+    proc (w: glfw.Window, button, action, mods: int32) =
+      case glfw.KeyAction(action)
+      of glfw.kaDown:
+        run(onMousePress, fn(win, glfw.MouseButton(button), int mods))
+      of glfw.kaUp:
+        run(onMouseRelease, fn(win, glfw.MouseButton(button), int mods))
+      else: discard
   )
   discard glfw.setScrollCallback(win.handle,
-    proc (w: glfw.Window, x, y: cdouble) {.cdecl.} =
-      windowEvents[id].addLast(WindowEvent(
-        kind: wevScroll,
-        scrollX: x, scrollY: y
-      ))
+    proc (w: glfw.Window, x, y: cdouble) =
+      run(onScroll, fn(win, x, y))
+  )
+  discard glfw.setWindowCloseCallback(win.handle,
+    proc (w: glfw.Window) =
+      var close = true
+      run(onClose): close = close and fn(win)
+      glfw.setWindowShouldClose(w, int32 close)
   )
   discard glfw.setWindowSizeCallback(win.handle,
-    proc (w: glfw.Window, width, height: int32) {.cdecl.} =
-      windowEvents[id].addLast(WindowEvent(
-        kind: wevWindowSize,
-        width: width, height: height
-      )))
+    proc (w: glfw.Window, width, height: int32) =
+      run(onResize, fn(win, width, height))
+  )
 
 converter toInt32(hint: glfw.Hint): int32 =
-  int32(hint)
+  int32 hint
 
 proc open*(wopt): RWindow =
+  ## Builds a window using the specified options and opens it.
+  ## The window will always have an OpenGL 3.3 (or newer) context.
+  ## rapid only ever makes use of 3.3 procs, however.
   result = RWindow()
-
-  result.id = len(windowEvents)
-  windowEvents.add(initDeque[WindowEvent]())
-
-  new(result.options)
-  result.options[] = wopt
 
   let
     mon = glfw.getPrimaryMonitor()
@@ -251,20 +228,137 @@ proc open*(wopt): RWindow =
   glfw.windowHint(glfw.hRedBits, mode.redBits)
   glfw.windowHint(glfw.hGreenBits, mode.greenBits)
   glfw.windowHint(glfw.hBlueBits, mode.blueBits)
+  glfw.windowHint(glfw.hAlphaBits, 8)
+  glfw.windowHint(glfw.hDepthBits, 24)
+  glfw.windowHint(glfw.hStencilBits, 8)
 
-  glfw.windowHint(glfw.hClientApi, int32 glfw.oaOpenglEsApi)
-  glfw.windowHint(glfw.hContextVersionMajor, 2)
-  glfw.windowHint(glfw.hContextVersionMinor, 0)
+  glfw.windowHint(glfw.hResizable, int32 wopt.resizable)
+  glfw.windowHint(glfw.hVisible, int32 wopt.visible)
+  glfw.windowHint(glfw.hDecorated, int32 wopt.decorated)
+  glfw.windowHint(glfw.hFocused, int32 wopt.focused)
+  glfw.windowHint(glfw.hFloating, int32 wopt.floating)
+  glfw.windowHint(glfw.hMaximized, int32 wopt.maximized)
+
+  glfw.windowHint(glfw.hContextVersionMajor, 3)
+  glfw.windowHint(glfw.hContextVersionMinor, 3)
+  glfw.windowHint(glfw.hOpenglProfile, int32 glfw.opCoreProfile)
+  glfw.windowHint(glfw.hOpenglDebugContext, 1)
   result.handle = glfw.createWindow(
     int32 wopt.width, int32 wopt.height,
     wopt.title,
     nil, nil
   )
 
+  if not glInitialized:
+    let status = initGl(result.handle)
+    if status != ieOK:
+      raise newException(GLError, $status)
+    glInitialized = true
+
+  glfw.setWindowUserPointer(result.handle, cast[pointer](result))
   glfwCallbacks(result)
 
-proc `=destroy`(win: var RWindowObj) =
+proc destroy*(win: RWindow) =
   glfw.destroyWindow(win.handle)
+
+#~~
+# Window attributes
+#~~
+
+proc close*(win: var RWindow) =
+  ## Tells the window it should close. This doesn't immediately close the window;
+  ## the application might prevent the window from being closed.
+  glfw.setWindowShouldClose(win.handle, 1)
+
+proc pos*(win: RWindow): tuple[x, y: int] =
+  var x, y: int32
+  glfw.getWindowPos(win.handle, addr x, addr y)
+  result = (int x, int y)
+proc x*(win: RWindow): int = win.pos().x
+proc y*(win: RWindow): int = win.pos().y
+proc `pos=`*(win: var RWindow, pos: tuple[x, y: int]) =
+  glfw.setWindowSize(win.handle, int32 pos.x, int32 pos.y)
+proc `x=`*(win: var RWindow, x: int) = win.pos = (x, win.x)
+proc `y=`*(win: var RWindow, y: int) = win.pos = (y, win.y)
+
+type
+  IntDimensions* = tuple[width, height: int]
+proc size*(win: RWindow): IntDimensions =
+  var w, h: int32
+  glfw.getWindowSize(win.handle, addr w, addr h)
+  result = (int w, int h)
+proc width*(win: RWindow): int = win.size().width
+proc height*(win: RWindow): int = win.size().height
+proc `size=`*(win: var RWindow, size: IntDimensions) =
+  glfw.setWindowSize(win.handle, int32 size.width, int32 size.height)
+proc `width=`*(win: var RWindow, width: int) = win.size = (width, win.width)
+proc `height=`*(win: var RWindow, height: int) = win.size = (win.width, height)
+proc limitSize*(win: var RWindow, min, max: IntDimensions) =
+  glfw.setWindowSizeLimits(win.handle,
+    int32 min.width, int32 min.height, int32 max.width, int32 max.height)
+
+proc fbSize*(win: RWindow): IntDimensions =
+  var w, h: int32
+  glfw.getFramebufferSize(win.handle, addr w, addr h)
+  result = (int w, int h)
+
+proc iconify*(win: var RWindow) = glfw.iconifyWindow(win.handle)
+proc restore*(win: var RWindow) = glfw.restoreWindow(win.handle)
+proc maximize*(win: var RWindow) = glfw.maximizeWindow(win.handle)
+proc show*(win: var RWindow) = glfw.showWindow(win.handle)
+proc hide*(win: var RWindow) = glfw.hideWindow(win.handle)
+proc focus*(win: var RWindow) = glfw.focusWindow(win.handle)
+
+proc focused*(win: RWindow): bool =
+  result = bool glfw.getWindowAttrib(win.handle, glfw.hFocused)
+proc iconified*(win: RWindow): bool =
+  result = bool glfw.getWindowAttrib(win.handle, glfw.Iconified)
+proc maximized*(win: RWindow): bool =
+  result = bool glfw.getWindowAttrib(win.handle, glfw.hMaximized)
+proc visible*(win: RWindow): bool =
+  result = bool glfw.getWindowAttrib(win.handle, glfw.hVisible)
+proc decorated*(win: RWindow): bool =
+  result = bool glfw.getWindowAttrib(win.handle, glfw.hDecorated)
+proc floating*(win: RWindow): bool =
+  result = bool glfw.getWindowAttrib(win.handle, glfw.hFloating)
+
+template callbackProc(name, T, doc: untyped): untyped {.dirty.} =
+  proc name*(win: var RWindow, callback: T) =
+    doc
+    win.callbacks.name.add(callback)
+callbackProc(onChar, RCharFn):
+  ## Adds a callback executed when a character is typed on the keyboard.
+callbackProc(onCursorEnter, RCursorEnterFn):
+  ## Adds a callback executed when the cursor enters the window.
+callbackProc(onCursorLeave, RCursorEnterFn):
+  ## Adds a callback executed when the cursor leaves the window.
+callbackProc(onCursorMove, RCursorMoveFn):
+  ## Adds a callback executed when the cursor moves in the window.
+callbackProc(onFilesDropped, RFilesDroppedFn):
+  ## Adds a callback executed when files are dropped onto the window.
+callbackProc(onKeyPress, RKeyFn):
+  ## Adds a callback executed when a key is pressed on the keyboard.
+callbackProc(onKeyRelease, RKeyFn):
+  ## Adds a callback executed when a key is released on the keyboard.
+callbackProc(onKeyRepeat, RKeyFn):
+  ## Adds a callback executed when a repeat is triggered by holding down a key \
+  ## on the keyboard.
+callbackProc(onMousePress, RMouseFn):
+  ## Adds a callback executed when a mouse button is pressed.
+callbackProc(onMouseRelease, RMouseFn):
+  ## Adds a callback executed when a mouse button is released.
+callbackProc(onScroll, RScrollFn):
+  ## Adds a callback executed when the scroll wheel is moved.
+callbackProc(onClose, RCloseFn):
+  ## Adds a callback executed when there's an attempt to close the window.
+  ## The callback should return ``true`` if the window is to be closed, or \
+  ## ``false`` if closing should be canceled.
+callbackProc(onResize, RResizeFn):
+  ## Adds a callback executed when the window is resized.
+
+#~~
+# Game loop
+#~~
 
 proc calcMillisPerFrame(win: RWindow): float =
   let
@@ -276,54 +370,11 @@ type
   RDrawProc* = proc (step: float)
   RUpdateProc* = proc (delta: float)
 
-proc processEvents(win: var RWindow) =
-  template run(name, body: untyped) {.dirty.} =
-    for fn in win.callbacks.name: body
-  var queue = windowEvents[win.id]
-  while queue.len > 0:
-    let ev = queue.popFirst()
-    case ev.kind
-    of wevCharMods:
-      run(onChar): fn(win, ev.modsRune)
-    of wevCursorEnter:
-      if ev.cursorEntered:
-        run(onCursorEnter): fn(win)
-      else:
-        run(onCursorLeave): fn(win)
-    of wevCursorMove:
-      run(onCursorMove): fn(win, ev.posX, ev.posY)
-    of wevFilesDropped:
-      run(onFilesDropped): fn(win, ev.filenames)
-    of wevKey:
-      case ev.keyAction
-      of glfw.kaDown:
-        run(onKeyPress): fn(win, ev.key, ev.keyScancode, ev.keyMods)
-      of glfw.kaUp:
-        run(onKeyRelease): fn(win, ev.key, ev.keyScancode, ev.keyMods)
-      of glfw.kaRepeat:
-        run(onKeyRepeat): fn(win, ev.key, ev.keyScancode, ev.keyMods)
-    of wevMouseButton:
-      case ev.buttonAction
-      of glfw.kaDown:
-        run(onMousePress): fn(win, ev.button, ev.buttonMods)
-      of glfw.kaUp:
-        run(onMouseRelease): fn(win, ev.button, ev.buttonMods)
-      else: discard
-    of wevScroll:
-      run(onScroll): fn(win, ev.scrollX, ev.scrollY)
-    of wevWindowClose:
-      run(onClose):
-        let close = fn(win)
-        glfw.setWindowShouldClose(win.handle, int32 close)
-    of wevWindowSize:
-      run(onResize): fn(win, ev.width, ev.height)
-
-  windowEvents[win.id].clear()
-
 proc loop*(win: var RWindow,
            draw: RDrawProc, update: RUpdateProc) =
+  ## Starts a game loop on the specified window.
   glfw.makeContextCurrent(win.handle)
-  if not gladLoadGLES2(glfw.getProcAddress):
+  if not gladLoadGL(glfw.getProcAddress):
     raise newException(GLError, "Couldn't load OpenGL procs")
 
   glfw.swapInterval(1)
@@ -333,19 +384,17 @@ proc loop*(win: var RWindow,
     previous = float(glfw.getTime())
     lag = 0.0
   while glfw.windowShouldClose(win.handle) == 0:
-    glfw.swapBuffers(win.handle)
-
     let
       current = float(glfw.getTime())
       elapsed = current - previous
     previous = current
     lag += elapsed
 
-    glfw.pollEvents()
-    processEvents(win)
-
     while lag >= millisPerUpdate:
-      update(elapsed / millisPerUpdate)
+      update(elapsed)
       lag -= millisPerUpdate
 
     draw(lag / millisPerUpdate)
+
+    glfw.swapBuffers(win.handle)
+    glfw.pollEvents()
