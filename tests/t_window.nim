@@ -13,11 +13,7 @@ suite "windows":
 
     win.loop(
       proc (step: float) =
-        var ctx = gfx.ctx
-        ctx.clear(rgb(0, 0, 255))
-        ctx.begin()
-        ctx.tri((0.0, 0.5), (-0.5, -0.5), (0.5, -0.5))
-        ctx.draw(),
+        drawExample(gfx),
       proc (delta: float) =
         discard
     )
