@@ -1,8 +1,8 @@
-#~~
+#--
 # rapid
 # a game engine optimized for rapid prototyping
 # copyright (c) 2019, iLiquid
-#~~
+#--
 
 ## This module has everything related to windows.
 
@@ -23,9 +23,9 @@ export glfw.MouseButton
 export times.cpuTime
 export unicode.Rune
 
-#~~
+#--
 # OpenGL Initialization
-#~~
+#--
 
 type
   InitErrorKind = enum
@@ -62,21 +62,21 @@ proc initGl(win: glfw.Window): InitErrorKind =
     glDebugMessageCallback(onGlDebug, nil)
   return ieOK
 
-#~~
+#--
 # Window building
-#~~
+#--
 
 type
-  #~~
+  #--
   # Building
-  #~~
+  #--
   WindowOptions = object
     width, height: Natural
     title: string
     resizable, visible, decorated, focused, floating, maximized: bool
-  #~~
+  #--
   # Events
-  #~~
+  #--
   RCharFn* = proc (win: RWindow, rune: Rune, mods: int)
   RCursorEnterFn* = proc (win: RWindow)
   RCursorMoveFn* = proc (win: RWindow, x, y: float)
@@ -96,9 +96,9 @@ type
     onScroll: seq[RScrollFn]
     onClose: seq[RCloseFn]
     onResize: seq[RResizeFn]
-  #~~
+  #--
   # Windows
-  #~~
+  #--
   RWindowObj = object
     handle: glfw.Window
     callbacks: WindowCallbacks
@@ -261,9 +261,9 @@ proc open*(wopt): RWindow =
 proc destroy*(win: RWindow) =
   glfw.destroyWindow(win.handle)
 
-#~~
+#--
 # Window attributes
-#~~
+#--
 
 proc close*(win: var RWindow) =
   ## Tells the window it should close. This doesn't immediately close the window;
@@ -356,9 +356,9 @@ callbackProc(onClose, RCloseFn):
 callbackProc(onResize, RResizeFn):
   ## Adds a callback executed when the window is resized.
 
-#~~
+#--
 # Game loop
-#~~
+#--
 
 proc calcMillisPerFrame(win: RWindow): float =
   let

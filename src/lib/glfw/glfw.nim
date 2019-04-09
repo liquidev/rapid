@@ -1,8 +1,8 @@
-#~~
+#--
 # rapid
 # a game engine optimized for rapid prototyping
 # copyright (c) 2019, iLiquid
-#~~
+#--
 
 ## This GLFW wrapper is a slightly modified version of \
 ## https://github.com/ephja/nim-glfw/blob/master/glfw/wrapper.nim

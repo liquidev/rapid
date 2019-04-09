@@ -1,8 +1,8 @@
-#~~
+#--
 # rapid
 # a game engine optimized for rapid prototyping
 # copyright (c) 2019, iLiquid
-#~~
+#--
 
 import colors
 import tables
@@ -13,9 +13,9 @@ import window
 import ../data/data
 import ../lib/glad/gl
 
-#~~
+#--
 # Shaders
-#~~
+#--
 
 type
   RShader* = distinct GLuint
@@ -54,9 +54,9 @@ const
 
     void main(void) {
       if (rTextureEnabled) {
-        fCol = texture(tex, vfUV);
+        fCol = texture(tex, vfUV) * vfCol;
       } else {
-        fCol = vec4(vfUV.x, vfUV.y, 0.0, 1.0);
+        fCol = vfCol;
       }
     }
   """
@@ -160,9 +160,9 @@ proc uniform*(prog: RProgram, name: string, val: int) =
   with(prog): glUniform1i(prog.uniformLocations[name], GLint val)
 
 
-#~~
+#--
 # Textures
-#~~
+#--
 
 var currentTexture: GLuint = 0
 
@@ -208,11 +208,11 @@ proc newTexture*(img: RImage): RTexture =
       0,
       GL_RGBA, GL_UNSIGNED_BYTE,
       img.data[0].unsafeAddr)
-    glGenerateMipmap(GL_TEXTURE_2D)
+    # glGenerateMipmap(GL_TEXTURE_2D)
 
-#~~
+#--
 # Gfx
-#~~
+#--
 
 type
   RGfx* = ref object
@@ -312,9 +312,9 @@ proc openGfx*(win: RWindow): RGfx =
   result.init()
   result.initRoot()
 
-#~~
+#--
 # Gfx context
-#~~
+#--
 
 type
   RGfxContext* = object

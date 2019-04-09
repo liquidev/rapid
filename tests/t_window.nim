@@ -24,7 +24,7 @@ suite "windows":
     proc draw(step: float) =
       ctx.clear(rgb(0, 0, 0))
       ctx.begin()
-      #ctx.texture = "rapid"
+      ctx.texture = "rapid"
       ctx.rect(32, 32, float(gfx.width - 64), float(gfx.height - 64))
       ctx.draw()
 
