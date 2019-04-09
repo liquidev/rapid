@@ -41,10 +41,10 @@ var win = initRWindow()
 
 var gfx = win.gfx
 
-var data = newRData:
+var data = dataSpec:
   "hello" <- image("hello.png")
 # An non-macro approach can be used:
-# data.image("hello.png")
+# data.image("hello", "hello.png")
 
 # The data is loaded from a folder called ``data`` (for development), or the
 # rapid bundle embedded in the executable with RDK.
@@ -54,7 +54,8 @@ var data = newRData:
 # Keep in mind, that this folder won't be loaded from if there's a bundle
 # embedded into the executable. It isn't required to embed a bundle, however.
 
-data.loadAll() # ``load()`` can be used for concurrent loading if needed
+# The ``load()`` iterator can be used for loading with progress reporting
+data.loadAll()
 
 gfx.data = data
 

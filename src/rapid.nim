@@ -4,16 +4,18 @@
 # copyright (c) 2019, iLiquid
 #~~
 
-import lib/glfw/glfw
+import glm
 
+import data/data
 import gfx/colors
 import gfx/gfx
 import gfx/opengl
 import gfx/window
-import math/vectors
+
+export glm
 
 export colors
+export data
 export opengl.GLError
 export gfx
-export vectors
 export window

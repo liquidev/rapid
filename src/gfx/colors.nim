@@ -1,6 +1,6 @@
 import std/colors
 
-export Color
+export colors except rgb
 
 type
   ColorChannel = range[0..255]
@@ -15,6 +15,9 @@ proc rgba*(r, g, b, a: ColorChannel): Color =
 
 proc rgb*(r, g, b: ColorChannel): Color =
   result = rgba(r, g, b, 255)
+
+proc col*(col: Color): Color =
+  result = Color(int(col) or 0xff000000)
 
 proc alpha*(col: Color): ColorChannel = (0xff000000 and int(col)) shr 24
 proc red*(col: Color): ColorChannel   = (0x00ff0000 and int(col)) shr 16
