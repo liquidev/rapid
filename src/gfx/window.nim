@@ -52,6 +52,8 @@ proc onGlDebug(source, kind: GLenum, id: GLuint, severity: GLenum,
   var msg = newString(length)
   copyMem(msg[0].unsafeAddr, msgPtr, length)
   debug("GL | kind ", kind, ", severity ", severity, ": ", msg)
+  when defined(glDebugBacktrace):
+    writeStackTrace()
 
 proc initGl(win: glfw.Window): InitErrorKind =
   glfw.makeContextCurrent(win)
@@ -322,6 +324,10 @@ proc decorated*(win: RWindow): bool =
 proc floating*(win: RWindow): bool =
   result = bool glfw.getWindowAttrib(win.handle, glfw.hFloating)
 
+#~~
+# Input
+#~~
+
 template callbackProc(name, T, doc: untyped): untyped {.dirty.} =
   proc name*(win: var RWindow, callback: T) =
     doc
@@ -355,6 +361,22 @@ callbackProc(onClose, RCloseFn):
   ## ``false`` if closing should be canceled.
 callbackProc(onResize, RResizeFn):
   ## Adds a callback executed when the window is resized.
+
+proc key*(win: RWindow, key: glfw.Key): glfw.KeyAction =
+  glfw.KeyAction(glfw.getKey(win.handle, int32(key)))
+
+proc mouseButton*(win: RWindow, btn: glfw.MouseButton): glfw.KeyAction =
+  glfw.KeyAction(glfw.getMouseButton(win.handle, int32(btn)))
+
+proc mousePos*(win: RWindow): tuple[x, y: float] =
+  var x, y: float64
+  glfw.getCursorPos(win.handle, addr x, addr y)
+  result = (x, y)
+proc mouseX*(win: RWindow): float = win.mousePos.x
+proc mouseY*(win: RWindow): float = win.mousePos.y
+
+proc `mousePos=`*(win: var RWindow, x, y: float) =
+  glfw.setCursorPos(win.handle, float64 x, float64 y)
 
 #--
 # Game loop

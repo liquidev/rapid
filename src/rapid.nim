@@ -6,6 +6,7 @@
 
 import glm
 
+import audio/audio
 import data/data
 import gfx/colors
 import gfx/gfx
@@ -14,6 +15,7 @@ import gfx/window
 
 export glm
 
+export audio
 export colors
 export data
 export opengl.GLError

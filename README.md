@@ -19,14 +19,19 @@ var win = initRWindow()
 
 # We need to get a handle to the underlying framebuffer in order to draw on the
 # screen
-var gfx = win.gfx
+var
+  gfx = win.gfx
+  ctx = gfx.ctx
+
+proc draw(step: float) =
+  ctx.activate()
+  ctx.clear(col(colWhite))
+
+proc update(delta: float) =
+  discard
 
 # Then we can begin a game loop:
-win.loop:
-  draw(step):
-    gfx.clear(colWhite)
-  update(delta):
-    discard
+win.loop(draw, update)
 ```
 
 ### Loading data
@@ -59,10 +64,12 @@ data.loadAll()
 
 gfx.data = data
 
-win.loop:
-  draw(step):
-    gfx.clear(colBlack)
-    gfx.texture("hello")
-    gfx.uvRect(0, 0, 1, 1)
-    gfx.rect(32, 32, 32, 32)
+proc draw(step: float) =
+  gfx.clear(colBlack)
+  gfx.texture("hello")
+  gfx.uvRect(0, 0, 1, 1)
+  gfx.rect(32, 32, 32, 32)
+
+proc update(delta: float) =
+  discard
 ```

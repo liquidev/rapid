@@ -9,6 +9,7 @@ import tables
 
 import glm
 
+import opengl
 import window
 import ../data/data
 import ../lib/glad/gl
@@ -24,40 +25,63 @@ type
     shFragment
   ShaderError* = object of Exception
 
+
+
 const
-  RDefaultVshSrc = """
+  RVshLibSrc = """
     #version 330 core
 
-    layout (location = 0) in vec2 vPos;
-    layout (location = 1) in vec4 vCol;
-    layout (location = 2) in vec2 vUV;
+    layout (location = 0) in vec2 rapid_vPos;
+    layout (location = 1) in vec4 rapid_vCol;
+    layout (location = 2) in vec2 rapid_vUV;
 
-    out vec4 vfCol;
-    out vec2 vfUV;
+    uniform mat4 rapid_transform;
+
+    out vec4 rapid_vfCol;
+    out vec2 rapid_vfUV;
+
+    vec4 rVertex(vec4 pos, mat4 transform);
 
     void main(void) {
-      gl_Position = vec4(vPos.x, vPos.y, 0.0, 1.0);
-      vfCol = vCol;
-      vfUV = vUV;
+      gl_Position =
+        rVertex(vec4(rapid_vPos.x, rapid_vPos.y, 0.0, 1.0), rapid_transform);
+      rapid_vfCol = rapid_vCol;
+      rapid_vfUV = rapid_vUV;
+    }
+  """
+  RFshLibSrc = """
+    #version 330 core
+
+    in vec4 rapid_vfCol;
+    in vec2 rapid_vfUV;
+
+    uniform bool rapid_textureEnabled;
+    uniform sampler2D rapid_texture;
+
+    out vec4 rapid_fCol;
+
+    vec4 rTexel(sampler2D tex, vec2 uv) {
+      if (rapid_textureEnabled) {
+        return texture(tex, uv);
+      } else {
+        return vec4(1.0, 1.0, 1.0, 1.0);
+      }
+    }
+
+    vec4 rFragment(vec4 col, sampler2D tex, vec2 uv);
+
+    void main(void) {
+      rapid_fCol = rFragment(rapid_vfCol, rapid_texture, rapid_vfUV);
+    }
+  """
+  RDefaultVshSrc = """
+    vec4 rVertex(vec4 pos, mat4 transform) {
+      return pos * transform;
     }
   """
   RDefaultFshSrc = """
-    #version 330 core
-
-    in vec4 vfCol;
-    in vec2 vfUV;
-
-    uniform bool rTextureEnabled;
-    uniform sampler2D tex;
-
-    out vec4 fCol;
-
-    void main(void) {
-      if (rTextureEnabled) {
-        fCol = texture(tex, vfUV) * vfCol;
-      } else {
-        fCol = vfCol;
-      }
+    vec4 rFragment(vec4 col, sampler2D tex, vec2 uv) {
+      return rTexel(tex, uv) * col;
     }
   """
 
@@ -86,36 +110,25 @@ proc newShader*(kind: RShaderKind, source: string): RShader =
 type
   RProgram* = ref object
     id: GLuint
-    shaders: seq[RShader]
     uniformLocations: Table[string, GLint]
     vPosLoc: GLint
   ProgramError* = object of Exception
 
-proc newProgram*(): RProgram =
-  ## Creayes a new shader program.
+proc newProgram(): RProgram =
   result = RProgram(
     id: glCreateProgram(),
     uniformLocations: initTable[string, GLint]()
   )
 
-proc attach*(program: RProgram, shader: RShader): RProgram =
+proc attach(program: var RProgram, shader: RShader) =
   ## Attaches a shader to a program.
   ## The ``RProgram`` is not a ``var RProgram``, because without it being \
   ## ``var`` we can easily chain calls together.
   glAttachShader(program.id, GLuint(shader))
-  result = program
-  result.shaders.add(shader)
 
-proc attach*(program: RProgram,
-             shaderKind: RShaderKind, source: string): RProgram =
-  ## Alias for ``program.attach(newShader(shaderKind, source))``.
-  program.attach(newShader(shaderKind, source))
-
-proc link*(program: RProgram): RProgram =
+proc link(program: var RProgram) =
   ## Links the program, and destroys all attached shaders.
   glLinkProgram(program.id)
-  for sh in program.shaders:
-    glDeleteShader(GLuint(sh))
   # Error checking
   var isuccess: GLint
   glGetProgramiv(program.id, GL_LINK_STATUS, addr isuccess)
@@ -126,89 +139,33 @@ proc link*(program: RProgram): RProgram =
     var log = cast[ptr GLchar](alloc(logLength))
     glGetProgramInfoLog(GLuint(program.id), logLength, addr logLength, log)
     raise newException(ShaderError, $log)
-  result = program
-
-var currentProgram: GLuint
-
-template with*(prog: RProgram, body: untyped): untyped =
-  let previousProgram = currentProgram
-  glUseProgram(prog.id)
-  currentProgram = prog.id
-  body
-  glUseProgram(previousProgram)
-  currentProgram = previousProgram
 
 template uniformCheck(): untyped {.dirty.} =
+  glUseProgram(prog.id)
   if not prog.uniformLocations.hasKey(name):
     prog.uniformLocations[name] = glGetUniformLocation(prog.id, name)
+  var val = val
 
-proc uniform*(prog: RProgram, name: string, val: float) =
+proc uniform(prog: RProgram, name: string, val: float) =
   uniformCheck()
-  with(prog): glUniform1f(prog.uniformLocations[name], val)
-proc uniform*(prog: RProgram, name: string, val: Vec2f) =
+  glUniform1f(prog.uniformLocations[name], val)
+proc uniform(prog: RProgram, name: string, val: Vec2f) =
   uniformCheck()
-  with(prog): glUniform2f(prog.uniformLocations[name], val.x, val.y)
-proc uniform*(prog: RProgram, name: string, val: Vec3f) =
+  glUniform2fv(prog.uniformLocations[name], 1, val.caddr)
+proc uniform(prog: RProgram, name: string, val: Vec3f) =
   uniformCheck()
-  with(prog): glUniform3f(prog.uniformLocations[name], val.x, val.y, val.z)
-proc uniform*(prog: RProgram, name: string, val: Vec4f) =
+  glUniform3fv(prog.uniformLocations[name], 1, val.caddr)
+proc uniform(prog: RProgram, name: string, val: Vec4f) =
   uniformCheck()
-  with(prog): glUniform4f(prog.uniformLocations[name], val.x, val.y, val.z, val.w)
+  glUniform4fv(prog.uniformLocations[name], 1, val.caddr)
 
-proc uniform*(prog: RProgram, name: string, val: int) =
+proc uniform(prog: RProgram, name: string, val: int) =
   uniformCheck()
-  with(prog): glUniform1i(prog.uniformLocations[name], GLint val)
+  glUniform1i(prog.uniformLocations[name], GLint val)
 
-
-#--
-# Textures
-#--
-
-var currentTexture: GLuint = 0
-
-template with*(tex: RTexture, body: untyped) =
-  let previousTexture = currentTexture
-  glBindTexture(GL_TEXTURE_2D, tex.id)
-  currentTexture = tex.id
-  body
-  glBindTexture(GL_TEXTURE_2D, previousTexture)
-  currentTexture = previousTexture
-
-template use*(tex: RTexture) =
-  glBindTexture(GL_TEXTURE_2D, tex.id)
-  currentTexture = tex.id
-
-proc GLenum*(flt: RTextureFilter): GLenum =
-  case flt
-  of fltNearest: GL_NEAREST
-  of fltLinear:  GL_LINEAR
-
-proc GLenum*(wrap: RTextureWrap): GLenum =
-  case wrap
-  of wrapRepeat:         GL_REPEAT
-  of wrapMirroredRepeat: GL_MIRRORED_REPEAT
-  of wrapClampToEdge:    GL_CLAMP_TO_EDGE
-  of wrapClampToBorder:  GL_CLAMP_TO_BORDER
-
-proc newTexture*(img: RImage): RTexture =
-  result = RTexture()
-  glGenTextures(1, addr result.id)
-  with(result):
-    glTexParameteri(GL_TEXTURE_2D,
-      GL_TEXTURE_MIN_FILTER, GLint GLenum(img.textureConf.minFilter))
-    glTexParameteri(GL_TEXTURE_2D,
-      GL_TEXTURE_MAG_FILTER, GLint GLenum(img.textureConf.magFilter))
-    glTexParameteri(GL_TEXTURE_2D,
-      GL_TEXTURE_WRAP_S, GLint GLenum(img.textureConf.wrap))
-    glTexParameteri(GL_TEXTURE_2D,
-      GL_TEXTURE_WRAP_T, GLint GLenum(img.textureConf.wrap))
-    glTexImage2D(GL_TEXTURE_2D,
-      0,
-      GLint GL_RGBA8, GLsizei img.width, GLsizei img.height,
-      0,
-      GL_RGBA, GL_UNSIGNED_BYTE,
-      img.data[0].unsafeAddr)
-    # glGenerateMipmap(GL_TEXTURE_2D)
+proc uniform(prog: RProgram, name: string, val: Mat4) =
+  uniformCheck()
+  glUniformMatrix4fv(prog.uniformLocations[name], 1, false, val.caddr)
 
 #--
 # Gfx
@@ -219,9 +176,13 @@ type
     win: RWindow
     width*, height*: int
     # Default state
+    vertexLibSh, fragmentLibSh: RShader
     defaultProgram: RProgram
+    # Framebuffer
+    fbo: GLuint
+    target: RTexture
     # Buffer objects
-    fboID, vaoID, vboID, eboID: GLuint
+    vaoID, vboID, eboID: GLuint
     vboSize, eboSize: int
     # Data
     data: RData
@@ -230,6 +191,26 @@ type
     prLines, prLineStrip, prLineLoop
     prTris, prTriStrip, prTriFan
     prShape
+
+proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
+  result = newProgram()
+  if int(gfx.vertexLibSh) == 0:
+    gfx.vertexLibSh = newShader(shVertex, RVshLibSrc)
+  if int(gfx.fragmentLibSh) == 0:
+    gfx.fragmentLibSh = newShader(shFragment, RFshLibSrc)
+  let
+    vsh = newShader(shVertex, vertexSrc)
+    fsh = newShader(shFragment, """
+    vec4 rTexel(sampler2D tex, vec2 uv);
+
+    """ & fragmentSrc)
+  result.attach(gfx.vertexLibSh)
+  result.attach(vsh)
+  result.attach(gfx.fragmentLibSh)
+  result.attach(fsh)
+  result.link()
+  glDeleteShader(GLuint(vsh))
+  glDeleteShader(GLuint(fsh))
 
 proc reallocVbo(gfx: RGfx) =
   glBufferData(GL_ARRAY_BUFFER,
@@ -262,11 +243,11 @@ proc updateEbo(gfx: RGfx, data: seq[int32]) =
     data[0].unsafeAddr)
 
 proc init(gfx: RGfx) =
+  # Settings
+  glEnable(GL_BLEND)
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
   # Default program
-  gfx.defaultProgram = newProgram()
-    .attach(shVertex,   RDefaultVshSrc)
-    .attach(shFragment, RDefaultFshSrc)
-    .link()
+  gfx.defaultProgram = gfx.newRProgram(RDefaultVshSrc, RDefaultFshSrc)
   # Allocate buffers
   glGenBuffers(1, addr gfx.vboID)
   glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)
@@ -302,22 +283,37 @@ proc initRoot(gfx: RGfx) =
 proc `data=`*(gfx: var RGfx, data: RData) =
   gfx.data = data
 
+proc texture*(gfx: RGfx): RTexture =
+  result = gfx.target
+
 proc openGfx*(win: RWindow): RGfx =
   result = RGfx(
     win: win,
-    fboID: 0,
+    fbo: 0,
     width: win.width,
     height: win.height
   )
   result.init()
   result.initRoot()
 
+proc newGfx*(width, height: int, texConf: RTextureConfig): RGfx =
+  result = RGfx(
+    width: width,
+    height: height
+  )
+  glGenFramebuffers(1, addr result.fbo)
+  glBindFramebuffer(GL_FRAMEBUFFER, result.fbo)
+  result.target = newRTexture(width, height, nil, texConf)
+  glFramebufferTexture2D(
+    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, result.target.id, 0)
+  result.init()
+
 #--
 # Gfx context
 #--
 
 type
-  RGfxContext* = object
+  RGfxContext* = ref object
     gfx: RGfx
     # Shapes
     shape: seq[float32]
@@ -353,13 +349,6 @@ converter toRVertex*(vert: RTexVertex): RVertex =
 converter toRVertex*(vert: RColVertex): RVertex =
   (vert.x, vert.y, vert.color, 0.0, 0.0)
 
-proc `program=`*(ctx: var RGfxContext, program: RProgram) =
-  glUseProgram(program.id)
-  ctx.program = program
-
-proc defaultProgram*(ctx: var RGfxContext) =
-  ctx.`program=`(ctx.gfx.defaultProgram)
-
 template uniformProc(T: typedesc): untyped {.dirty.} =
   proc uniform*(ctx: var RGfxContext, name: string, val: T) =
     ctx.program.uniform(name, val)
@@ -368,6 +357,18 @@ uniformProc(Vec2f)
 uniformProc(Vec3f)
 uniformProc(Vec4f)
 uniformProc(int)
+uniformProc(Mat4f)
+
+proc updateTransform(ctx: var RGfxContext) =
+  ctx.uniform("rapid_transform", ctx.transform)
+
+proc `program=`*(ctx: var RGfxContext, program: RProgram) =
+  glUseProgram(program.id)
+  ctx.program = program
+  ctx.updateTransform()
+
+proc defaultProgram*(ctx: var RGfxContext) =
+  ctx.`program=`(ctx.gfx.defaultProgram)
 
 proc clear*(ctx: var RGfxContext, col: Color) =
   glClearColor(
@@ -380,22 +381,22 @@ proc `color=`*(ctx: var RGfxContext, col: Color) =
 proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
   if not ctx.textureEnabled:
     ctx.textureEnabled = true
-    ctx.uniform("rTextureEnabled", 1)
+    ctx.uniform("rapid_textureEnabled", 1)
   ctx.texture = tex
 
 proc `texture=`*(ctx: var RGfxContext, tex: string) =
-  assert not isNil(ctx.gfx.data),
+  assert not (isNil(ctx.gfx.data)),
     "A data object must be bound to the RGfx"
   assert ctx.gfx.data.images.hasKey(tex),
     "The texture \"" & tex & "\" doesn't exist"
   if not ctx.gfx.data.textures.hasKey(tex):
-    ctx.gfx.data.textures[tex] = newTexture(ctx.gfx.data.images[tex])
+    ctx.gfx.data.textures[tex] = newRTexture(ctx.gfx.data.images[tex])
   ctx.`texture=`(ctx.gfx.data.textures[tex])
 
 proc noTexture*(ctx: var RGfxContext) =
   if ctx.textureEnabled:
     ctx.textureEnabled = false
-    ctx.uniform("rTextureEnabled", 0)
+    ctx.uniform("rapid_textureEnabled", 0)
 
 proc begin*(ctx: var RGfxContext) =
   ctx.vertexCount = 0
@@ -406,19 +407,21 @@ proc mapX(gfx: RGfx, x: float): float32 =
   result = x / float(gfx.width) * 2 - 1
 
 proc mapY(gfx: RGfx, y: float): float32 =
-  result = y / float(gfx.height) * -2 + 1
+  result =
+    if gfx.fbo == 0: y / float(gfx.height) * -2 + 1
+    else: y / float(gfx.height) * 2 - 1
 
 proc vertex*(ctx: var RGfxContext,
              vert: RVertex): RVertexIndex {.discardable.} =
   result = RVertexIndex(ctx.vertexCount)
   ctx.shape.add([
     # Position
-    ctx.gfx.mapX(vert.x), ctx.gfx.mapY(vert.y),
+    float32 ctx.gfx.mapX(vert.x), ctx.gfx.mapY(vert.y),
     # Color
     vert.color.red.norm32, vert.color.green.norm32, vert.color.blue.norm32,
     vert.color.alpha.norm32,
     # Texture coordinates
-    vert.u, 1.0 - vert.v
+    vert.u, vert.v
   ])
   inc(ctx.vertexCount)
 
@@ -457,11 +460,14 @@ proc rect*(ctx: var RGfxContext,
 
 proc draw*(ctx: var RGfxContext, primitive = prShape) =
   if ctx.shape.len > 0:
-    ctx.texture.use()
+    # TODO: sending uniforms every draw operation isn't very efficient
+    glActiveTexture(GL_TEXTURE0)
+    glBindTexture(GL_TEXTURE_2D, ctx.texture.id)
     ctx.gfx.updateVbo(ctx.shape)
     if primitive == prShape:
       ctx.gfx.updateEbo(ctx.indices)
-      glDrawElements(GL_TRIANGLES, GLsizei ctx.indices.len, GL_UNSIGNED_INT, nil)
+      glDrawElements(
+        GL_TRIANGLES, GLsizei ctx.indices.len, GL_UNSIGNED_INT, nil)
     else:
       glDrawArrays(
         case primitive
@@ -472,12 +478,16 @@ proc draw*(ctx: var RGfxContext, primitive = prShape) =
         else:          GL_TRIANGLES,
         0, GLsizei ctx.vertexCount)
 
+proc activate*(ctx: var RGfxContext) =
+  glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.fbo)
+  ctx.defaultProgram()
+  glBindVertexArray(ctx.gfx.vaoID)
+  glBindBuffer(GL_ARRAY_BUFFER, ctx.gfx.vboID)
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ctx.gfx.eboID)
+
 proc ctx*(gfx: RGfx): RGfxContext =
   result = RGfxContext(
     gfx: gfx,
-    color: col(colWhite)
+    color: col(colWhite),
+    transform: mat4(vec4(1.0'f32, 1.0, 1.0, 1.0))
   )
-  result.defaultProgram()
-  glBindVertexArray(gfx.vaoID)
-  glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gfx.eboID)
