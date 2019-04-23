@@ -1,9 +1,15 @@
 import unittest
-import rapid
-import lib/glad/gl
+import rapid/data
+import rapid/gfx
+import rapid/lib/glad/gl
 
 suite "windows":
   test "creation":
+    const Map = [
+      [(1, 0), (1, 1), (1, 1), (1, 1), (1, 1), (1, 2)],
+      [(1, 0), (1, 1), (1, 1), (1, 1), (1, 1), (1, 2)],
+      [(1, 0), (1, 1), (1, 1), (1, 1), (1, 1), (1, 2)]
+    ]
     var
       win = initRWindow()
         .size(640, 480)
@@ -36,11 +42,14 @@ suite "windows":
 
     proc draw(step: float) =
       ctx.activate()
-      if pressed:
-        ctx.begin()
-        ctx.color = col(colWhite)
-        ctx.texture = "rapid"
-        ctx.rect(win.mouseX, win.mouseY, 64, 64)
-        ctx.draw()
+      ctx.clear(col(colBlack))
+      ctx.begin()
+      ctx.color = col(colWhite)
+      ctx.texture = "rapid"
+      ctx.rect(win.mouseX, win.mouseY, 64, 64)
+      ctx.draw()
 
-    win.loop(draw, proc (delta: float) = discard)
+    proc update(delta: float) =
+      discard
+
+    win.loop(draw, update)

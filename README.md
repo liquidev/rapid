@@ -3,6 +3,13 @@
 A game engine written in Nim, optimized for rapid game development and
 easy prototyping.
 
+## Installing
+
+To install rapid, use the following command:
+```
+$ nimble install https://github.com/liquid600pgm/rapid
+```
+
 ## Examples
 
 ### Opening a window

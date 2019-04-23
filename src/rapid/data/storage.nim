@@ -11,7 +11,6 @@ import nimPNG
 
 import dsl
 import ../lib/glad/gl
-import ../lib/soloud
 
 export dsl
 
@@ -38,7 +37,6 @@ type
   DataSpec = object
     images: Table[string, string]
     textures: Table[string, RTextureConfig]
-    sounds: Table[string, string]
   RData* = ref object
     # Loading
     dir*: string
@@ -46,7 +44,6 @@ type
     # Storage
     images*: TableRef[string, RImage]
     textures*: TableRef[string, RTexture]
-    sounds*: TableRef[string, ptr Wav]
   RResKind* = enum
     resImage
     resSound
@@ -103,25 +100,19 @@ proc newRData*(): RData =
   result.dir = "data"
   result.spec = DataSpec(
     images: initTable[string, string](),
-    textures: initTable[string, RTextureConfig](),
-    sounds: initTable[string, string]()
+    textures: initTable[string, RTextureConfig]()
   )
   result.images = newTable[string, RImage]()
   result.textures = newTable[string, RTexture]()
-  result.sounds = newTable[string, ptr Wav]()
 
 proc image*(data: var RData, name, filename: string, texConf: RTextureConfig) =
   data.spec.images[name] = filename
   data.spec.textures[name] = texConf
 
-proc sound*(data: var RData, name, filename: string) =
-  data.spec.sounds[name] = filename
-
 iterator load*(data: var RData): tuple[kind: RResKind, id: string,
                                        progress: float] =
   let
-    progressPerImage = (1 / 2) / float(data.spec.images.len)
-    progressPerSound = (1 / 2) / float(data.spec.sounds.len)
+    progressPerImage = (1 / 1) / float(data.spec.images.len)
   var progress = 0.0
   for id, filename in data.spec.images:
     let png = loadPNG32(data.dir / filename)
@@ -132,12 +123,6 @@ iterator load*(data: var RData): tuple[kind: RResKind, id: string,
     )
     progress += progressPerImage
     yield (resImage, id, progress)
-  for id, filename in data.spec.sounds:
-    var wav = Wav_create()
-    discard Wav_load(wav, filename)
-    data.sounds[id] = wav
-    progress += progressPerSound
-    yield (resSound, id, progress)
 
 proc loadAll*(data: var RData) =
   for r in data.load(): discard

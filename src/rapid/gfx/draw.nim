@@ -11,7 +11,7 @@ import glm
 
 import opengl
 import window
-import ../data/data
+import ../data/storage
 import ../lib/glad/gl
 
 #--
@@ -403,6 +403,7 @@ proc begin*(ctx: var RGfxContext) =
   ctx.shape.setLen(0)
   ctx.indices.setLen(0)
 
+# TODO: replace this with a projection matrix
 proc mapX(gfx: RGfx, x: float): float32 =
   result = x / float(gfx.width) * 2 - 1
 
