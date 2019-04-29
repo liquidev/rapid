@@ -5,7 +5,8 @@
 #--
 
 ## This module provides texture atlas utilities.
-## It is not exported by ``gfx``, since not all games/applications use atlases.
+## It is not exported by ``gfx``, since not all games/applications use tile \
+## atlases.
 
 import tables
 
@@ -15,24 +16,18 @@ type
   RAtlas* = object
     tileWidth, tileHeight, spacingX, spacingY: float
     tilesX, tilesY: int
-  RTileQuad* = array[4, tuple[u, v: float]]
+  RTileRect* = tuple[x, y, w, h: float]
 
-proc uv*(atlas: RAtlas, x, y: int): RTileQuad =
+proc rect*(atlas: RAtlas, x, y: int): RTileRect =
+  ## Calculates texture coordinates for the tile (x, y).
   let
-    left = float(x) * (atlas.tileWidth + atlas.spacingX * 2)
-    top = float(y) * (atlas.tileHeight + atlas.spacingY * 2)
-  result = [
-    (left, top),
-    (left + atlas.tileWidth, top),
-    (left + atlas.tileWidth, top + atlas.tileHeight),
-    (left, top + atlas.tileHeight)
-  ]
-
-proc uv*(atlas: RAtlas, index: int): RTileQuad =
-  result = atlas.uv(index mod atlas.tilesX, index div atlas.tilesY)
+    left = float(x) * (atlas.tileWidth + atlas.spacingX * 2) + atlas.spacingX
+    top = float(y) * (atlas.tileHeight + atlas.spacingY * 2) + atlas.spacingY
+  result = (left, top, atlas.tileWidth, atlas.tileHeight)
 
 proc newRAtlas*(img: RImage,
                 tileWidth, tileHeight: Natural, spacing = 0.Natural): RAtlas =
+  ## Creates a new tile atlas for an image.
   let
     fullTileWidth = (tileWidth + spacing * 2)
     fullTileHeight = (tileHeight + spacing * 2)

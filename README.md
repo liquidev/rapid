@@ -16,7 +16,7 @@ $ nimble install https://github.com/liquid600pgm/rapid
 
 ```nim
 import color
-import rapid
+import rapid/gfx
 
 # Building a window is fairly straightforward:
 var win = initRWindow()
@@ -44,7 +44,8 @@ win.loop(draw, update)
 ### Loading data
 
 ```nim
-import rapid
+import rapid/gfx
+import rapid/data
 
 var win = initRWindow()
   .title("My Game")

@@ -4,6 +4,9 @@
 # copyright (c) 2019, iLiquid
 #--
 
+## Game resource loading and management, packed into a convenient structure \
+## supported by most resource-using objects.
+
 import os
 import tables
 
@@ -64,11 +67,9 @@ proc GLenum*(wrap: RTextureWrap): GLenum =
   of wrapClampToEdge:    GL_CLAMP_TO_EDGE
   of wrapClampToBorder:  GL_CLAMP_TO_BORDER
 
-proc `config=`*(tex: var RTexture, conf: RTextureConfig) =
-  glBindTexture(GL_TEXTURE_2D, tex.id)
-
 proc newRTexture*(width, height: int, data: pointer,
                   conf: RTextureConfig): RTexture =
+  ## Creates a new, blank texture.
   result = RTexture()
   glGenTextures(1, addr result.id)
   glBindTexture(GL_TEXTURE_2D, result.id)
@@ -88,6 +89,7 @@ proc newRTexture*(width, height: int, data: pointer,
     GL_TEXTURE_WRAP_T, GLint GLenum(conf.wrap))
 
 proc newRTexture*(img: RImage): RTexture =
+  ## Creates a new texture from an image.
   result = newRTexture(
     img.width, img.height, img.data[0].unsafeAddr, img.textureConf)
 
@@ -96,6 +98,8 @@ proc newRTexture*(img: RImage): RTexture =
 #--
 
 proc newRData*(): RData =
+  ## Creates a new ``RData`` object, for automated game resource loading and \
+  ## management.
   new(result)
   result.dir = "data"
   result.spec = DataSpec(
@@ -106,11 +110,13 @@ proc newRData*(): RData =
   result.textures = newTable[string, RTexture]()
 
 proc image*(data: var RData, name, filename: string, texConf: RTextureConfig) =
+  ## Defines an image to be loaded with the ``load`` iterator.
   data.spec.images[name] = filename
   data.spec.textures[name] = texConf
 
 iterator load*(data: var RData): tuple[kind: RResKind, id: string,
                                        progress: float] =
+  ## An iterator for loading resources one by one.
   let
     progressPerImage = (1 / 1) / float(data.spec.images.len)
   var progress = 0.0
@@ -125,4 +131,5 @@ iterator load*(data: var RData): tuple[kind: RResKind, id: string,
     yield (resImage, id, progress)
 
 proc loadAll*(data: var RData) =
+  ## Loads all resources in one go.
   for r in data.load(): discard

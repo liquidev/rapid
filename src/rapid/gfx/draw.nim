@@ -14,6 +14,8 @@ import window
 import ../data/storage
 import ../lib/glad/gl
 
+export glm
+
 #--
 # Shaders
 #--
@@ -115,6 +117,7 @@ type
   ProgramError* = object of Exception
 
 proc newProgram(): RProgram =
+  ## Creates a new ``RProgram``.
   result = RProgram(
     id: glCreateProgram(),
     uniformLocations: initTable[string, GLint]()
@@ -127,7 +130,7 @@ proc attach(program: var RProgram, shader: RShader) =
   glAttachShader(program.id, GLuint(shader))
 
 proc link(program: var RProgram) =
-  ## Links the program, and destroys all attached shaders.
+  ## Links the program. This does not destroy attached shaders!
   glLinkProgram(program.id)
   # Error checking
   var isuccess: GLint
@@ -147,6 +150,7 @@ template uniformCheck(): untyped {.dirty.} =
   var val = val
 
 proc uniform(prog: RProgram, name: string, val: float) =
+  ## Sets a uniform in the specified program.
   uniformCheck()
   glUniform1f(prog.uniformLocations[name], val)
 proc uniform(prog: RProgram, name: string, val: Vec2f) =
@@ -193,6 +197,7 @@ type
     prShape
 
 proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
+  ## Creates a new ``RProgram`` from the specified shaders.
   result = newProgram()
   if int(gfx.vertexLibSh) == 0:
     gfx.vertexLibSh = newShader(shVertex, RVshLibSrc)
@@ -281,12 +286,16 @@ proc initRoot(gfx: RGfx) =
     gfx.height = height
 
 proc `data=`*(gfx: var RGfx, data: RData) =
+  ## Makes the ``RGfx`` use data from the specified container.
   gfx.data = data
 
 proc texture*(gfx: RGfx): RTexture =
+  ## Returns the texture the Gfx is drawing to. This is ``nil`` if the \
+  ## Gfx's target is a window!
   result = gfx.target
 
 proc openGfx*(win: RWindow): RGfx =
+  ## Opens a Gfx for a window.
   result = RGfx(
     win: win,
     fbo: 0,
@@ -297,6 +306,8 @@ proc openGfx*(win: RWindow): RGfx =
   result.initRoot()
 
 proc newGfx*(width, height: int, texConf: RTextureConfig): RGfx =
+  ## Creates a new, blank Gfx, with the specified size and texture config.
+  ## The implementation uses framebuffers.
   result = RGfx(
     width: width,
     height: height
@@ -324,7 +335,9 @@ type
     color: Color
     textureEnabled: bool
     texture: RTexture
-    transform: Mat4f
+    # Transformations
+    # TODO: implement transformations
+    projection, transform: Mat4f
   RVertex* = tuple
     x, y: float
     color: Color
@@ -351,6 +364,7 @@ converter toRVertex*(vert: RColVertex): RVertex =
 
 template uniformProc(T: typedesc): untyped {.dirty.} =
   proc uniform*(ctx: var RGfxContext, name: string, val: T) =
+    ## Sets a uniform in the currently bound program.
     ctx.program.uniform(name, val)
 uniformProc(float)
 uniformProc(Vec2f)
@@ -363,28 +377,35 @@ proc updateTransform(ctx: var RGfxContext) =
   ctx.uniform("rapid_transform", ctx.transform)
 
 proc `program=`*(ctx: var RGfxContext, program: RProgram) =
+  ## Binds a shader program for drawing operations.
   glUseProgram(program.id)
   ctx.program = program
   ctx.updateTransform()
 
 proc defaultProgram*(ctx: var RGfxContext) =
+  ## Binds the default shader program.
   ctx.`program=`(ctx.gfx.defaultProgram)
 
 proc clear*(ctx: var RGfxContext, col: Color) =
+  ## Clears the Gfx with the specified color.
   glClearColor(
     col.red.norm32, col.green.norm32, col.blue.norm32, col.alpha.norm32)
   glClear(GL_COLOR_BUFFER_BIT)
 
 proc `color=`*(ctx: var RGfxContext, col: Color) =
+  ## Sets a 'default' vertex color. This vertex color is used when no explicit \
+  ## color is specified in the vertex.
   ctx.color = col
 
 proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
+  ## Sets the texture to draw with.
   if not ctx.textureEnabled:
     ctx.textureEnabled = true
     ctx.uniform("rapid_textureEnabled", 1)
   ctx.texture = tex
 
 proc `texture=`*(ctx: var RGfxContext, tex: string) =
+  ## Sets the texture to draw with, pulling it from the Gfx's ``RData``.
   assert not (isNil(ctx.gfx.data)),
     "A data object must be bound to the RGfx"
   assert ctx.gfx.data.images.hasKey(tex),
@@ -394,11 +415,13 @@ proc `texture=`*(ctx: var RGfxContext, tex: string) =
   ctx.`texture=`(ctx.gfx.data.textures[tex])
 
 proc noTexture*(ctx: var RGfxContext) =
+  ## Disables the texture, and draws with plain colors.
   if ctx.textureEnabled:
     ctx.textureEnabled = false
     ctx.uniform("rapid_textureEnabled", 0)
 
 proc begin*(ctx: var RGfxContext) =
+  ## Begins a new shape.
   ctx.vertexCount = 0
   ctx.shape.setLen(0)
   ctx.indices.setLen(0)
@@ -409,11 +432,13 @@ proc mapX(gfx: RGfx, x: float): float32 =
 
 proc mapY(gfx: RGfx, y: float): float32 =
   result =
+    # ugh
     if gfx.fbo == 0: y / float(gfx.height) * -2 + 1
     else: y / float(gfx.height) * 2 - 1
 
 proc vertex*(ctx: var RGfxContext,
              vert: RVertex): RVertexIndex {.discardable.} =
+  ## Adds a vertex to the shape.
   result = RVertexIndex(ctx.vertexCount)
   ctx.shape.add([
     # Position
@@ -435,14 +460,18 @@ proc vertex*(ctx: var RGfxContext,
   ctx.vertex((vert.x, vert.y, ctx.color, vert.u, vert.v))
 
 proc index*(ctx: var RGfxContext, indices: varargs[RVertexIndex]) =
+  ## Adds a vertex index to the shape. This is only required when the
+  ## ``prShape`` primitive is used.
   for idx in indices: ctx.indices.add(int32(idx))
 
 proc tri*[T: SomeVertex](ctx: var RGfxContext, a, b, c: T) =
+  ## Adds a triangle, together with its indices.
   ctx.index(ctx.vertex(a))
   ctx.index(ctx.vertex(b))
   ctx.index(ctx.vertex(c))
 
 proc quad*[T: SomeVertex](ctx: var RGfxContext, a, b, c, d: T) =
+  ## Adds a quad, together with its indices.
   let
     i = ctx.vertex(a)
     j = ctx.vertex(b)
@@ -452,16 +481,20 @@ proc quad*[T: SomeVertex](ctx: var RGfxContext, a, b, c, d: T) =
 
 proc rect*(ctx: var RGfxContext,
            x, y, w, h: float,
-           tx, ty = 0.0, tw, th = 1.0) =
+           uv: tuple[x, y, w, h: float] = (0.0, 0.0, 1.0, 1.0)) =
+  ## Adds a rectangle, at the specified coordinates, with the specified
+  ## dimensions and texture coordinates.
+  ## The texture coordinates are a tuple for easy usage with tile atlases \
+  ## (see ``rapid/gfx/atlas``)
   ctx.quad(
-    (x,     y,     tx,      ty),
-    (x + w, y,     tx + tw, ty),
-    (x + w, y + h, tx + tw, ty + th),
-    (x,     y + h, tx,      ty + th))
+    (x,     y,     uv.x,        uv.y),
+    (x + w, y,     uv.x + uv.w, uv.y),
+    (x + w, y + h, uv.x + uv.w, uv.y + uv.h),
+    (x,     y + h, uv.x,        uv.y + uv.h))
 
 proc draw*(ctx: var RGfxContext, primitive = prShape) =
+  ## Draws the previously built shape.
   if ctx.shape.len > 0:
-    # TODO: sending uniforms every draw operation isn't very efficient
     glActiveTexture(GL_TEXTURE0)
     glBindTexture(GL_TEXTURE_2D, ctx.texture.id)
     ctx.gfx.updateVbo(ctx.shape)
@@ -480,6 +513,8 @@ proc draw*(ctx: var RGfxContext, primitive = prShape) =
         0, GLsizei ctx.vertexCount)
 
 proc activate*(ctx: var RGfxContext) =
+  ## Activates the Gfx context for drawing. This is only required when using \
+  ## multiple Gfx objects.
   glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.fbo)
   ctx.defaultProgram()
   glBindVertexArray(ctx.gfx.vaoID)
@@ -487,6 +522,7 @@ proc activate*(ctx: var RGfxContext) =
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ctx.gfx.eboID)
 
 proc ctx*(gfx: RGfx): RGfxContext =
+  ## Creates a Gfx context for the specified Gfx.
   result = RGfxContext(
     gfx: gfx,
     color: col(colWhite),

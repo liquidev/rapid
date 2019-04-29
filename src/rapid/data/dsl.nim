@@ -7,6 +7,14 @@
 import macros
 
 macro dataSpec*(body: untyped): untyped =
+  ## A DSL for ``RData`` construction.
+  runnableExamples:
+    let tc = (fltNearest, fltNearest, wrapRepeat)
+    var data = dataSpec:
+      "myIcon" <- image("myIcon.png", tc)
+      "mySound" <- sound("bleep.wav")
+      "spr_*" <- dir(resImage, "sprites/")
+
   var stmts = newStmtList()
   stmts.add(newVarStmt(ident("d"), newCall("newRData")))
   for decl in body:

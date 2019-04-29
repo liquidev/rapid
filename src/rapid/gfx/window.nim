@@ -18,6 +18,7 @@ from ../lib/glfw/glfw import nil
 import opengl
 
 export glfw.Key
+export glfw.KeyAction
 export glfw.ModifierKey
 export glfw.MouseButton
 export times.cpuTime
@@ -109,16 +110,12 @@ type
 using
   wopt: WindowOptions
 
-var
-  glfwInitialized, glInitialized = false
-
 proc initRWindow*(): WindowOptions =
   ## Initializes a new ``RWindow``.
-  if not glfwInitialized:
+  once:
     let status = initGlfw()
     if status != ieOK:
       raise newException(GLFWError, $status)
-    glfwInitialized = true
   result = WindowOptions(
     width: 800, height: 600,
     title: "rapid",
@@ -128,7 +125,7 @@ proc initRWindow*(): WindowOptions =
   )
 
 proc size*(wopt; width, height: int): WindowOptions =
-  ## Builds the window with size ``width × height``.
+  ## Builds the window with the specified dimensions.
   result = wopt
   result.width = width
   result.height = height
@@ -235,7 +232,7 @@ proc open*(wopt): RWindow =
   glfw.windowHint(glfw.hStencilBits, 8)
 
   glfw.windowHint(glfw.hResizable, int32 wopt.resizable)
-  glfw.windowHint(glfw.hVisible, int32 wopt.visible)
+  glfw.windowHint(glfw.hVisible, int32 false)
   glfw.windowHint(glfw.hDecorated, int32 wopt.decorated)
   glfw.windowHint(glfw.hFocused, int32 wopt.focused)
   glfw.windowHint(glfw.hFloating, int32 wopt.floating)
@@ -251,16 +248,23 @@ proc open*(wopt): RWindow =
     nil, nil
   )
 
-  if not glInitialized:
+  # center the window
+  glfw.setWindowPos(result.handle,
+    int32(mode.width / 2 - wopt.width / 2),
+    int32(mode.height / 2 - wopt.height / 2))
+
+  if wopt.visible: glfw.showWindow(result.handle)
+
+  once:
     let status = initGl(result.handle)
     if status != ieOK:
       raise newException(GLError, $status)
-    glInitialized = true
 
   glfw.setWindowUserPointer(result.handle, cast[pointer](result))
   glfwCallbacks(result)
 
 proc destroy*(win: RWindow) =
+  ## Destroys a window.
   glfw.destroyWindow(win.handle)
 
 #--
@@ -386,22 +390,32 @@ proc calcMillisPerFrame(win: RWindow): float =
   let
     mon = glfw.getPrimaryMonitor()
     mode = glfw.getVideoMode(mon)
-  result = 1000 / mode.refreshRate
+  result = 1 / mode.refreshRate
 
 type
   RDrawProc* = proc (step: float)
-  RUpdateProc* = proc (delta: float)
+  RUpdateProc* = proc (step: float)
+
+proc render*(win: var RWindow, draw: proc ()) =
+  ## Renders a single frame onto the specified window.
+  glfw.makeContextCurrent(win.handle)
+  draw()
+  glfw.swapBuffers(win.handle)
+  glfw.pollEvents()
 
 proc loop*(win: var RWindow,
            draw: RDrawProc, update: RUpdateProc) =
   ## Starts a game loop on the specified window.
+  ## This should only be used for the main window! See ``render`` for drawing \
+  ## onto children windows.
   glfw.makeContextCurrent(win.handle)
-  if not gladLoadGL(glfw.getProcAddress):
-    raise newException(GLError, "Couldn't load OpenGL procs")
 
   glfw.swapInterval(1)
 
   let millisPerUpdate = calcMillisPerFrame(win)
+  const millisPer60fps = 1 / 60
+    # 60 fps is an arbitrary number, but gives a more natural time step to
+    # work with in update functions
   var
     previous = float(glfw.getTime())
     lag = 0.0
@@ -413,7 +427,7 @@ proc loop*(win: var RWindow,
     lag += elapsed
 
     while lag >= millisPerUpdate:
-      update(elapsed)
+      update(elapsed / millisPer60fps)
       lag -= millisPerUpdate
 
     draw(lag / millisPerUpdate)
