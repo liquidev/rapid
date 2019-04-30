@@ -41,7 +41,7 @@ proc initGlfw(): InitErrorKind =
     return ieGlfwInitFailed
   addQuitProc() do:
     glfw.terminate()
-  discard glfw.setErrorCallback() do (errCode: int32, msg: cstring):
+  discard glfw.setErrorCallback do (errCode: int32, msg: cstring):
     var err = newException(GLFWError, $msg)
     err.code = int errCode
     raise err

@@ -4,51 +4,70 @@
 # copyright (c) 2019, iLiquid
 #--
 
-## This GLFW wrapper is a slightly modified version of \
-## https://github.com/ephja/nim-glfw/blob/master/glfw/wrapper.nim
+## This is a wrapper for GLFW. It's a modified version of \
+## https://github.com/ephja/nim-glfw/blob/master/glfw/wrapper.nim to make use \
+## of nimterop's gitPull instead of embedding the library's source code into
+## rapid's source code.
+
+import os
+
+import nimterop/[cimport, git, paths]
+
+const
+  BaseDir = nimteropBuildDir()/"glfw"
+  Incl = BaseDir/"include"
+  Src = BaseDir/"src"
 
 static:
   assert cshort.sizeof == int16.sizeof and cint.sizeof == int32.sizeof,
-    "Not binary-compatible with GLFW. Please report this"
+    "Not binary-compatible with GLFW. Please report this."
+  gitPull("https://github.com/glfw/glfw", BaseDir, "include/*\nsrc/*\n")
+  cDisableCaching()
+  cDebug()
 
-{.compile: "glfw/src/vulkan.c".}
+cCompile(Src/"vulkan.c")
 
 when defined(windows):
-  {.passC: "-D_GLFW_WIN32", passL: "-lopengl32 -lgdi32",
-    compile: "glfw/src/win32_init.c",   compile: "glfw/src/win32_monitor.c",
-    compile: "glfw/src/win32_time.c",   compile: "glfw/src/win32_tls.c",
-    compile: "glfw/src/win32_window.c", compile: "glfw/src/win32_joystick.c",
-    compile: "glfw/src/wgl_context.c",  compile: "glfw/src/egl_context.c".}
+  {.passC: "-D_GLFW_WIN32", passL: "-lopengl32 -lgdi32".}
+  cCompile(Src/"win32_*.c")
+  cCompile(Src/"wgl_context.c")
+  cCompile(Src/"egl_context.c")
 elif defined(macosx):
   {.passC: "-D_GLFW_COCOA -D_GLFW_USE_CHDIR -D_GLFW_USE_MENUBAR -D_GLFW_USE_RETINA",
-    passL: "-framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo",
-    compile: "glfw/src/cocoa_init.m",   compile: "glfw/src/cocoa_monitor.m",
-    compile: "glfw/src/cocoa_time.c",   compile: "glfw/src/posix_tls.c",
-    compile: "glfw/src/cocoa_window.m", compile: "glfw/src/cocoa_joystick.m",
-    compile: "glfw/src/nsgl_context.m".}
+    passL: "-framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo".}
+  cCompile(Src/"cocoa_*.m")
+  cCompile(Src/"cocoa_time.c")
+  cCompile(Src/"posix_tls.c")
+  cCompile(Src/"nsgl_context.m")
 else:
   {.passL: "-pthread -lGL -lX11 -lXrandr -lXxf86vm -lXi -lXcursor -lm -lXinerama".}
 
   when defined(wayland):
-    {.passC: "-D_GLFW_WAYLAND",
-      compile: "glfw/src/wl_init.c",   compile: "glfw/src/wl_monitor.c",
-      compile: "glfw/src/wl_window.c", compile: "glfw/src/egl_context.c".}
+    {.passC: "-D_GLFW_WAYLAND".}
+    cCompile(Src/"wl_*.c")
+    cCompile(Src/"egl_context.c")
   elif defined(mir):
-    {.passC: "-D_GLFW_MIR",
-      compile: "glfw/src/mir_init.c",   compile: "glfw/src/mir_monitor.c",
-      compile: "glfw/src/mir_window.c", compile: "glfw/src/egl_context.c".}
+    {.passC: "-D_GLFW_MIR".}
+    cCompile(Src/"mir_*.c")
+    cCompile(Src/"egl_context.c")
   else:
-    {.passC: "-D_GLFW_X11",
-      compile: "glfw/src/x11_init.c",   compile: "glfw/src/x11_monitor.c",
-      compile: "glfw/src/x11_window.c", compile: "glfw/src/glx_context.c",
-      compile: "glfw/src/egl_context.c".}
+    {.passC: "-D_GLFW_X11".}
+    cCompile(Src/"x11_*.c")
+    cCompile(Src/"glx_context.c")
+    cCompile(Src/"egl_context.c")
 
   {.compile: "glfw/src/xkb_unicode.c", compile: "glfw/src/linux_joystick.c",
     compile: "glfw/src/posix_time.c",  compile: "glfw/src/posix_tls.c".}
+  cCompile(Src/"xkb_unicode.c")
+  cCompile(Src/"linux_joystick.c")
+  cCompile(Src/"posix_time.c")
+  cCompile(Src/"posix_tls.c")
 
-{.compile: "glfw/src/context.c", compile: "glfw/src/init.c",
-  compile: "glfw/src/input.c",   compile: "glfw/src/monitor.c",
-  compile: "glfw/src/window.c".}
+cCompile("glfw/src/context.c")
+cCompile("glfw/src/init.c")
+cCompile("glfw/src/input.c")
+cCompile("glfw/src/monitor.c")
+cCompile("glfw/src/window.c")
 
 {.pragma: glfwImport.}
 
@@ -427,14 +446,14 @@ macro generateProcs(): typed =
     proc createStandardCursor*(shape: CursorShape): Cursor
     proc destroyCursor*(cursor: Cursor)
     proc setCursor*(window: Window; cursor: Cursor)
-    proc setKeyCallback*(window: Window; cbfun: Keyfun): Keyfun {.discardable.}
-    proc setCharCallback*(window: Window; cbfun: Charfun): Charfun {.discardable.}
-    proc setCharModsCallback*(window: Window; cbfun: Charmodsfun): Charmodsfun {.discardable.}
-    proc setMouseButtonCallback*(window: Window; cbfun: Mousebuttonfun): Mousebuttonfun {.discardable.}
-    proc setCursorPosCallback*(window: Window; cbfun: Cursorposfun): Cursorposfun {.discardable.}
-    proc setCursorEnterCallback*(window: Window; cbfun: Cursorenterfun): Cursorenterfun {.discardable.}
-    proc setScrollCallback*(window: Window; cbfun: Scrollfun): Scrollfun {.discardable.}
-    proc setDropCallback*(window: Window; cbfun: Dropfun): Dropfun {.discardable.}
+    proc setKeyCallback*(window: Window; cbfun: Keyfun): Keyfun
+    proc setCharCallback*(window: Window; cbfun: Charfun): Charfun
+    proc setCharModsCallback*(window: Window; cbfun: Charmodsfun): Charmodsfun
+    proc setMouseButtonCallback*(window: Window; cbfun: Mousebuttonfun): Mousebuttonfun
+    proc setCursorPosCallback*(window: Window; cbfun: Cursorposfun): Cursorposfun
+    proc setCursorEnterCallback*(window: Window; cbfun: Cursorenterfun): Cursorenterfun
+    proc setScrollCallback*(window: Window; cbfun: Scrollfun): Scrollfun
+    proc setDropCallback*(window: Window; cbfun: Dropfun): Dropfun
     proc joystickPresent*(joy: int32): int32
     proc getJoystickAxes*(joy: int32; count: ptr int32): ptr cfloat
     proc getJoystickButtons*(joy: int32; count: ptr int32): ptr cuchar

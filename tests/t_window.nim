@@ -7,9 +7,6 @@ import rapid/lib/glad/gl
 import rapid/world/sprite
 import rapid/world/tilemap
 
-const
-  g = 0.98
-
 type
   Tile = object
     tileX, tileY: int
@@ -40,19 +37,23 @@ method draw(plr: var Player, ctx: var RGfxContext, step: float) =
 
 method update(plr: var Player, step: float) =
   echo plr
-  const v = 0.3
-  if plr.win.key(keyDown) == kaDown:
-    plr.force(vec2(0.0, v))
-  if plr.win.key(keyUp) == kaDown:
-    plr.force(vec2(0.0, -v))
+  const
+    v = 0.3
+    g = 0.2
+  plr.force(vec2(0.0, g))
   if plr.win.key(keyLeft) == kaDown:
     plr.force(vec2(-v, 0.0))
   if plr.win.key(keyRight) == kaDown:
     plr.force(vec2(v, 0.0))
-  plr.vel *= 0.8
+  plr.vel.x *= 0.8
 
 proc newPlayer(win: var RWindow, x, y: float): Player =
   result = Player(win: win, width: 8, height: 8)
+
+  let plr = result
+  win.onKeyPress do (win: RWindow, key: Key, scancode: int, mods: int):
+    if key == keyUp:
+      plr.force(vec2(0.0, -3.0))
 
 let Map = [
   [at(),     at(),     at(),     at(),     at(),     at(),     at(),     at()],
