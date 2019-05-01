@@ -14,7 +14,7 @@ import unicode
 
 import ../debug
 import ../lib/glad/gl
-from ../lib/glfw/glfw import nil
+from ../lib/glfw import nil
 import opengl
 
 export glfw.Key

@@ -11,19 +11,20 @@
 
 import os
 
-import nimterop/[cimport, git, paths]
+import nimterop/[cimport, git]
 
 const
-  BaseDir = nimteropBuildDir()/"glfw"
+  BaseDir = currentSourcePath().splitPath().head/"glfw_src"
   Incl = BaseDir/"include"
   Src = BaseDir/"src"
 
 static:
   assert cshort.sizeof == int16.sizeof and cint.sizeof == int32.sizeof,
     "Not binary-compatible with GLFW. Please report this."
-  gitPull("https://github.com/glfw/glfw", BaseDir, "include/*\nsrc/*\n")
-  cDisableCaching()
-  cDebug()
+  gitPull("https://github.com/glfw/glfw", BaseDir, "include/*\nsrc/*\n",
+          checkout = "#latest")
+
+cIncludeDir(Incl)
 
 cCompile(Src/"vulkan.c")
 
@@ -37,7 +38,7 @@ elif defined(macosx):
     passL: "-framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo".}
   cCompile(Src/"cocoa_*.m")
   cCompile(Src/"cocoa_time.c")
-  cCompile(Src/"posix_tls.c")
+  cCompile(Src/"posix_thread.c")
   cCompile(Src/"nsgl_context.m")
 else:
   {.passL: "-pthread -lGL -lX11 -lXrandr -lXxf86vm -lXi -lXcursor -lm -lXinerama".}
@@ -55,19 +56,18 @@ else:
     cCompile(Src/"x11_*.c")
     cCompile(Src/"glx_context.c")
     cCompile(Src/"egl_context.c")
+    cCompile(Src/"osmesa_context.c")
 
-  {.compile: "glfw/src/xkb_unicode.c", compile: "glfw/src/linux_joystick.c",
-    compile: "glfw/src/posix_time.c",  compile: "glfw/src/posix_tls.c".}
   cCompile(Src/"xkb_unicode.c")
   cCompile(Src/"linux_joystick.c")
   cCompile(Src/"posix_time.c")
-  cCompile(Src/"posix_tls.c")
+  cCompile(Src/"posix_thread.c")
 
-cCompile("glfw/src/context.c")
-cCompile("glfw/src/init.c")
-cCompile("glfw/src/input.c")
-cCompile("glfw/src/monitor.c")
-cCompile("glfw/src/window.c")
+cCompile(Src/"context.c")
+cCompile(Src/"init.c")
+cCompile(Src/"input.c")
+cCompile(Src/"monitor.c")
+cCompile(Src/"window.c")
 
 {.pragma: glfwImport.}
 
