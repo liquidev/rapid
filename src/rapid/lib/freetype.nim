@@ -20,8 +20,8 @@ FT_USE_MODULE( FT_Driver_ClassRec, tt_driver_class )
 FT_USE_MODULE( FT_Driver_ClassRec, cff_driver_class )
 FT_USE_MODULE( FT_Module_Class, psnames_module_class )
 FT_USE_MODULE( FT_Module_Class, pshinter_module_class )
-FT_USE_MODULE( FT_Renderer_Class, ft_raster1_renderer_class )
 FT_USE_MODULE( FT_Module_Class, sfnt_module_class )
+FT_USE_MODULE( FT_Renderer_Class, ft_raster1_renderer_class )
 FT_USE_MODULE( FT_Renderer_Class, ft_smooth_renderer_class )
 FT_USE_MODULE( FT_Renderer_Class, ft_smooth_lcd_renderer_class )
 FT_USE_MODULE( FT_Renderer_Class, ft_smooth_lcdv_renderer_class )
@@ -59,7 +59,10 @@ cIncludeDir(Incl)
 
 cDefine("FT2_BUILD_LIBRARY")
 
-cImport("freetype_import.h", recurse = true)
+var ft2build = open(Incl/"ft2build.h")
+ft2build.writeLine("#include FT_FREETYPE_H")
+
+cImport(Incl/"ft2build.h", recurse = true)
 
 cCompile(Src/"base/ftsystem.c")
 cCompile(Src/"base/ftinit.c")
