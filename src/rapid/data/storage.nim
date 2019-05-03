@@ -12,10 +12,10 @@ import tables
 
 import nimPNG
 
-import dsl
 import ../lib/glad/gl
+import ../lib/freetype
 
-export dsl
+include dsl
 
 type
   RImage* = ref object
@@ -36,10 +36,26 @@ type
     wrapMirroredRepeat
     wrapClampToEdge
     wrapClampToBorder
+  RPixelFormat* = enum
+    pfRgb8
+    pfRed8
+
+  RFont* = ref object
+    handle*: FT_Face
+  RFontRenderMode* = enum
+    frPixel
+    frSmooth
+    frLCD
+    frLCDV
+  FontConfig = object
+    path: string
+    height, width: int
+    mode: RFontRenderMode
 
   DataSpec = object
     images: Table[string, string]
     textures: Table[string, RTextureConfig]
+    fonts: Table[string, FontConfig]
   RData* = ref object
     # Loading
     dir*: string
@@ -47,9 +63,10 @@ type
     # Storage
     images*: TableRef[string, RImage]
     textures*: TableRef[string, RTexture]
+    fonts*: TableRef[string, RFont]
   RResKind* = enum
     resImage
-    resSound
+    resFont
 
 #--
 # Textures
@@ -71,27 +88,44 @@ proc newRTexture*(width, height: int, data: pointer,
                   conf: RTextureConfig): RTexture =
   ## Creates a new, blank texture.
   result = RTexture()
-  glGenTextures(1, addr result.id)
-  glBindTexture(GL_TEXTURE_2D, result.id)
-  glTexImage2D(GL_TEXTURE_2D,
-    0,
-    GLint GL_RGBA8, GLsizei width, GLsizei height,
-    0,
-    GL_RGBA, GL_UNSIGNED_BYTE,
-    data)
-  glTexParameteri(GL_TEXTURE_2D,
+  glCreateTextures(GL_TEXTURE_2D, 1, addr result.id)
+  glTextureStorage2D(result.id, 1, GL_RGBA8, width.GLsizei, height.GLsizei)
+  glTextureSubImage2D(result.id, 0, 0, 0, width.GLsizei, height.GLsizei,
+                      GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, data)
+  glTextureParameteri(result.id,
     GL_TEXTURE_MIN_FILTER, GLint GLenum(conf.minFilter))
-  glTexParameteri(GL_TEXTURE_2D,
+  glTextureParameteri(result.id,
     GL_TEXTURE_MAG_FILTER, GLint GLenum(conf.magFilter))
-  glTexParameteri(GL_TEXTURE_2D,
+  glTextureParameteri(result.id,
     GL_TEXTURE_WRAP_S, GLint GLenum(conf.wrap))
-  glTexParameteri(GL_TEXTURE_2D,
+  glTextureParameteri(result.id,
     GL_TEXTURE_WRAP_T, GLint GLenum(conf.wrap))
 
 proc newRTexture*(img: RImage): RTexture =
   ## Creates a new texture from an image.
   result = newRTexture(
     img.width, img.height, img.data[0].unsafeAddr, img.textureConf)
+
+#~~
+# Fonts
+#~~
+
+type
+  FreetypeError* = object of Exception
+
+var freetypeLib*: FT_Library
+
+proc newRFont*(file: string,
+               height: int, width = 0, renderMode = frSmooth): RFont =
+  once:
+    let err = FT_Init_Freetype(addr freetypeLib).bool
+    if err:
+      raise newException(FreetypeError, "Could not initialize FreeType")
+  let err = FT_New_Face(freetypeLib, file, 0, addr result.handle)
+  if err == FT_Err_Unknown_File_Format:
+    raise newException(FreetypeError, "Unknown font format (" & file & ")")
+  elif err.bool:
+    raise newException(FreetypeError, "Could not load font " & file & "")
 
 #--
 # Data
@@ -114,11 +148,21 @@ proc image*(data: var RData, name, filename: string, texConf: RTextureConfig) =
   data.spec.images[name] = filename
   data.spec.textures[name] = texConf
 
+proc font*(data: var RData, name, filename: string,
+           height: int, width = 0, renderMode = frSmooth) =
+  ## Defines a font to be loaded with the ``load`` iterator.
+  data.spec.fonts[name] = FontConfig(
+    path: filename,
+    height: height, width: width,
+    mode: renderMode
+  )
+
 iterator load*(data: var RData): tuple[kind: RResKind, id: string,
                                        progress: float] =
   ## An iterator for loading resources one by one.
   let
-    progressPerImage = (1 / 1) / float(data.spec.images.len)
+    progressPerImage = (1 / 2) / float(data.spec.images.len)
+    progressPerFont = (1 / 2) / float(data.spec.fonts.len)
   var progress = 0.0
   for id, filename in data.spec.images:
     let png = loadPNG32(data.dir / filename)
@@ -129,6 +173,12 @@ iterator load*(data: var RData): tuple[kind: RResKind, id: string,
     )
     progress += progressPerImage
     yield (resImage, id, progress)
+  for id, conf in data.spec.fonts:
+    let fnt = newRFont(conf.path, conf.height, conf.width, conf.mode)
+    data.fonts[id] = fnt
+    progress += progressPerFont
+    yield (resFont, id, progress)
+
 
 proc loadAll*(data: var RData) =
   ## Loads all resources in one go.

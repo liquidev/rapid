@@ -10,6 +10,31 @@ To install rapid, use the following command:
 $ nimble install https://github.com/liquid600pgm/rapid
 ```
 
+### Linux
+
+On Linux, the development headers for the following libraries must be installed:
+ - GL
+ - X11
+ - Xrandr
+ - Xxf86vm
+ - Xi
+ - Xcursor
+ - Xinerama
+
+#### Debian and Ubuntu
+```
+sudo apt install \
+  libgl-dev libx11-dev libxrandr-dev libxxf86vm-dev libxi-dev libxcursor-dev \
+  libxinerama-dev
+```
+
+#### openSUSE
+```
+sudo zypper in \
+  Mesa-libGL-devel libX11-devel libXrandr-devel libXxf86vm-devel \
+  libXinerama-devel libXi-devel libXcursor-devel
+```
+
 ## Examples
 
 ### Opening a window

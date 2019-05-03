@@ -4,6 +4,9 @@
 # copyright (c) 2019, iLiquid
 #--
 
+## This module handles drawing basic graphics. Other modules from the gfx \
+## directory provide more advanced drawing, like texture atlases and text.
+
 import colors
 import tables
 
@@ -15,6 +18,7 @@ import ../data/storage
 import ../lib/glad/gl
 
 export glm
+export opengl.GLError
 
 #--
 # Shaders
@@ -26,8 +30,6 @@ type
     shVertex
     shFragment
   ShaderError* = object of Exception
-
-
 
 const
   RVshLibSrc = """

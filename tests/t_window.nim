@@ -1,6 +1,6 @@
 import glm
 
-import rapid/data
+import rapid/data/storage
 import rapid/gfx
 import rapid/gfx/atlas
 import rapid/lib/glad/gl
@@ -36,7 +36,7 @@ method draw(plr: var Player, ctx: var RGfxContext, step: float) =
   ctx.draw()
 
 method update(plr: var Player, step: float) =
-  echo plr
+  #echo plr
   const
     v = 0.3
     g = 0.2

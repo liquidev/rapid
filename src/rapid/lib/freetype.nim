@@ -4,14 +4,16 @@
 # copyright (c) 2019, iLiquid
 #--
 
-## This is a wrapper for the FreeType library.
+## This is a wrapper for the FreeType library. Feel free to include it in your
+## own projects.
 
 import os
 
 import nimterop/[cimport, git]
 
 const
-  BaseDir = currentSourcePath().splitPath().head/"freetype_src"
+  ThisDir = currentSourcePath().splitPath().head
+  BaseDir = ThisDir/"freetype_src"
   Incl = BaseDir/"include"
   Src = BaseDir/"src"
 
@@ -59,10 +61,7 @@ cIncludeDir(Incl)
 
 cDefine("FT2_BUILD_LIBRARY")
 
-var ft2build = open(Incl/"ft2build.h")
-ft2build.writeLine("#include FT_FREETYPE_H")
-
-cImport(Incl/"ft2build.h", recurse = true)
+cImport(ThisDir/"freetype_include.h", recurse = true)
 
 cCompile(Src/"base/ftsystem.c")
 cCompile(Src/"base/ftinit.c")
