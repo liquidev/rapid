@@ -1,3 +1,12 @@
+#--
+# rapid
+# a game engine optimized for rapid prototyping
+# copyright (c) 2019, iLiquid
+#--
+
+## This module has some utility color manipulation procs.
+## **Do not import this directly, it's included by the surface module.**
+
 import std/colors
 
 export colors except rgb

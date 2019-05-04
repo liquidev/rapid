@@ -5,8 +5,10 @@
 #--
 
 ## This module has everything related to windows.
+## **Do not import this directly, it's included by the surface module.**
 
 import deques
+import macros
 import os
 import tables
 import times
@@ -103,8 +105,9 @@ type
   # Windows
   #--
   RWindowObj = object
-    handle: glfw.Window
+    handle*: glfw.Window
     callbacks: WindowCallbacks
+    context*: GLContext
   RWindow* = ref RWindowObj
 
 using
@@ -160,23 +163,19 @@ proc glfwCallbacks(win: var RWindow) =
     for fn in win.callbacks.name: body
   discard glfw.setCharModsCallback(win.handle,
     proc (w: glfw.Window, uchar: cuint, mods: int32) =
-      run(onChar): fn(win, Rune(uchar), int mods)
-  )
+      run(onChar): fn(win, Rune(uchar), int mods))
   discard glfw.setCursorEnterCallback(win.handle,
     proc (w: glfw.Window, entered: int32) =
       if entered == 1:
         run(onCursorEnter, fn(win))
       else:
-        run(onCursorLeave, fn(win))
-  )
+        run(onCursorLeave, fn(win)))
   discard glfw.setCursorPosCallback(win.handle,
     proc (w: glfw.Window, x, y: cdouble) =
-      run(onCursorMove, fn(win, x, y))
-  )
+      run(onCursorMove, fn(win, x, y)))
   discard glfw.setDropCallback(win.handle,
     proc (w: glfw.Window, n: int32, files: cstringArray) =
-      run(onFilesDropped, fn(win, cstringArrayToSeq(files, n)))
-  )
+      run(onFilesDropped, fn(win, cstringArrayToSeq(files, n))))
   discard glfw.setKeyCallback(win.handle,
     proc (w: glfw.Window, key, scan, action, mods: int32) =
       case glfw.KeyAction(action)
@@ -185,8 +184,7 @@ proc glfwCallbacks(win: var RWindow) =
       of glfw.kaUp:
         run(onKeyRelease, fn(win, glfw.Key(key), int scan, int mods))
       of glfw.kaRepeat:
-        run(onKeyRepeat, fn(win, glfw.Key(key), int scan, int mods))
-  )
+        run(onKeyRepeat, fn(win, glfw.Key(key), int scan, int mods)))
   discard glfw.setMouseButtonCallback(win.handle,
     proc (w: glfw.Window, button, action, mods: int32) =
       case glfw.KeyAction(action)
@@ -194,22 +192,18 @@ proc glfwCallbacks(win: var RWindow) =
         run(onMousePress, fn(win, glfw.MouseButton(button), int mods))
       of glfw.kaUp:
         run(onMouseRelease, fn(win, glfw.MouseButton(button), int mods))
-      else: discard
-  )
+      else: discard)
   discard glfw.setScrollCallback(win.handle,
     proc (w: glfw.Window, x, y: cdouble) =
-      run(onScroll, fn(win, x, y))
-  )
+      run(onScroll, fn(win, x, y)))
   discard glfw.setWindowCloseCallback(win.handle,
     proc (w: glfw.Window) =
       var close = true
       run(onClose): close = close and fn(win)
-      glfw.setWindowShouldClose(w, int32 close)
-  )
+      glfw.setWindowShouldClose(w, int32 close))
   discard glfw.setWindowSizeCallback(win.handle,
     proc (w: glfw.Window, width, height: int32) =
-      run(onResize, fn(win, width, height))
-  )
+      run(onResize, fn(win, width, height)))
 
 converter toInt32(hint: glfw.Hint): int32 =
   int32 hint
@@ -231,21 +225,24 @@ proc open*(wopt): RWindow =
   glfw.windowHint(glfw.hDepthBits, 24)
   glfw.windowHint(glfw.hStencilBits, 8)
 
-  glfw.windowHint(glfw.hResizable, int32 wopt.resizable)
-  glfw.windowHint(glfw.hVisible, int32 false)
-  glfw.windowHint(glfw.hDecorated, int32 wopt.decorated)
-  glfw.windowHint(glfw.hFocused, int32 wopt.focused)
-  glfw.windowHint(glfw.hFloating, int32 wopt.floating)
-  glfw.windowHint(glfw.hMaximized, int32 wopt.maximized)
+  glfw.windowHint(glfw.hResizable, wopt.resizable.int32)
+  glfw.windowHint(glfw.hVisible, false.int32)
+  glfw.windowHint(glfw.hDecorated, wopt.decorated.int32)
+  glfw.windowHint(glfw.hFocused, wopt.focused.int32)
+  glfw.windowHint(glfw.hFloating, wopt.floating.int32)
+  glfw.windowHint(glfw.hMaximized, wopt.maximized.int32)
 
   glfw.windowHint(glfw.hContextVersionMajor, 3)
   glfw.windowHint(glfw.hContextVersionMinor, 3)
-  glfw.windowHint(glfw.hOpenglProfile, int32 glfw.opCoreProfile)
+  glfw.windowHint(glfw.hOpenglProfile, glfw.opCoreProfile.int32)
   glfw.windowHint(glfw.hOpenglDebugContext, 1)
   result.handle = glfw.createWindow(
-    int32 wopt.width, int32 wopt.height,
+    wopt.width.int32, wopt.height.int32,
     wopt.title,
     nil, nil
+  )
+  result.context = GLContext(
+    window: result.handle
   )
 
   # center the window
@@ -382,55 +379,14 @@ proc mouseY*(win: RWindow): float = win.mousePos.y
 proc `mousePos=`*(win: var RWindow, x, y: float) =
   glfw.setCursorPos(win.handle, float64 x, float64 y)
 
-#--
-# Game loop
-#--
+proc makeCurrent*(win: RWindow) =
+  ## Makes the window the current one for drawing actions.
+  win.context.makeCurrent()
 
-proc calcMillisPerFrame(win: RWindow): float =
-  let
-    mon = glfw.getPrimaryMonitor()
-    mode = glfw.getVideoMode(mon)
-  result = 1 / mode.refreshRate
-
-type
-  RDrawProc* = proc (step: float)
-  RUpdateProc* = proc (step: float)
-
-proc render*(win: var RWindow, draw: proc ()) =
-  ## Renders a single frame onto the specified window.
-  glfw.makeContextCurrent(win.handle)
-  draw()
-  glfw.swapBuffers(win.handle)
-  glfw.pollEvents()
-
-proc loop*(win: var RWindow,
-           draw: RDrawProc, update: RUpdateProc) =
-  ## Starts a game loop on the specified window.
-  ## This should only be used for the main window! See ``render`` for drawing \
-  ## onto children windows.
-  glfw.makeContextCurrent(win.handle)
-
-  glfw.swapInterval(1)
-
-  let millisPerUpdate = calcMillisPerFrame(win)
-  const millisPer60fps = 1 / 60
-    # 60 fps is an arbitrary number, but gives a more natural time step to
-    # work with in update functions
-  var
-    previous = float(glfw.getTime())
-    lag = 0.0
-  while glfw.windowShouldClose(win.handle) == 0:
-    let
-      current = float(glfw.getTime())
-      elapsed = current - previous
-    previous = current
-    lag += elapsed
-
-    while lag >= millisPerUpdate:
-      update(elapsed / millisPer60fps)
-      lag -= millisPerUpdate
-
-    draw(lag / millisPerUpdate)
-
-    glfw.swapBuffers(win.handle)
-    glfw.pollEvents()
+template with*(win: RWindow, body: untyped) =
+  ## Does the specified actions on the window's contents.
+  ## ``render`` should be preferred over this.
+  let prevGlc = currentGlc
+  win.makeCurrent()
+  body
+  prevGlc.makeCurrent()

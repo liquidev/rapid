@@ -8,17 +8,21 @@
 ## directory provide more advanced drawing, like texture atlases and text.
 
 import colors
+import macros
 import tables
 
 import glm
 
 import opengl
-import window
 import ../data/storage
 import ../lib/glad/gl
+from ../lib/glfw import nil
 
 export glm
 export opengl.GLError
+
+include rcolor
+include window
 
 #--
 # Shaders
@@ -408,7 +412,7 @@ proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
 
 proc `texture=`*(ctx: var RGfxContext, tex: string) =
   ## Sets the texture to draw with, pulling it from the Gfx's ``RData``.
-  assert not (isNil(ctx.gfx.data)),
+  assert (not ctx.gfx.data.isNil),
     "A data object must be bound to the RGfx"
   assert ctx.gfx.data.images.hasKey(tex),
     "The texture \"" & tex & "\" doesn't exist"
@@ -514,19 +518,110 @@ proc draw*(ctx: var RGfxContext, primitive = prShape) =
         else:          GL_TRIANGLES,
         0, GLsizei ctx.vertexCount)
 
-proc activate*(ctx: var RGfxContext) =
-  ## Activates the Gfx context for drawing. This is only required when using \
-  ## multiple Gfx objects.
-  glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.fbo)
-  ctx.defaultProgram()
-  glBindVertexArray(ctx.gfx.vaoID)
-  glBindBuffer(GL_ARRAY_BUFFER, ctx.gfx.vboID)
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ctx.gfx.eboID)
-
 proc ctx*(gfx: RGfx): RGfxContext =
   ## Creates a Gfx context for the specified Gfx.
+  ## This should not be used by itself unless you know what you're doing!
+  ## Use ``render`` and ``loop`` instead. This proc is exported because they \
+  ## would not work without it.
   result = RGfxContext(
     gfx: gfx,
     color: col(colWhite),
     transform: mat4(vec4(1.0'f32, 1.0, 1.0, 1.0))
   )
+
+#--
+# Rendering
+#--
+
+template render*(gfx: RGfx, ctx, body: untyped): untyped =
+  ## Renders a single frame onto the specified window.
+  with(gfx.win):
+    var ctx {.inject.} = gfx.ctx()
+    glBindFramebuffer(GL_FRAMEBUFFER, gfx.fbo)
+    ctx.defaultProgram()
+    glBindVertexArray(gfx.vaoID)
+    glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gfx.eboID)
+    body
+    glfw.swapBuffers(gfx.win.handle)
+    glfw.pollEvents()
+
+proc calcMillisPerFrame(): float =
+  let
+    mon = glfw.getPrimaryMonitor()
+    mode = glfw.getVideoMode(mon)
+  result = 1 / mode.refreshRate
+
+macro loop*(gfx: RGfx, body: untyped): untyped =
+  ## Runs a game loop on the specified window. A ``draw`` and ``update`` event \
+  ## must be provided (see example).
+  ## The game loop is responsible for running the game at a constant speed, \
+  ## independent of the hardware the game's running on.
+  runnableExamples:
+    var
+      win = initRWindow()
+        .size(800, 600)
+        .open()
+      gfx = win.openGfx
+      x = 0.0
+    gfx.loop:
+      draw ctx, step:
+        # The ctx should *never* be assigned to a variable outside of this
+        # block's scope. Doing so is undefined behavior, and will cause problems
+        # when rendering to multiple windows if special care is not taken.
+        ctx.clear(col(colWhite))
+        ctx.color = col(colBlack)
+        ctx.rect(0, x, 32, 32)
+      update step:
+        x += step
+  # What this macro does can technically be done using a proc, but for some
+  # reason doing so causes a segmentation fault under Windows.
+  var
+    drawBody, updateBody: NimNode
+    drawCtxName, drawStepName, updateStepName: NimNode
+  body.expectKind(nnkStmtList)
+  for st in body:
+    st.expectKind(nnkCommand)
+    st[1].expectKind(nnkIdent)
+    if st[0].eqIdent("draw"):
+      st[2].expectKind(nnkIdent)
+      st[3].expectKind(nnkStmtList)
+      drawCtxName = st[1]
+      drawStepName = st[2]
+      drawBody = st[3]
+    elif st[0].eqIdent("update"):
+      st[2].expectKind(nnkStmtList)
+      updateStepName = st[1]
+      updateBody = st[2]
+    else:
+      error("Invalid loop event! Must be 'draw' or 'update'", st)
+  if drawBody.isNil: error("Missing draw event", body)
+  if updateBody.isNil: error("Missing update event", body)
+  result = quote do:
+    glfw.swapInterval(1)
+
+    let millisPerUpdate = calcMillisPerFrame()
+    const millisPer60fps = 1 / 60
+      # 60 fps is an arbitrary number, but gives a more natural time step to
+      # work with in update functions, because this is the typical monitor
+      # refresh rate
+    var
+      previous = float(glfw.getTime())
+      lag = 0.0
+    while glfw.windowShouldClose(`gfx`.win.handle) == 0:
+      let
+        current = float(glfw.getTime())
+        elapsed = current - previous
+      previous = current
+      lag += elapsed
+
+      while lag >= millisPerUpdate:
+        block update:
+          let `updateStepName` = elapsed / millisPer60fps
+          `updateBody`
+        lag -= millisPerUpdate
+
+      block draw:
+        let `drawStepName` = lag / millisPerUpdate
+        `gfx`.render `drawCtxName`:
+          `drawBody`

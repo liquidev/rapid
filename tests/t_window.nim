@@ -1,8 +1,8 @@
 import glm
 
 import rapid/data/storage
-import rapid/gfx
-import rapid/gfx/atlas
+import rapid/gfx/texatlas
+import rapid/gfx/surface
 import rapid/lib/glad/gl
 import rapid/world/sprite
 import rapid/world/tilemap
@@ -79,7 +79,6 @@ proc main() =
       "rapid" <- image("logo-4x.png", tc)
       "tileset" <- image("tileset.png", tc)
     gfx = win.openGfx()
-    ctx = gfx.ctx
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
 
   data.dir = "sampleData"
@@ -116,15 +115,12 @@ proc main() =
   win.onMouseRelease do (win: RWindow, btn: MouseButton, mode: int):
     pressed = false
 
-  proc draw(step: float) =
-    ctx.activate()
-    ctx.clear(rgb(32, 32, 32))
-    ctx.color = col(colWhite)
-    map.draw(ctx, step)
-
-  proc update(step: float) =
-    map.update(step)
-
-  win.loop(draw, update)
+  gfx.loop:
+    draw ctx, step:
+      ctx.clear(rgb(32, 32, 32))
+      ctx.color = col(colWhite)
+      map.draw(ctx, step)
+    update step:
+      map.update(step)
 
 main()

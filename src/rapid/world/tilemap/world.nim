@@ -9,7 +9,7 @@ import math
 import ../aabb
 import ../sprite
 import ../worldbase
-import ../../gfx/draw
+import ../../gfx/surface
 
 export worldbase
 
@@ -61,7 +61,7 @@ proc isSolid*(wld: RTmWorld, x, y: int): bool =
   result = wld.tile.isSolidImpl(wld[x, y])
 
 proc init*[T](wld: var RTmWorld[T]) =
-  assert not isNil(wld.tile.initImpl),
+  assert (not wld.tile.initImpl.isNil),
     "Attempt to initialize unimplemented world"
   wld.tiles = @[]
   for y in 0..<wld.height:
@@ -122,7 +122,8 @@ proc tileAlignedHitbox(wld: RTmWorld,
 
 proc update*[T](wld: var RTmWorld[T], step: float) =
   ## Updates the world, simulating physics on its sprites.
-  assert not wld.tile.isSolidImpl.isNil, "Cannot update an uninitialized world"
+  assert (not wld.tile.isSolidImpl.isNil),
+    "Cannot update an uninitialized world"
   for spr in mitems(wld.sprites):
     spr.update(step)
     spr.vel += spr.acc
@@ -140,12 +141,14 @@ proc update*[T](wld: var RTmWorld[T], step: float) =
         let t = newRAABB(x.float * wld.tileWidth, y.float * wld.tileWidth,
                          wld.tileWidth, wld.tileHeight)
         if spr.vel.x > 0.001 and not wld.isSolid(x - 1, y):
-          let w = newRAABB(t.left, t.top + 1, spr.vel.x, t.height - 2)
+          let w = newRAABB(t.left, t.top + 1,
+                           spr.vel.x * 1.5, t.height - 2)
           if s.intersects(w):
             spr.vel.x *= -spr.friction
             p.x = t.left - s.width
-        if spr.vel.x < 0.001 and not wld.isSolid(x + 1, y):
-          let w = newRAABB(t.right - spr.vel.x, t.top + 1, spr.vel.x, t.height - 2)
+        if spr.vel.x < -0.001 and not wld.isSolid(x + 1, y):
+          let w = newRAABB(t.right - (spr.vel.x * -1.5), t.top + 1,
+                           spr.vel.x * -1.5, t.height - 2)
           if s.intersects(w):
             spr.vel.x *= -spr.friction
             p.x = t.right
@@ -159,12 +162,14 @@ proc update*[T](wld: var RTmWorld[T], step: float) =
         let t = newRAABB(x.float * wld.tileWidth, y.float * wld.tileWidth,
                          wld.tileWidth, wld.tileHeight)
         if spr.vel.y > 0.001 and not wld.isSolid(x, y - 1):
-          let w = newRAABB(t.left + 1, t.top, t.width - 2, spr.vel.y)
+          let w = newRAABB(t.left + 1, t.top,
+                           t.width - 2, spr.vel.y * 1.5)
           if s.intersects(w):
             spr.vel.y *= -spr.friction
             p.y = t.top - s.height
-        if spr.vel.y < 0.001 and not wld.isSolid(x, y + 1):
-          let w = newRAABB(t.left + 1, t.bottom - spr.vel.y, t.width - 2, spr.vel.y)
+        if spr.vel.y < -0.001 and not wld.isSolid(x, y + 1):
+          let w = newRAABB(t.left + 1, t.bottom - (spr.vel.y * -1.5),
+                           t.width - 2, spr.vel.y * -1.5)
           if s.intersects(w):
             spr.vel.y *= -spr.friction
             p.y = t.bottom

@@ -5,8 +5,6 @@
 #--
 
 ## This module provides texture atlas utilities.
-## It is not exported by ``gfx``, since not all games/applications use tile \
-## atlases.
 
 import tables
 
@@ -21,8 +19,8 @@ type
 proc rect*(atlas: RAtlas, x, y: int): RTileRect =
   ## Calculates texture coordinates for the tile (x, y).
   let
-    left = float(x) * (atlas.tileWidth + atlas.spacingX * 2) + atlas.spacingX
-    top = float(y) * (atlas.tileHeight + atlas.spacingY * 2) + atlas.spacingY
+    left = x.float * (atlas.tileWidth + atlas.spacingX * 2) + atlas.spacingX
+    top = y.float * (atlas.tileHeight + atlas.spacingY * 2) + atlas.spacingY
   result = (left, top, atlas.tileWidth, atlas.tileHeight)
 
 proc newRAtlas*(img: RImage,

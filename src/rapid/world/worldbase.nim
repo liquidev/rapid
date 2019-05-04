@@ -5,7 +5,7 @@
 #--
 
 import sprite
-import ../gfx/draw
+import ../gfx/surface
 
 type
   RWorld* = ref object of RootObj
