@@ -65,6 +65,12 @@ proc initGl(win: glfw.Window): InitErrorKind =
   if GLAD_GL_KHR_debug:
     glEnable(GL_DEBUG_OUTPUT)
     glDebugMessageCallback(onGlDebug, nil)
+  else:
+    warn("KHR_debug is not present. OpenGL debug info will not be available")
+  if not GLAD_GL_ARB_separate_shader_objects:
+    error("ARB_separate_shader_objects is not available. ",
+          "Please update your graphics drivers")
+    quit(QuitFailure)
   return ieOK
 
 #--
@@ -244,6 +250,8 @@ proc open*(wopt): RWindow =
   result.context = GLContext(
     window: result.handle
   )
+  if currentGlc.isNil:
+    result.context.makeCurrent()
 
   # center the window
   glfw.setWindowPos(result.handle,

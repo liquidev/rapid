@@ -8,7 +8,7 @@
 
 import tables
 
-import ../data/storage
+import ../res/textures
 
 type
   RAtlas* = object
@@ -23,21 +23,17 @@ proc rect*(atlas: RAtlas, x, y: int): RTileRect =
     top = y.float * (atlas.tileHeight + atlas.spacingY * 2) + atlas.spacingY
   result = (left, top, atlas.tileWidth, atlas.tileHeight)
 
-proc newRAtlas*(img: RImage,
+proc newRAtlas*(texture: RTexture,
                 tileWidth, tileHeight: Natural, spacing = 0.Natural): RAtlas =
   ## Creates a new tile atlas for an image.
   let
     fullTileWidth = (tileWidth + spacing * 2)
     fullTileHeight = (tileHeight + spacing * 2)
   result = RAtlas(
-    tileWidth: tileWidth / img.width,
-    tileHeight: tileHeight / img.height,
-    spacingX: spacing / img.width,
-    spacingY: spacing / img.height,
-    tilesX: int(img.width / fullTileWidth),
-    tilesY: int(img.height / fullTileHeight)
+    tileWidth: tileWidth / texture.width,
+    tileHeight: tileHeight / texture.height,
+    spacingX: spacing / texture.width,
+    spacingY: spacing / texture.height,
+    tilesX: int(texture.width / fullTileWidth),
+    tilesY: int(texture.height / fullTileHeight)
   )
-
-proc newRAtlas*(data: RData, img: string,
-                tileWidth, tileHeight: Natural, spacing = 0.Natural): RAtlas =
-  result = newRAtlas(data.images[img], tileWidth, tileHeight, spacing)

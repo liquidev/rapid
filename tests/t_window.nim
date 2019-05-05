@@ -1,8 +1,10 @@
 import glm
 
-import rapid/data/storage
+import rapid/res/textures
+import rapid/res/fonts
 import rapid/gfx/texatlas
 import rapid/gfx/surface
+import rapid/gfx/text
 import rapid/lib/glad/gl
 import rapid/world/sprite
 import rapid/world/tilemap
@@ -30,7 +32,7 @@ type
 
 method draw(plr: var Player, ctx: var RGfxContext, step: float) =
   ctx.begin()
-  ctx.color = col(colWhite)
+  ctx.color = gray(255)
   ctx.noTexture()
   ctx.rect(plr.pos.x * 4, plr.pos.y * 4, 32, 32)
   ctx.draw()
@@ -74,18 +76,14 @@ proc main() =
       .open()
     tc = (
       minFilter: fltNearest, magFilter: fltNearest,
-      wrap: wrapRepeat)
-    data = dataSpec:
-      "rapid" <- image("logo-4x.png", tc)
-      "tileset" <- image("tileset.png", tc)
+      wrapH: wrapRepeat, wrapV: wrapRepeat)
+    rapidLogo = newRTexture("sampleData/logo-4x.png", tc)
+    tileset = newRTexture("sampleData/tileset.png", tc)
+    rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 12)
     gfx = win.openGfx()
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
 
-  data.dir = "sampleData"
-  data.loadAll()
-  gfx.data = data
-
-  let atl = newRAtlas(data, "tileset", 8, 8, 1)
+  let atl = newRAtlas(tileset, 8, 8, 1)
 
   map.implTile(initTile, isSolid)
   map.init()
@@ -93,7 +91,7 @@ proc main() =
 
   proc drawMap(ctx: var RGfxContext, wld: RTmWorld[Tile], step: float) =
     ctx.begin()
-    ctx.texture = "tileset"
+    ctx.texture = tileset
     for x, y, t in tiles(wld):
       ctx.rect(x.float * 32, y.float * 32, 32, 32, atl.rect(t.tileX, t.tileY))
     ctx.draw()
@@ -118,8 +116,9 @@ proc main() =
   gfx.loop:
     draw ctx, step:
       ctx.clear(rgb(32, 32, 32))
-      ctx.color = col(colWhite)
+      ctx.color = gray(255)
       map.draw(ctx, step)
+      ctx.text(rubik, 48, 48, "nied-_-b ciomka makes nied-_-b games presents")
     update step:
       map.update(step)
 

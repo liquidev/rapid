@@ -100,9 +100,11 @@ proc clear*[T](wld: var RTmWorld[T]) =
     t = wld.tile.initImpl()
 
 proc tilePos*(wld: RTmWorld, x, y: float): tuple[x, y: int] =
+  ## Converts world coordinates into world tile coordinates.
   result = (int(x / wld.tileWidth.float), int(y / wld.tileHeight.float))
 
 proc wldPos*(wld: RTmWorld, x, y: int): tuple[x, y: float] =
+  ## Converts tile coordinates into world coordinates.
   result = (x.float * wld.tileWidth.float, y.float * wld.tileHeight.float)
 
 proc draw*[T](wld: RTmWorld[T], ctx: var RGfxContext, step: float) =

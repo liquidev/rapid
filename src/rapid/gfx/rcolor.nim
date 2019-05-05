@@ -7,42 +7,27 @@
 ## This module has some utility color manipulation procs.
 ## **Do not import this directly, it's included by the surface module.**
 
-import std/colors
-
-export colors except rgb
-
 type
-  ColorChannel* = range[0..255]
+  ColorCh* = range[0..255]
+  RColor* = tuple
+    red, green, blue, alpha: float
 
-proc rgba*(r, g, b, a: ColorChannel): Color =
-  ## Creates an RGBA color.
-  result = Color(
-    a shl 24 or
-    r shl 16 or
-    g shl 8 or
-    b
-  )
+proc rgb*(r, g, b: float): RColor =
+  (r, g, b, 1.0)
 
-proc rgb*(r, g, b: ColorChannel): Color =
-  ## Creates an RGB color, with 100% alpha (255).
-  result = rgba(r, g, b, 255)
+proc rgba*(r, g, b, a: float): RColor =
+  (r, g, b, a)
 
-proc gray*(gray: ColorChannel, a = 255.ColorChannel): Color =
+proc rgb*(r, g, b: ColorCh): RColor =
+  (r / 255, g / 255, b / 255, 1.0)
+
+proc rgba*(r, g, b, a: ColorCh): RColor =
+  (r / 255, g / 255, b / 255, a / 255)
+
+proc gray*(gray: ColorCh, a = 255.ColorCh): RColor =
   result = rgba(gray, gray, gray, a)
 
-proc col*(col: Color): Color =
-  ## Sets a color's alpha to 255. This is made to be used with Nim's built-in \
-  ## color constants, which, unfortunately, do not contain an alpha channel.
-  runnableExamples:
-    let greenWithAlpha = col(colGreen)
-  result = Color(int(col) or 0xff000000)
-
-proc alpha*(col: Color): ColorChannel = (0xff000000 and int(col)) shr 24
-proc red*(col: Color): ColorChannel   = (0x00ff0000 and int(col)) shr 16
-proc green*(col: Color): ColorChannel = (0x0000ff00 and int(col)) shr 8
-proc blue*(col: Color): ColorChannel  = (0x000000ff and int(col))
-
-proc norm32*(ch: ColorChannel): float32 =
-  ## Utility method for sending colors to the GPU. Divides the given channel
-  ## by 255, resulting in a normalized ``float32``, which can be used by OpenGL.
-  ch / 255
+proc ired*(col: RColor): ColorCh = int(col.red * 255)
+proc igreen*(col: RColor): ColorCh = int(col.green * 255)
+proc iblue*(col: RColor): ColorCh = int(col.blue * 255)
+proc ialpha*(col: RColor): ColorCh = int(col.alpha * 255)

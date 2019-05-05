@@ -7,14 +7,13 @@
 ## This module handles drawing basic graphics. Other modules from the gfx \
 ## directory provide more advanced drawing, like texture atlases and text.
 
-import colors
 import macros
 import tables
 
 import glm
 
 import opengl
-import ../data/storage
+import ../res/textures
 import ../lib/glad/gl
 from ../lib/glfw import nil
 
@@ -64,13 +63,18 @@ const
     in vec2 rapid_vfUV;
 
     uniform bool rapid_textureEnabled;
+    uniform bool rapid_renderText;
     uniform sampler2D rapid_texture;
 
     out vec4 rapid_fCol;
 
     vec4 rTexel(sampler2D tex, vec2 uv) {
       if (rapid_textureEnabled) {
-        return texture(tex, uv);
+        if (rapid_renderText) {
+          return vec4(1.0, 1.0, 1.0, texture(tex, uv).r);
+        } else {
+          return texture(tex, uv);
+        }
       } else {
         return vec4(1.0, 1.0, 1.0, 1.0);
       }
@@ -84,7 +88,7 @@ const
   """
   RDefaultVshSrc = """
     vec4 rVertex(vec4 pos, mat4 transform) {
-      return pos * transform;
+      return transform * pos;
     }
   """
   RDefaultFshSrc = """
@@ -150,7 +154,6 @@ proc link(program: var RProgram) =
     raise newException(ShaderError, $log)
 
 template uniformCheck(): untyped {.dirty.} =
-  glUseProgram(prog.id)
   if not prog.uniformLocations.hasKey(name):
     prog.uniformLocations[name] = glGetUniformLocation(prog.id, name)
   var val = val
@@ -158,24 +161,24 @@ template uniformCheck(): untyped {.dirty.} =
 proc uniform(prog: RProgram, name: string, val: float) =
   ## Sets a uniform in the specified program.
   uniformCheck()
-  glUniform1f(prog.uniformLocations[name], val)
+  glProgramUniform1f(prog.id, prog.uniformLocations[name], val)
 proc uniform(prog: RProgram, name: string, val: Vec2f) =
   uniformCheck()
-  glUniform2fv(prog.uniformLocations[name], 1, val.caddr)
+  glProgramUniform2fv(prog.id, prog.uniformLocations[name], 1, val.caddr)
 proc uniform(prog: RProgram, name: string, val: Vec3f) =
   uniformCheck()
-  glUniform3fv(prog.uniformLocations[name], 1, val.caddr)
+  glProgramUniform3fv(prog.id, prog.uniformLocations[name], 1, val.caddr)
 proc uniform(prog: RProgram, name: string, val: Vec4f) =
   uniformCheck()
-  glUniform4fv(prog.uniformLocations[name], 1, val.caddr)
+  glProgramUniform4fv(prog.id, prog.uniformLocations[name], 1, val.caddr)
 
 proc uniform(prog: RProgram, name: string, val: int) =
   uniformCheck()
-  glUniform1i(prog.uniformLocations[name], GLint val)
+  glProgramUniform1i(prog.id, prog.uniformLocations[name], GLint val)
 
 proc uniform(prog: RProgram, name: string, val: Mat4) =
   uniformCheck()
-  glUniformMatrix4fv(prog.uniformLocations[name], 1, false, val.caddr)
+  glProgramUniformMatrix4fv(prog.id, prog.uniformLocations[name], 1, false, val.caddr)
 
 #--
 # Gfx
@@ -194,8 +197,8 @@ type
     # Buffer objects
     vaoID, vboID, eboID: GLuint
     vboSize, eboSize: int
-    # Data
-    data: RData
+    # Projection
+    projection: Mat4f
   RPrimitive* = enum
     prPoints
     prLines, prLineStrip, prLineLoop
@@ -284,16 +287,15 @@ proc init(gfx: RGfx) =
     2, 2, cGL_FLOAT, false, Stride, cast[pointer](6 * sizeof(float32)))
   # Textures
   glActiveTexture(GL_TEXTURE0)
+  # Projection
+  gfx.projection = ortho(0'f32, gfx.width.float, gfx.height.float, 0, -1, 1)
 
 proc initRoot(gfx: RGfx) =
   gfx.win.onResize do (win: RWindow, width, height: Natural):
     glViewport(0, 0, GLsizei(width), GLsizei(height))
     gfx.width = width
     gfx.height = height
-
-proc `data=`*(gfx: var RGfx, data: RData) =
-  ## Makes the ``RGfx`` use data from the specified container.
-  gfx.data = data
+    gfx.projection = ortho(0'f32, width.float, height.float, 0, -1, 1)
 
 proc texture*(gfx: RGfx): RTexture =
   ## Returns the texture the Gfx is drawing to. This is ``nil`` if the \
@@ -316,8 +318,9 @@ proc newGfx*(width, height: int, texConf: RTextureConfig): RGfx =
   ## The implementation uses framebuffers.
   result = RGfx(
     width: width,
-    height: height
+    height: height,
   )
+  echo result.projection
   glGenFramebuffers(1, addr result.fbo)
   glBindFramebuffer(GL_FRAMEBUFFER, result.fbo)
   result.target = newRTexture(width, height, nil, texConf)
@@ -338,15 +341,15 @@ type
     vertexCount: int
     # Painting
     program: RProgram
-    color: Color
+    color: RColor
     textureEnabled: bool
     texture: RTexture
     # Transformations
     # TODO: implement transformations
-    projection, transform: Mat4f
+    transform: Mat4f
   RVertex* = tuple
     x, y: float
-    color: Color
+    color: RColor
     u, v: float
   RPointVertex* = tuple
     x, y: float
@@ -355,15 +358,15 @@ type
     u, v: float
   RColVertex* = tuple
     x, y: float
-    color: Color
+    color: RColor
   SomeVertex = RPointVertex | RColVertex | RTexVertex | RVertex
   RVertexIndex* = distinct int32
 
 converter toRVertex*(vert: RPointVertex): RVertex =
-  (vert.x, vert.y, colWhite, 0.0, 0.0)
+  (vert.x, vert.y, gray(255), 0.0, 0.0)
 
 converter toRVertex*(vert: RTexVertex): RVertex =
-  (vert.x, vert.y, colWhite, vert.u, vert.v)
+  (vert.x, vert.y, gray(255), vert.u, vert.v)
 
 converter toRVertex*(vert: RColVertex): RVertex =
   (vert.x, vert.y, vert.color, 0.0, 0.0)
@@ -380,7 +383,7 @@ uniformProc(int)
 uniformProc(Mat4f)
 
 proc updateTransform(ctx: var RGfxContext) =
-  ctx.uniform("rapid_transform", ctx.transform)
+  ctx.uniform("rapid_transform", ctx.gfx.projection * ctx.transform)
 
 proc `program=`*(ctx: var RGfxContext, program: RProgram) =
   ## Binds a shader program for drawing operations.
@@ -392,13 +395,13 @@ proc defaultProgram*(ctx: var RGfxContext) =
   ## Binds the default shader program.
   ctx.`program=`(ctx.gfx.defaultProgram)
 
-proc clear*(ctx: var RGfxContext, col: Color) =
+proc clear*(ctx: var RGfxContext, col: RColor) =
   ## Clears the Gfx with the specified color.
   glClearColor(
-    col.red.norm32, col.green.norm32, col.blue.norm32, col.alpha.norm32)
+    col.red, col.green, col.blue, col.alpha)
   glClear(GL_COLOR_BUFFER_BIT)
 
-proc `color=`*(ctx: var RGfxContext, col: Color) =
+proc `color=`*(ctx: var RGfxContext, col: RColor) =
   ## Sets a 'default' vertex color. This vertex color is used when no explicit \
   ## color is specified in the vertex.
   ctx.color = col
@@ -410,15 +413,10 @@ proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
     ctx.uniform("rapid_textureEnabled", 1)
   ctx.texture = tex
 
-proc `texture=`*(ctx: var RGfxContext, tex: string) =
-  ## Sets the texture to draw with, pulling it from the Gfx's ``RData``.
-  assert (not ctx.gfx.data.isNil),
-    "A data object must be bound to the RGfx"
-  assert ctx.gfx.data.images.hasKey(tex),
-    "The texture \"" & tex & "\" doesn't exist"
-  if not ctx.gfx.data.textures.hasKey(tex):
-    ctx.gfx.data.textures[tex] = newRTexture(ctx.gfx.data.images[tex])
-  ctx.`texture=`(ctx.gfx.data.textures[tex])
+proc texture*(ctx: RGfxContext): RTexture =
+  ## Returns the currently bound texture.
+  if ctx.textureEnabled: result = ctx.texture
+  else: result = nil
 
 proc noTexture*(ctx: var RGfxContext) =
   ## Disables the texture, and draws with plain colors.
@@ -432,26 +430,16 @@ proc begin*(ctx: var RGfxContext) =
   ctx.shape.setLen(0)
   ctx.indices.setLen(0)
 
-# TODO: replace this with a projection matrix
-proc mapX(gfx: RGfx, x: float): float32 =
-  result = x / float(gfx.width) * 2 - 1
-
-proc mapY(gfx: RGfx, y: float): float32 =
-  result =
-    # ugh
-    if gfx.fbo == 0: y / float(gfx.height) * -2 + 1
-    else: y / float(gfx.height) * 2 - 1
-
 proc vertex*(ctx: var RGfxContext,
              vert: RVertex): RVertexIndex {.discardable.} =
   ## Adds a vertex to the shape.
   result = RVertexIndex(ctx.vertexCount)
   ctx.shape.add([
     # Position
-    float32 ctx.gfx.mapX(vert.x), ctx.gfx.mapY(vert.y),
+    float32 vert.x, vert.y,
     # Color
-    vert.color.red.norm32, vert.color.green.norm32, vert.color.blue.norm32,
-    vert.color.alpha.norm32,
+    vert.color.red, vert.color.green, vert.color.blue,
+    vert.color.alpha,
     # Texture coordinates
     vert.u, vert.v
   ])
@@ -502,7 +490,8 @@ proc draw*(ctx: var RGfxContext, primitive = prShape) =
   ## Draws the previously built shape.
   if ctx.shape.len > 0:
     glActiveTexture(GL_TEXTURE0)
-    glBindTexture(GL_TEXTURE_2D, ctx.texture.id)
+    if not ctx.texture.isNil: glBindTexture(GL_TEXTURE_2D, ctx.texture.id)
+    ctx.updateTransform()
     ctx.gfx.updateVbo(ctx.shape)
     if primitive == prShape:
       ctx.gfx.updateEbo(ctx.indices)
@@ -525,7 +514,7 @@ proc ctx*(gfx: RGfx): RGfxContext =
   ## would not work without it.
   result = RGfxContext(
     gfx: gfx,
-    color: col(colWhite),
+    color: gray(255),
     transform: mat4(vec4(1.0'f32, 1.0, 1.0, 1.0))
   )
 
