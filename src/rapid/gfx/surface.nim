@@ -8,6 +8,7 @@
 ## directory provide more advanced drawing, like texture atlases and text.
 
 import macros
+import math
 import tables
 
 import glm
@@ -199,11 +200,6 @@ type
     vboSize, eboSize: int
     # Projection
     projection: Mat4f
-  RPrimitive* = enum
-    prPoints
-    prLines, prLineStrip, prLineLoop
-    prTris, prTriStrip, prTriFan
-    prShape
 
 proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
   ## Creates a new ``RProgram`` from the specified shaders.
@@ -361,6 +357,11 @@ type
     color: RColor
   SomeVertex = RPointVertex | RColVertex | RTexVertex | RVertex
   RVertexIndex* = distinct int32
+  RPrimitive* = enum
+    prPoints
+    prLines, prLineStrip, prLineLoop
+    prTris, prTriStrip, prTriFan
+    prTriShape, prLineShape
 
 converter toRVertex*(vert: RPointVertex): RVertex =
   (vert.x, vert.y, gray(255), 0.0, 0.0)
@@ -406,23 +407,33 @@ proc `color=`*(ctx: var RGfxContext, col: RColor) =
   ## color is specified in the vertex.
   ctx.color = col
 
+proc noTexture*(ctx: var RGfxContext) =
+  ## Disables the texture, and draws with plain colors.
+  if ctx.textureEnabled:
+    ctx.textureEnabled = false
+    ctx.uniform("rapid_textureEnabled", 0)
+
 proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
   ## Sets the texture to draw with.
-  if not ctx.textureEnabled:
-    ctx.textureEnabled = true
-    ctx.uniform("rapid_textureEnabled", 1)
-  ctx.texture = tex
+  if tex.isNil:
+    ctx.noTexture()
+  else:
+    if not ctx.textureEnabled:
+      ctx.textureEnabled = true
+      ctx.uniform("rapid_textureEnabled", 1)
+    ctx.texture = tex
 
 proc texture*(ctx: RGfxContext): RTexture =
   ## Returns the currently bound texture.
   if ctx.textureEnabled: result = ctx.texture
   else: result = nil
 
-proc noTexture*(ctx: var RGfxContext) =
-  ## Disables the texture, and draws with plain colors.
-  if ctx.textureEnabled:
-    ctx.textureEnabled = false
-    ctx.uniform("rapid_textureEnabled", 0)
+proc `lineWidth=`*(ctx: var RGfxContext, width: float) =
+  glLineWidth(width)
+
+proc `lineSmooth=`*(ctx: var RGfxContext, enable: bool) =
+  if enable: glEnable(GL_LINE_SMOOTH)
+  else: glDisable(GL_LINE_SMOOTH)
 
 proc begin*(ctx: var RGfxContext) =
   ## Begins a new shape.
@@ -479,24 +490,94 @@ proc rect*(ctx: var RGfxContext,
   ## Adds a rectangle, at the specified coordinates, with the specified
   ## dimensions and texture coordinates.
   ## The texture coordinates are a tuple for easy usage with tile atlases \
-  ## (see ``rapid/gfx/atlas``)
+  ## (see ``rapid/gfx/atlas``) and texture packing (see ``rapid/gfx/texpack``).
   ctx.quad(
     (x,     y,     uv.x,        uv.y),
     (x + w, y,     uv.x + uv.w, uv.y),
     (x + w, y + h, uv.x + uv.w, uv.y + uv.h),
     (x,     y + h, uv.x,        uv.y + uv.h))
 
-proc draw*(ctx: var RGfxContext, primitive = prShape) =
+proc circle*(ctx: var RGfxContext, x, y, r: float, points = 32) =
+  ## Adds a circle, with the specified center and radius. An amount of points \
+  ## can be specified to create an equilateral polygon.
+  ## This proc does not use texture coordinates, since there are many ways of \
+  ## specifying them for a circle (convert to cartesian, or use polar?)
+  let center = ctx.vertex((x, y))
+  var rim: seq[RVertexIndex]
+  for i in 0..<points:
+    let angle = i / (points - 1) * (2 * PI)
+    rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
+  for n, i in rim:
+    ctx.index(center, i, rim[(n + 1) mod rim.len])
+
+proc pie*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
+  ## Adds a pie, with the specified center, radius, and start and finish \
+  ## angles. All angles should be expressed in radians.
+  let center = ctx.vertex((x, y))
+  var rim: seq[RVertexIndex]
+  for i in 0..<points:
+    let angle = start + i / (points - 1) * (fin - start)
+    rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
+  for n, i in rim:
+    ctx.index(center, i, rim[(n + 1) mod rim.len])
+
+proc line*[T: SomeVertex](ctx: var RGfxContext, a, b: T) =
+  ## Adds a line with the specified points, for use with ``prLineShape``.
+  ctx.index(ctx.vertex(a))
+  ctx.index(ctx.vertex(b))
+
+proc lquad*[T: SomeVertex](ctx: var RGfxContext, a, b, c, d: T) =
+  ## Adds a quad outline, together with its indices.
+  let
+    i = ctx.vertex(a)
+    j = ctx.vertex(b)
+    k = ctx.vertex(c)
+    l = ctx.vertex(d)
+  ctx.index(i, j, j, k, k, l, l, i)
+
+proc lrect*(ctx: var RGfxContext, x, y, w, h: float) =
+  ## Adds a rectangle outline, at the specified coordinates, with the \
+  ## specified dimensions.
+  ## This isn't to be used with texturing; for rendering textures, see \
+  ## ``rect()``.
+  ctx.lquad(
+    (x,     y),     (x + w, y),
+    (x + w, y + h), (x,     y + h))
+
+proc lcircle*(ctx: var RGfxContext, x, y, r: float, points = 32) =
+  ## Adds a circle outline, with the specified center and radius. An amount of \
+  ## points can be specified to create an equilateral polygon.
+  var rim: seq[RVertexIndex]
+  for i in 0..<points:
+    let angle = i / (points - 1) * (2 * PI)
+    rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
+  for n, i in rim:
+    ctx.index(i, rim[(n + 1) mod rim.len])
+
+proc arc*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
+  ## Adds an arc, with the specified center, radius, and start and finish \
+  ## angles. All angles should be expressed in radians.
+  var rim: seq[RVertexIndex]
+  for i in 0..<points:
+    let angle = start + i / (points - 1) * (fin - start)
+    rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
+  for n in 0..<rim.len - 1:
+    ctx.index(rim[n], rim[n + 1])
+
+proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
   ## Draws the previously built shape.
   if ctx.shape.len > 0:
     glActiveTexture(GL_TEXTURE0)
     if not ctx.texture.isNil: glBindTexture(GL_TEXTURE_2D, ctx.texture.id)
     ctx.updateTransform()
     ctx.gfx.updateVbo(ctx.shape)
-    if primitive == prShape:
+    case primitive
+    of prTriShape, prLineShape:
       ctx.gfx.updateEbo(ctx.indices)
       glDrawElements(
-        GL_TRIANGLES, GLsizei ctx.indices.len, GL_UNSIGNED_INT, nil)
+        case primitive
+        of prTriShape: GL_TRIANGLES
+        else: GL_LINES, GLsizei ctx.indices.len, GL_UNSIGNED_INT, nil)
     else:
       glDrawArrays(
         case primitive

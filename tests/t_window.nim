@@ -122,6 +122,11 @@ proc main() =
       ctx.text(rubik, 48, 64, "Don't mind me, I'm just rendering a bunch of text")
       ctx.text(rubik, 48, 80, "so I can show off my neat texture packer.")
       ctx.text(rubik, 48, 96, "Have a nice day!")
+      ctx.begin()
+      # ctx.lineSmooth = true
+      ctx.lineWidth = 2
+      ctx.arc(32, 32, 32, 0, 3.141592)
+      ctx.draw(prLineShape)
     update step:
       map.update(step)
 
