@@ -79,7 +79,7 @@ proc main() =
       wrapH: wrapRepeat, wrapV: wrapRepeat)
     rapidLogo = newRTexture("sampleData/logo-4x.png", tc)
     tileset = newRTexture("sampleData/tileset.png", tc)
-    rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 12)
+    rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 14, 14, 64, 64)
     gfx = win.openGfx()
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
 
@@ -118,7 +118,10 @@ proc main() =
       ctx.clear(rgb(32, 32, 32))
       ctx.color = gray(255)
       map.draw(ctx, step)
-      ctx.text(rubik, 48, 48, "nied-_-b ciomka makes nied-_-b games presents")
+      ctx.text(rubik, 48, 48, "Oh, hi there")
+      ctx.text(rubik, 48, 64, "Don't mind me, I'm just rendering a bunch of text")
+      ctx.text(rubik, 48, 80, "so I can show off my neat texture packer.")
+      ctx.text(rubik, 48, 96, "Have a nice day!")
     update step:
       map.update(step)
 

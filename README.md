@@ -40,8 +40,7 @@ sudo zypper in \
 ### Opening a window
 
 ```nim
-import color
-import rapid/gfx
+import rapid/gfx/surface
 
 # Building a window is fairly straightforward:
 var win = initRWindow()
@@ -51,58 +50,38 @@ var win = initRWindow()
 
 # We need to get a handle to the underlying framebuffer in order to draw on the
 # screen
-var
-  gfx = win.gfx
-  ctx = gfx.ctx
+var gfx = win.openGfx()
 
-proc draw(step: float) =
-  ctx.activate()
-  ctx.clear(col(colWhite))
-
-proc update(delta: float) =
-  discard
-
-# Then we can begin a game loop:
-win.loop(draw, update)
+# Then we can begin a game loop
+gfx.loop:
+  draw ctx, step:
+    ctx.clear(gray(255))
+  update step:
+    discard
 ```
 
 ### Loading data
 
 ```nim
-import rapid/gfx
-import rapid/data
+import rapid/gfx/surface
+import rapid/res/textures
 
 var win = initRWindow()
   .title("My Game")
   .size(800, 600)
   .open()
 
-var gfx = win.gfx
+var gfx = win.openGfx()
 
-var data = dataSpec:
-  "hello" <- image("hello.png")
-# An non-macro approach can be used:
-# data.image("hello", "hello.png")
+let
+  # As of now, only PNGs are supported
+  hello = newRTexture("data/hello.png")
 
-# The data is loaded from a folder called ``data`` (for development), or the
-# rapid bundle embedded in the executable with RDK.
-
-# A different loading path can be specified using:
-# data.dir = "some/other/data/folder"
-# Keep in mind, that this folder won't be loaded from if there's a bundle
-# embedded into the executable. It isn't required to embed a bundle, however.
-
-# The ``load()`` iterator can be used for loading with progress reporting
-data.loadAll()
-
-gfx.data = data
-
-proc draw(step: float) =
-  gfx.clear(colBlack)
-  gfx.texture("hello")
-  gfx.uvRect(0, 0, 1, 1)
-  gfx.rect(32, 32, 32, 32)
-
-proc update(delta: float) =
-  discard
+gfx.loop:
+  draw ctx, step:
+    ctx.clear(gray(0))
+    ctx.texture = hello
+    ctx.rect(32, 32, 32, 32)
+  update step:
+    discard
 ```

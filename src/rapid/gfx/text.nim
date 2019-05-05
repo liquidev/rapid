@@ -22,17 +22,16 @@ proc text*(ctx: var RGfxContext, font: RFont, x, y: float, text: string) =
     penX = x
     penY = y
   ctx.uniform("rapid_renderText", 1)
-  ctx.noTexture()
+  ctx.texture = font.packer.texture
+  ctx.begin()
   for r in runes:
     if not font.glyphs.hasKey(r):
       font.render(r)
     let glyph = font.glyphs[r]
-    ctx.texture = glyph.texture
-    ctx.begin()
     ctx.rect(penX + glyph.bitmapLeft.float, penY - glyph.bitmapTop.float,
-             glyph.width.float, glyph.height.float)
-    ctx.draw()
+             glyph.width.float, glyph.height.float,
+             glyph.rect)
     penX += float(glyph.advanceX shr 6)
-
+  ctx.draw()
   ctx.uniform("rapid_renderText", 0)
   ctx.texture = previousTex

@@ -10,10 +10,11 @@ import unicode
 import ../lib/freetype
 
 import textures
+import ../gfx/texpack
 
 type
   RGlyph* = ref object
-    texture*: RTexture
+    rect*: RTextureRect
     width*, height*, bitmapLeft*, bitmapTop*, advanceX*: int
   RFont* = ref object
     handle*: FT_Face
@@ -21,12 +22,14 @@ type
     #       characters
     glyphs*: TableRef[Rune, RGlyph]
     texConf*: RTextureConfig
+    packer*: RTexturePacker
   FreetypeError* = object of Exception
 
 var freetypeLib*: FT_Library
 
 proc newRFont*(file: string, textureConfig: RTextureConfig,
-               height: Natural, width = 0.Natural): RFont =
+               height: Natural, width = 0.Natural,
+               texWidth = 512.Natural, texHeight = texWidth): RFont =
   once:
     let err = FT_Init_Freetype(addr freetypeLib).bool
     doAssert not err, "Could not initialize FreeType"
@@ -34,6 +37,7 @@ proc newRFont*(file: string, textureConfig: RTextureConfig,
   new(result)
   result.texConf = textureConfig
   result.glyphs = newTable[Rune, RGlyph]()
+  result.packer = newRTexturePacker(texWidth, texHeight, textureConfig, fmtRed8)
   var err = FT_New_Face(freetypeLib, file, 0, addr result.handle)
   if err == FT_Err_Unknown_File_Format:
     raise newException(FreetypeError, "Unknown font format (" & file & ")")
@@ -49,10 +53,9 @@ proc renderGlyph(font: RFont, rune: Rune): RGlyph =
   let
     glyph = font.handle.glyph
     bitmap = glyph.bitmap
-  let tex = newRTexture(bitmap.width.int, bitmap.rows.int,
-                        bitmap.buffer, font.texConf, fmtRed8)
+    rect = font.packer.place(bitmap.width.int, bitmap.rows.int, bitmap.buffer)
   result = RGlyph(
-    texture: tex,
+    rect: rect,
     width: bitmap.width.int, height: bitmap.rows.int,
     bitmapLeft: glyph.bitmapLeft, bitmapTop: glyph.bitmapTop,
     advanceX: glyph.advance.x
