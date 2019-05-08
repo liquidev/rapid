@@ -28,6 +28,13 @@ sudo apt install \
   libxinerama-dev
 ```
 
+#### Fedora
+```
+sudo dnf install \
+  mesa-libGL-devel libX11-devel libXrandr-devel libXxf86vm-devel \
+  libXinerama-devel libXi-devel libXcursor-devel
+```
+
 #### openSUSE
 ```
 sudo zypper in \

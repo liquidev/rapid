@@ -118,15 +118,7 @@ proc main() =
       ctx.clear(rgb(32, 32, 32))
       ctx.color = gray(255)
       map.draw(ctx, step)
-      ctx.text(rubik, 48, 48, "Oh, hi there")
-      ctx.text(rubik, 48, 64, "Don't mind me, I'm just rendering a bunch of text")
-      ctx.text(rubik, 48, 80, "so I can show off my neat texture packer.")
-      ctx.text(rubik, 48, 96, "Have a nice day!")
-      ctx.begin()
-      # ctx.lineSmooth = true
-      ctx.lineWidth = 2
-      ctx.arc(32, 32, 32, 0, 3.141592)
-      ctx.draw(prLineShape)
+      ctx.text(rubik, 48, 48, "My Table\nx\ty\n123\t567\tnicely tabulated")
     update step:
       map.update(step)
 

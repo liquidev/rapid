@@ -18,26 +18,30 @@ type
     width*, height*, bitmapLeft*, bitmapTop*, advanceX*: int
   RFont* = ref object
     handle*: FT_Face
-    # TODO: optimize text rendering to use a single packed texture for all
-    #       characters
     glyphs*: TableRef[Rune, RGlyph]
     texConf*: RTextureConfig
     packer*: RTexturePacker
+    width*, height*: int
+    lineSpacing, tabWidth: float
   FreetypeError* = object of Exception
 
 var freetypeLib*: FT_Library
 
 proc newRFont*(file: string, textureConfig: RTextureConfig,
-               height: Natural, width = 0.Natural,
+               height: Natural, width = height,
                texWidth = 512.Natural, texHeight = texWidth): RFont =
   once:
     let err = FT_Init_Freetype(addr freetypeLib).bool
     doAssert not err, "Could not initialize FreeType"
 
-  new(result)
-  result.texConf = textureConfig
-  result.glyphs = newTable[Rune, RGlyph]()
-  result.packer = newRTexturePacker(texWidth, texHeight, textureConfig, fmtRed8)
+  result = RFont(
+    texConf: textureConfig,
+    glyphs: newTable[Rune, RGlyph](),
+    packer: newRTexturePacker(texWidth, texHeight, textureConfig, fmtRed8),
+    width: width, height: height,
+    lineSpacing: 1.3,
+    tabWidth: 96
+  )
   var err = FT_New_Face(freetypeLib, file, 0, addr result.handle)
   if err == FT_Err_Unknown_File_Format:
     raise newException(FreetypeError, "Unknown font format (" & file & ")")
@@ -63,3 +67,21 @@ proc renderGlyph(font: RFont, rune: Rune): RGlyph =
 
 proc render*(font: RFont, rune: Rune) =
   font.glyphs[rune] = font.renderGlyph(rune)
+
+proc `lineSpacing=`*(font: RFont, spacing: float) =
+  font.lineSpacing = spacing
+
+proc lineSpacing*(font: RFont): float =
+  result = font.lineSpacing
+
+proc `tabWidth=`*(font: RFont, width: float) =
+  font.tabWidth = width
+
+proc tabWidth*(font: RFont): float =
+  result = font.tabWidth
+
+proc unload*(font: var RFont) =
+  ## Unloads a texture. The font cannot be used afterwards.
+  let err = FT_Done_Face(font.handle)
+  doAssert not err.bool, "Could not unload font face"
+  font.packer.texture.unload()

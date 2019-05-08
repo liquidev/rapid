@@ -6,6 +6,7 @@
 
 import nimPNG
 
+import images
 import ../gfx/opengl
 import ../lib/glad/gl
 
@@ -76,11 +77,14 @@ proc newRTexture*(width, height: int, data: pointer,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
                     conf.wrapV.GLenum.GLint)
 
+proc newRTexture*(image: RImage, conf = DefaultTextureConfig): RTexture =
+  ## Creates a texture from an RImage.
+  result = newRTexture(image.width, image.height, image.caddr, conf)
+
 proc newRTexture*(filename: string, conf = DefaultTextureConfig): RTexture =
-  ## Loads a PNG from a file and creates a texture from it.
-  let png = loadPNG32(filename)
-  result = newRTexture(
-    png.width, png.height, png.data[0].unsafeAddr, conf)
+  ## Loads an image from a file and creates a texture from it.
+  let img = newRImage(filename)
+  result = newRTexture(img, conf)
 
 proc `minFilter=`*(tex: RTexture, flt: RTextureFilter) =
   ## Sets the minification filter of the texture.
@@ -92,12 +96,16 @@ proc `magFilter=`*(tex: RTexture, flt: RTextureFilter) =
   currentGlc.withTex2D(tex.id):
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, flt.GLenum.GLint)
 
-proc `wrapS=`*(tex: RTexture, wrap: RTextureWrap) =
+proc `wrapH=`*(tex: RTexture, wrap: RTextureWrap) =
   ## Sets the horizontal wrapping of the texture.
   currentGlc.withTex2D(tex.id):
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap.GLenum.GLint)
 
-proc `wrapT=`*(tex: RTexture, wrap: RTextureWrap) =
+proc `wrapV=`*(tex: RTexture, wrap: RTextureWrap) =
   ## Sets the vertical wrapping of the texture.
   currentGlc.withTex2D(tex.id):
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap.GLenum.GLint)
+
+proc unload*(tex: var RTexture) =
+  ## Unloads a texture. The texture cannot be used afterwards.
+  glDeleteTextures(1, addr tex.id)
