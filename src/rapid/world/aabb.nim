@@ -6,6 +6,8 @@
 
 ## A minimal axis aligned bounding box implementation for collision detection.
 
+import glm
+
 type
   RAABounds* = object
     x*, y*, width*, height*: float
@@ -24,3 +26,7 @@ proc intersects*(a, b: RAABounds): bool =
   result =
     a.x < b.x + b.width and b.x < a.x + a.width and
     a.y < b.y + b.height and b.y < a.y + a.height
+
+proc has*(b: RAABounds, p: Vec2f): bool =
+  result =
+    p.x >= b.x and p.y >= b.y and p.x < b.x + b.width and p.y < b.y + b.height
