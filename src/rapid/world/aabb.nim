@@ -24,8 +24,13 @@ proc bottom*(aabb: RAABounds): float = aabb.y + aabb.height
 
 proc intersects*(a, b: RAABounds): bool =
   result =
-    a.x < b.x + b.width and b.x < a.x + a.width and
-    a.y < b.y + b.height and b.y < a.y + a.height
+    a.left < b.right and b.left < a.right and
+    a.top < b.bottom and b.top < a.bottom
+
+proc intersectsWhole*(a, b: RAABounds): bool =
+  result =
+    a.left >= b.left and a.right < b.right and
+    a.top >= b.top and a.bottom < b.bottom
 
 proc has*(b: RAABounds, p: Vec2f): bool =
   result =

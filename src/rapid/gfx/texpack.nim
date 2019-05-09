@@ -25,7 +25,8 @@ proc occupyArea(tp: RTexturePacker, x, y, w, h: int) =
   tp.occupied.add(newRAABB(x.float, y.float, w.float, h.float))
 
 proc areaFree(tp: RTexturePacker, x, y, w, h: int): bool =
-  let area = newRAABB(x.float, y.float, w.float, h.float)
+  let
+    area = newRAABB(x.float, y.float, w.float, h.float)
   for i in countdown(tp.occupied.len - 1, 0):
     if area.intersects(tp.occupied[i]): return false
   return true
@@ -38,18 +39,20 @@ proc rawPlace(tp: RTexturePacker, x, y, w, h: int, data: pointer) =
 proc place*(tp: RTexturePacker,
             width, height: int, data: pointer): RTextureRect =
   var x, y = 0
-  while y <= tp.texture.height - height:
-    while x <= tp.texture.width - width:
-      for i in countdown(tp.occupied.len - 1, 0):
-        let area = tp.occupied[i]
-        if area.has(vec2f(x.float, y.float)):
-          x = int(area.x + area.width)
-      if tp.areaFree(x, y, width, height):
-        tp.rawPlace(x, y, width, height, data)
-        tp.occupyArea(x, y, width, height)
-        return (x / tp.texture.width, y / tp.texture.height,
-                width / tp.texture.width, height / tp.texture.height)
-      inc(x)
+  while y <= tp.texture.height - height - 1:
+    while x <= tp.texture.width - width - 1:
+      block placeTexture:
+        for area in tp.occupied:
+          if area.has(vec2f(x.float, y.float)):
+            x = int(area.x + area.width)
+            break placeTexture
+        if tp.areaFree(x, y, width + 1, height + 1):
+          tp.rawPlace(x, y, width, height, data)
+          tp.occupyArea(x, y, width + 1, height + 1)
+          return (x / tp.texture.width, y / tp.texture.height,
+                  width / tp.texture.width, height / tp.texture.height)
+        inc(x)
+    x = 0
     inc(y)
 
 proc newRTexturePacker*(width, height: Natural,
@@ -60,5 +63,5 @@ proc newRTexturePacker*(width, height: Natural,
     fmt: fmt
   )
 
-proc unload*(pack: var RTexturePacker) =
-  pack.texture.unload()
+proc unload*(tp: var RTexturePacker) =
+  tp.texture.unload()

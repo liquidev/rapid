@@ -1,5 +1,7 @@
 import glm
 
+import times
+
 import rapid/res/textures
 import rapid/res/fonts
 import rapid/gfx/texatlas
@@ -77,7 +79,6 @@ proc main() =
     tc = (
       minFilter: fltNearest, magFilter: fltNearest,
       wrapH: wrapRepeat, wrapV: wrapRepeat)
-    rapidLogo = newRTexture("sampleData/logo-4x.png", tc)
     tileset = newRTexture("sampleData/tileset.png", tc)
     rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 14, 14, 64, 64)
     gfx = win.openGfx()
@@ -116,9 +117,12 @@ proc main() =
   gfx.loop:
     draw ctx, step:
       ctx.clear(rgb(32, 32, 32))
-      ctx.color = gray(255)
-      map.draw(ctx, step)
-      ctx.text(rubik, 48, 48, "My Table\nx\ty\n123\t567\tnicely tabulated")
+      transform(ctx):
+        ctx.rotate(PI/8)
+        ctx.translate(128, 128)
+        ctx.color = gray(255)
+        map.draw(ctx, step)
+        ctx.text(rubik, 48, 48, "My Table\nx\ty\n123\t567\tnicely tabulated")
     update step:
       map.update(step)
 

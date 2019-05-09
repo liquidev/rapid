@@ -58,7 +58,7 @@ proc `[]=`*[T](wld: var RTmWorld[T], x, y: int, tile: T) =
   if wld.isInbounds(x, y):
     let oldTile = wld.tiles[y][x]
     wld.tiles[y][x] = tile
-    wld.onModify(x, y, oldTile, tile)
+    if not wld.onModify.isNil: wld.onModify(x, y, oldTile, tile)
 
 proc isSolid*(wld: RTmWorld, x, y: int): bool =
   result = wld.tile.isSolidImpl(wld[x, y])

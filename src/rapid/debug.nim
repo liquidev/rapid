@@ -15,7 +15,7 @@ proc debug*(text: varargs[string, `$`]) =
 
 proc info*(text: varargs[string, `$`]) =
   styledEcho(
-    fgBlue, styleBright, "debug: ",
+    fgBlue, styleBright, "info: ",
     resetStyle, text.join()
   )
 

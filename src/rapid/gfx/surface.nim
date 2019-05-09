@@ -341,8 +341,7 @@ type
     textureEnabled: bool
     texture: RTexture
     # Transformations
-    # TODO: implement transformations
-    transform: Mat4f
+    transform*: Mat3f
   RVertex* = tuple
     x, y: float
     color: RColor
@@ -384,7 +383,7 @@ uniformProc(int)
 uniformProc(Mat4f)
 
 proc updateTransform(ctx: var RGfxContext) =
-  ctx.uniform("rapid_transform", ctx.gfx.projection * ctx.transform)
+  ctx.uniform("rapid_transform", ctx.gfx.projection)
 
 proc `program=`*(ctx: var RGfxContext, program: RProgram) =
   ## Binds a shader program for drawing operations.
@@ -395,6 +394,32 @@ proc `program=`*(ctx: var RGfxContext, program: RProgram) =
 proc defaultProgram*(ctx: var RGfxContext) =
   ## Binds the default shader program.
   ctx.`program=`(ctx.gfx.defaultProgram)
+
+proc translate*(ctx: var RGfxContext, x, y: float) =
+  ctx.transform = ctx.transform * mat3f(
+    vec3f(1.0, 0.0, 0.0),
+    vec3f(0.0, 1.0, 0.0),
+    vec3f(x, y, 1.0)
+  )
+
+proc scale*(ctx: var RGfxContext, x, y: float) =
+  ctx.transform = ctx.transform * mat3f(
+    vec3f(x, 0.0, 0.0),
+    vec3f(0.0, y, 0.0),
+    vec3f(0.0, 0.0, 1.0)
+  )
+
+proc rotate*(ctx: var RGfxContext, angle: float) =
+  ctx.transform = ctx.transform * mat3f(
+    vec3f(cos(angle), sin(angle), 0.0),
+    vec3f(-sin(angle), cos(angle), 0.0),
+    vec3f(0.0, 0.0, 1.0)
+  )
+
+template transform*(ctx: var RGfxContext, body: untyped): untyped =
+  let prevTransform = ctx.transform
+  body
+  ctx.transform = prevTransform
 
 proc clear*(ctx: var RGfxContext, col: RColor) =
   ## Clears the Gfx with the specified color.
@@ -445,9 +470,10 @@ proc vertex*(ctx: var RGfxContext,
              vert: RVertex): RVertexIndex {.discardable.} =
   ## Adds a vertex to the shape.
   result = RVertexIndex(ctx.vertexCount)
+  let p = ctx.transform * vec3f(vert.x, vert.y, 1.0)
   ctx.shape.add([
     # Position
-    float32 vert.x, vert.y,
+    p.x, p.y,
     # Color
     vert.color.red, vert.color.green, vert.color.blue,
     vert.color.alpha,
@@ -596,7 +622,7 @@ proc ctx*(gfx: RGfx): RGfxContext =
   result = RGfxContext(
     gfx: gfx,
     color: gray(255),
-    transform: mat4(vec4(1.0'f32, 1.0, 1.0, 1.0))
+    transform: mat3(vec3(1.0'f32, 1.0, 1.0))
   )
 
 #--
