@@ -54,7 +54,23 @@ proc onGlDebug(source, kind: GLenum, id: GLuint, severity: GLenum,
                userParam: pointer) {.stdcall.} =
   var msg = newString(length)
   copyMem(msg[0].unsafeAddr, msgPtr, length)
-  debug("GL | kind ", kind, ", severity ", severity, ": ", msg)
+  let kindStr =
+    case kind.int
+    of 0x824c: "error"
+    of 0x824d: "deprecated behavior"
+    of 0x824e: "undefined behavior"
+    of 0x824f: "portability"
+    of 0x8250: "performance"
+    of 0x8251: "marker"
+    of 0x8252: "push group"
+    of 0x8253: "pop group"
+    of 0x8254: "other"
+    else: "<unknown type>"
+  case severity.int
+  of 0x9146: error("(GL) ", kindStr, ": ", msg)
+  of 0x9147, 0x9148: warn("(GL) ", kindStr, ": ", msg)
+  of 0x826B: info("(GL) ", kindStr, ": ", msg)
+  else: discard
   when defined(glDebugBacktrace):
     writeStackTrace()
 
@@ -71,6 +87,9 @@ proc initGl(win: glfw.Window): InitErrorKind =
     error("ARB_separate_shader_objects is not available. ",
           "Please update your graphics drivers")
     quit(QuitFailure)
+  if not GLAD_GL_ARB_direct_state_access:
+    error("ARB_direct_state_access is not available. ",
+          "Please update your graphics drivers")
   return ieOK
 
 #--

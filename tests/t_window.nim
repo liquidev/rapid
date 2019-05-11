@@ -79,8 +79,8 @@ proc main() =
     tc = (
       minFilter: fltNearest, magFilter: fltNearest,
       wrapH: wrapRepeat, wrapV: wrapRepeat)
-    tileset = newRTexture("sampleData/tileset.png", tc)
-    rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 14, 14, 64, 64)
+    tileset = loadRTexture("sampleData/tileset.png", tc)
+    rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 32, 32)
     gfx = win.openGfx()
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
 
@@ -114,15 +114,31 @@ proc main() =
   win.onMouseRelease do (win: RWindow, btn: MouseButton, mode: int):
     pressed = false
 
+  let wave = gfx.newREffect("""
+    #define Width 10
+    #define Height 1
+    #define Area Width * Height
+
+    vec4 rEffect(vec2 pos) {
+      vec4 avg = vec4(0.0);
+      for (int y = 0; y < Height; ++y) {
+        for (int x = 0; x < Width; ++x) {
+          avg += rPixel(vec2(pos.x - float(x), pos.y - float(y)));
+        }
+      }
+      avg /= float(Area);
+      return avg;
+    }
+  """)
+
   gfx.loop:
     draw ctx, step:
       ctx.clear(rgb(32, 32, 32))
-      transform(ctx):
-        ctx.rotate(PI/8)
-        ctx.translate(128, 128)
-        ctx.color = gray(255)
-        map.draw(ctx, step)
+      map.draw(ctx, step)
+      effects(ctx):
         ctx.text(rubik, 48, 48, "My Table\nx\ty\n123\t567\tnicely tabulated")
+        wave.param("time", cpuTime() * 100)
+        ctx.effect(wave)
     update step:
       map.update(step)
 

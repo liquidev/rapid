@@ -67,6 +67,9 @@ const
     uniform bool rapid_renderText;
     uniform sampler2D rapid_texture;
 
+    uniform float rapid_width;
+    uniform float rapid_height;
+
     out vec4 rapid_fCol;
 
     vec4 rTexel(sampler2D tex, vec2 uv) {
@@ -81,20 +84,58 @@ const
       }
     }
 
-    vec4 rFragment(vec4 col, sampler2D tex, vec2 uv);
+    vec4 rFragment(vec4 col, sampler2D tex, vec2 pos, vec2 uv);
 
     void main(void) {
-      rapid_fCol = rFragment(rapid_vfCol, rapid_texture, rapid_vfUV);
+      rapid_fCol = rFragment(rapid_vfCol, rapid_texture,
+                             vec2(gl_FragCoord), rapid_vfUV);
     }
   """
-  RDefaultVshSrc = """
+  RDefaultVshSrc* = """
     vec4 rVertex(vec4 pos, mat4 transform) {
       return transform * pos;
     }
   """
-  RDefaultFshSrc = """
-    vec4 rFragment(vec4 col, sampler2D tex, vec2 uv) {
+  RDefaultFshSrc* = """
+    vec4 rFragment(vec4 col, sampler2D tex, vec2 pos, vec2 uv) {
       return rTexel(tex, uv) * col;
+    }
+  """
+  REffectVshSrc = """
+    #version 330 core
+
+    layout (location = 0) in vec2 rapid_vPos;
+    layout (location = 1) in vec4 rapid_vCol;
+    layout (location = 2) in vec2 rapid_vUV;
+
+    out vec2 rapid_vfUV;
+
+    void main(void) {
+      gl_Position = vec4(rapid_vPos.x, rapid_vPos.y, 0.0, 1.0);
+      rapid_vfUV = rapid_vUV;
+    }
+  """
+  REffectLibSrc = """
+    #version 330 core
+
+    in vec2 rapid_vfUV;
+
+    uniform sampler2D rapid_surface;
+
+    uniform float rapid_width;
+    uniform float rapid_height;
+
+    out vec4 rapid_fCol;
+
+    vec4 rPixel(vec2 pos) {
+      return texture(rapid_surface, vec2(pos.x / rapid_width,
+                                        (pos.y / rapid_height)));
+    }
+
+    vec4 rEffect(vec2 scrPos);
+
+    void main(void) {
+      rapid_fCol = rEffect(vec2(gl_FragCoord));
     }
   """
 
@@ -107,17 +148,17 @@ proc newShader*(kind: RShaderKind, source: string): RShader =
     of shFragment: GL_FRAGMENT_SHADER
   ))
   let cstr = allocCStringArray([source])
-  glShaderSource(GLuint(result), 1, cstr, nil)
+  glShaderSource(result.GLuint, 1, cstr, nil)
   deallocCStringArray(cstr)
-  glCompileShader(GLuint(result))
+  glCompileShader(result.GLuint)
   var isuccess: GLint
-  glGetShaderiv(GLuint(result), GL_COMPILE_STATUS, addr isuccess)
-  let success = bool(isuccess)
+  glGetShaderiv(result.GLuint, GL_COMPILE_STATUS, addr isuccess)
+  let success = isuccess.bool
   if not success:
     var logLength: GLint
-    glGetShaderiv(GLuint(result), GL_INFO_LOG_LENGTH, addr logLength)
+    glGetShaderiv(result.GLuint, GL_INFO_LOG_LENGTH, addr logLength)
     var log = cast[ptr GLchar](alloc(logLength))
-    glGetShaderInfoLog(GLuint(result), logLength, addr logLength, log)
+    glGetShaderInfoLog(result.GLuint, logLength, addr logLength, log)
     raise newException(ShaderError, $log)
 
 type
@@ -191,10 +232,12 @@ type
     width*, height*: int
     # Default state
     vertexLibSh, fragmentLibSh: RShader
+    effectVertSh, effectFragLibSh: RShader
     defaultProgram: RProgram
-    # Framebuffer
-    fbo: GLuint
-    target: RTexture
+    # Framebuffers
+    primaryFbo, fxFbo1, fxFbo2: GLuint
+    target, fx1Target, fx2Target: RTexture
+    fxTexConf: RTextureConfig
     # Buffer objects
     vaoID, vboID, eboID: GLuint
     vboSize, eboSize: int
@@ -203,24 +246,62 @@ type
 
 proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
   ## Creates a new ``RProgram`` from the specified shaders.
+  ## See example for more details.
+  runnableExamples:
+    # Creates a new program, equivalent to the default.
+    let myDefaultProgram = gfx.newRProgram(
+      # Vertex shader
+      """
+        vec4 rVertex(vec4 pos, mat4 transform) {
+          return transform * pos;
+        }
+      """,
+      # Fragment shader
+      """
+        vec4 rFragment(vec4 col, sampler2D tex, vec2 pos, vec2 uv) {
+          return rTexel(tex, uv) * col;
+        }
+      """)
+    # A few extra variables are available for both shaders:
+    let colors = gfx.newRProgram(
+      # The default vertex shader source is public, the default fragment shader
+      # has its source under the ``RDefaultFshSrc`` const.
+      RDefaultVshSrc,
+      """
+        vec4 rFragment(vec4 col, sampler2D tex, vec2 pos, vec2 uv) {
+          // ``rapid_width`` and ``rapid_height`` contain the width and height
+          // of the drawing surface, be it a window or a framebuffer;
+          // the ``pos`` argument contains the fragment's position on the screen
+          vec4 myColor =
+            // get normalized fragment coordinates
+            // pos.(0, 0) is at the bottom left
+            vec4(pos.x / rapid_width, pos.y / rapid_height, 1.0, 1.0);
+          return rTexel(tex, uv) * col * myColor;
+        }
+      """)
   result = newProgram()
   if int(gfx.vertexLibSh) == 0:
     gfx.vertexLibSh = newShader(shVertex, RVshLibSrc)
   if int(gfx.fragmentLibSh) == 0:
     gfx.fragmentLibSh = newShader(shFragment, RFshLibSrc)
   let
-    vsh = newShader(shVertex, vertexSrc)
+    vsh = newShader(shVertex, """
+      uniform float rapid_width;
+      uniform float rapid_height;
+    """ & vertexSrc)
     fsh = newShader(shFragment, """
-    vec4 rTexel(sampler2D tex, vec2 uv);
+      uniform float rapid_width;
+      uniform float rapid_height;
 
+      vec4 rTexel(sampler2D tex, vec2 uv);
     """ & fragmentSrc)
   result.attach(gfx.vertexLibSh)
   result.attach(vsh)
   result.attach(gfx.fragmentLibSh)
   result.attach(fsh)
   result.link()
-  glDeleteShader(GLuint(vsh))
-  glDeleteShader(GLuint(fsh))
+  glDeleteShader(vsh.GLuint)
+  glDeleteShader(fsh.GLuint)
 
 proc reallocVbo(gfx: RGfx) =
   glBufferData(GL_ARRAY_BUFFER,
@@ -251,6 +332,17 @@ proc updateEbo(gfx: RGfx, data: seq[int32]) =
   glBufferSubData(GL_ELEMENT_ARRAY_BUFFER,
     0, dataSize,
     data[0].unsafeAddr)
+
+proc updateEffectFbos(gfx: RGfx) =
+  glCreateFramebuffers(1, addr gfx.fxFbo1)
+  gfx.fx1Target = newRTexture(gfx.width, gfx.height, nil, gfx.fxTexConf)
+  glNamedFramebufferTexture(
+    gfx.fxFbo1, GL_COLOR_ATTACHMENT0, gfx.fx1Target.id, 0)
+
+  glCreateFramebuffers(1, addr gfx.fxFbo2)
+  gfx.fx2Target = newRTexture(gfx.width, gfx.height, nil, gfx.fxTexConf)
+  glNamedFramebufferTexture(
+    gfx.fxFbo2, GL_COLOR_ATTACHMENT0, gfx.fx2Target.id, 0)
 
 proc init(gfx: RGfx) =
   # Settings
@@ -285,6 +377,8 @@ proc init(gfx: RGfx) =
   glActiveTexture(GL_TEXTURE0)
   # Projection
   gfx.projection = ortho(0'f32, gfx.width.float, gfx.height.float, 0, -1, 1)
+  # Effects
+  gfx.updateEffectFbos()
 
 proc initRoot(gfx: RGfx) =
   gfx.win.onResize do (win: RWindow, width, height: Natural):
@@ -298,30 +392,31 @@ proc texture*(gfx: RGfx): RTexture =
   ## Gfx's target is a window!
   result = gfx.target
 
-proc openGfx*(win: RWindow): RGfx =
+proc openGfx*(win: RWindow, fxTexConfig = DefaultTextureConfig): RGfx =
   ## Opens a Gfx for a window.
   result = RGfx(
     win: win,
-    fbo: 0,
+    primaryFbo: 0,
     width: win.width,
-    height: win.height
+    height: win.height,
+    fxTexConf: fxTexConfig
   )
   result.init()
   result.initRoot()
 
-proc newGfx*(width, height: int, texConf: RTextureConfig): RGfx =
+proc newGfx*(width, height: int, texConf: RTextureConfig,
+             fxTexConfig = DefaultTextureConfig): RGfx =
   ## Creates a new, blank Gfx, with the specified size and texture config.
   ## The implementation uses framebuffers.
   result = RGfx(
     width: width,
     height: height,
+    fxTexConf: fxTexConfig
   )
-  echo result.projection
-  glGenFramebuffers(1, addr result.fbo)
-  glBindFramebuffer(GL_FRAMEBUFFER, result.fbo)
+  glCreateFramebuffers(1, addr result.primaryFbo)
   result.target = newRTexture(width, height, nil, texConf)
-  glFramebufferTexture2D(
-    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, result.target.id, 0)
+  glNamedFramebufferTexture(
+    result.primaryFbo, GL_COLOR_ATTACHMENT0, result.target.id, 0)
   result.init()
 
 #--
@@ -361,6 +456,8 @@ type
     prLines, prLineStrip, prLineLoop
     prTris, prTriStrip, prTriFan
     prTriShape, prLineShape
+  REffect* = ref object
+    program: RProgram
 
 converter toRVertex*(vert: RPointVertex): RVertex =
   (vert.x, vert.y, gray(255), 0.0, 0.0)
@@ -385,17 +482,24 @@ uniformProc(Mat4f)
 proc updateTransform(ctx: var RGfxContext) =
   ctx.uniform("rapid_transform", ctx.gfx.projection)
 
+proc program*(ctx: RGfxContext): RProgram =
+  ## Retrieves the currently bound shader program.
+  result = ctx.program
+
 proc `program=`*(ctx: var RGfxContext, program: RProgram) =
   ## Binds a shader program for drawing operations.
   glUseProgram(program.id)
   ctx.program = program
   ctx.updateTransform()
+  ctx.uniform("rapid_width", ctx.gfx.width.float)
+  ctx.uniform("rapid_height", ctx.gfx.height.float)
 
 proc defaultProgram*(ctx: var RGfxContext) =
   ## Binds the default shader program.
   ctx.`program=`(ctx.gfx.defaultProgram)
 
 proc translate*(ctx: var RGfxContext, x, y: float) =
+  ## Translates the transform matrix.
   ctx.transform = ctx.transform * mat3f(
     vec3f(1.0, 0.0, 0.0),
     vec3f(0.0, 1.0, 0.0),
@@ -403,6 +507,7 @@ proc translate*(ctx: var RGfxContext, x, y: float) =
   )
 
 proc scale*(ctx: var RGfxContext, x, y: float) =
+  ## Scales the transform matrix.
   ctx.transform = ctx.transform * mat3f(
     vec3f(x, 0.0, 0.0),
     vec3f(0.0, y, 0.0),
@@ -410,13 +515,20 @@ proc scale*(ctx: var RGfxContext, x, y: float) =
   )
 
 proc rotate*(ctx: var RGfxContext, angle: float) =
+  ## Rotates the transform matrix.
   ctx.transform = ctx.transform * mat3f(
     vec3f(cos(angle), sin(angle), 0.0),
     vec3f(-sin(angle), cos(angle), 0.0),
     vec3f(0.0, 0.0, 1.0)
   )
 
+proc resetTransform*(ctx: var RGfxContext) =
+  ## Resets the transform matrix.
+  ctx.transform = mat3f(1.0)
+
 template transform*(ctx: var RGfxContext, body: untyped): untyped =
+  ## Isolates the current transform matrix, returning to the previous one \
+  ## after the block.
   let prevTransform = ctx.transform
   body
   ctx.transform = prevTransform
@@ -454,9 +566,11 @@ proc texture*(ctx: RGfxContext): RTexture =
   else: result = nil
 
 proc `lineWidth=`*(ctx: var RGfxContext, width: float) =
+  ## Sets the line width.
   glLineWidth(width)
 
 proc `lineSmooth=`*(ctx: var RGfxContext, enable: bool) =
+  ## Sets if lines should be anti-aliased.
   if enable: glEnable(GL_LINE_SMOOTH)
   else: glDisable(GL_LINE_SMOOTH)
 
@@ -478,7 +592,7 @@ proc vertex*(ctx: var RGfxContext,
     vert.color.red, vert.color.green, vert.color.blue,
     vert.color.alpha,
     # Texture coordinates
-    vert.u, vert.v
+    vert.u, 1.0 - vert.v
   ])
   inc(ctx.vertexCount)
 
@@ -614,6 +728,105 @@ proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
         else:          GL_TRIANGLES,
         0, GLsizei ctx.vertexCount)
 
+proc `blitMode=`*(ctx: var RGfxContext, enabled: bool) =
+  ## Draws in blit mode (using premultiplied alpha blending).
+  ## Use this when using Gfxes as textures.
+  if enabled: glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
+  else:       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+template blit*(ctx: var RGfxContext, body: untyped) =
+  ## Enables blit mode for the specified block.
+  ## This should not be nested, and only used in single operations!
+  ctx.blitMode = true
+  body
+  ctx.blitMode = false
+
+proc newREffect*(gfx: RGfx, effect: string): REffect =
+  ## Creates a new effect.
+  ## Effects are a simple way of adding post-processing effects to a Gfx. \
+  ## All that has to be specified is a fragment shader with an ``rEffect`` \
+  ## function (see example).
+  runnableExamples:
+    let myEffect = gfx.newREffect("""
+      vec4 rEffect(vec2 pos) {
+        return rPixel(pos + sin(pos.x / rapid_height * 3.0) * 8.0);
+      }
+    """)
+  var program = newProgram()
+  if int(gfx.effectVertSh) == 0:
+    gfx.effectVertSh = newShader(shVertex, REffectVshSrc)
+  if int(gfx.effectFragLibSh) == 0:
+    gfx.effectFragLibSh = newShader(shFragment, REffectLibSrc)
+  let fsh = newShader(shFragment, """
+    uniform float rapid_width;
+    uniform float rapid_height;
+
+    vec4 rPixel(vec2 pos);
+  """ & effect)
+  program.attach(gfx.effectVertSh)
+  program.attach(gfx.effectFragLibSh)
+  program.attach(fsh)
+  program.link()
+  glDeleteShader(fsh.GLuint)
+  result = REffect(
+    program: program
+  )
+
+template paramProc(T: typedesc): untyped {.dirty.} =
+  proc param*(eff: REffect, name: string, val: T) =
+    eff.program.uniform(name, val)
+paramProc(float)
+paramProc(Vec2f)
+paramProc(Vec3f)
+paramProc(Vec4f)
+paramProc(int)
+paramProc(Mat4f)
+
+proc beginEffects*(ctx: var RGfxContext) =
+  ## Begins drawing onto the Gfx's effect surface.
+  glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.fxFbo1)
+  glClearColor(0.0, 0.0, 0.0, 0.0)
+  glClear(GL_COLOR_BUFFER_BIT)
+
+proc effect*(ctx: var RGfxContext, fx: REffect) =
+  ## Applies an effect to the contents on the Gfx's effect surface.
+  let
+    prevProgram = ctx.program
+    prevTexture = ctx.texture
+  glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.fxFbo2)
+  glClearColor(0.0, 0.0, 0.0, 0.0)
+  glClear(GL_COLOR_BUFFER_BIT)
+  transform(ctx):
+    ctx.resetTransform()
+    ctx.`texture=`(ctx.gfx.fx1Target)
+    ctx.`program=`(fx.program)
+    ctx.begin()
+    ctx.rect(-1, 1, 2, -2)
+    blit(ctx): ctx.draw()
+    ctx.`program=`(prevProgram)
+    ctx.`texture=`(prevTexture)
+  (ctx.gfx.fxFbo1, ctx.gfx.fxFbo2) =
+    (ctx.gfx.fxFbo2, ctx.gfx.fxFbo1)
+  (ctx.gfx.fx1Target, ctx.gfx.fx2Target) =
+    (ctx.gfx.fx2Target, ctx.gfx.fx1Target)
+
+proc blitEffects*(ctx: var RGfxContext) =
+  ## Blits the effect surface onto the primary surface.
+  let prevTexture = ctx.texture
+  glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.primaryFbo)
+  ctx.`texture=`(ctx.gfx.fx1Target)
+  ctx.begin()
+  ctx.rect(0, 0, ctx.gfx.width.float, ctx.gfx.height.float)
+  blit(ctx): ctx.draw()
+  ctx.`texture=`(prevTexture)
+
+template effects*(ctx: var RGfxContext, body: untyped) =
+  ## Draws onto the effect surface in the specified block.
+  ## This should not be nested!
+  ctx.beginEffects()
+  body
+  ctx.blitEffects()
+
 proc ctx*(gfx: RGfx): RGfxContext =
   ## Creates a Gfx context for the specified Gfx.
   ## This should not be used by itself unless you know what you're doing!
@@ -633,7 +846,7 @@ template render*(gfx: RGfx, ctx, body: untyped): untyped =
   ## Renders a single frame onto the specified window.
   with(gfx.win):
     var ctx {.inject.} = gfx.ctx()
-    glBindFramebuffer(GL_FRAMEBUFFER, gfx.fbo)
+    glBindFramebuffer(GL_FRAMEBUFFER, gfx.primaryFbo)
     ctx.defaultProgram()
     glBindVertexArray(gfx.vaoID)
     glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)

@@ -81,9 +81,9 @@ proc newRTexture*(image: RImage, conf = DefaultTextureConfig): RTexture =
   ## Creates a texture from an RImage.
   result = newRTexture(image.width, image.height, image.caddr, conf)
 
-proc newRTexture*(filename: string, conf = DefaultTextureConfig): RTexture =
+proc loadRTexture*(filename: string, conf = DefaultTextureConfig): RTexture =
   ## Loads an image from a file and creates a texture from it.
-  let img = newRImage(filename)
+  let img = loadRImage(filename)
   result = newRTexture(img, conf)
 
 proc `minFilter=`*(tex: RTexture, flt: RTextureFilter) =

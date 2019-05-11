@@ -9,6 +9,7 @@ import unicode
 
 import ../lib/freetype
 
+import images
 import textures
 import ../gfx/texpack
 
@@ -28,8 +29,8 @@ type
 var freetypeLib*: FT_Library
 
 proc newRFont*(file: string, textureConfig: RTextureConfig,
-               height: Natural, width = height,
-               texWidth = 512.Natural, texHeight = texWidth): RFont =
+               height: Natural, width = 0.Natural,
+               texWidth = 512.Natural, texHeight = 512.Natural): RFont =
   once:
     let err = FT_Init_Freetype(addr freetypeLib).bool
     doAssert not err, "Could not initialize FreeType"
@@ -38,7 +39,8 @@ proc newRFont*(file: string, textureConfig: RTextureConfig,
     texConf: textureConfig,
     glyphs: newTable[Rune, RGlyph](),
     packer: newRTexturePacker(texWidth, texHeight, textureConfig, fmtRed8),
-    width: width, height: height,
+    width: if width == 0: height else: width,
+    height: height,
     lineSpacing: 1.3,
     tabWidth: 96
   )
@@ -57,7 +59,9 @@ proc renderGlyph(font: RFont, rune: Rune): RGlyph =
   let
     glyph = font.handle.glyph
     bitmap = glyph.bitmap
-    rect = font.packer.place(bitmap.width.int, bitmap.rows.int, bitmap.buffer)
+    image = newRImage(bitmap.width.int, bitmap.rows.int, bitmap.buffer, 1)
+    rect = font.packer.place(image)
+
   result = RGlyph(
     rect: rect,
     width: bitmap.width.int, height: bitmap.rows.int,

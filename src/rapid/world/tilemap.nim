@@ -25,13 +25,17 @@ type
     tiles: seq[seq[T]]
     oobTile: T
 
+    wrapX*, wrapY*: bool
+
     drawImpl*: proc (ctx: var RGfxContext, wld: RTmWorld[T], step: float)
     onModify*: proc (x, y: int, previousTile, currentTile: T)
 
 proc isInbounds*(wld: RTmWorld, x, y: int): bool =
   ## Returns ``true`` if the specified coordinates are inside of the world's
   ## boundaries.
-  result = x >= 0 and y >= 0 and x < wld.width and y < wld.height
+  result =
+    (wld.wrapX or x >= 0 and x < wld.width) and
+    (wld.wrapY or y >= 0 and y < wld.height)
 
 proc `oobTile=`*[T](wld: var RTmWorld[T], tile: T) =
   wld.oobTile = tile
@@ -44,20 +48,30 @@ proc implTile*[T](wld: var RTmWorld[T],
     isSolidImpl: isSolidImpl
   )
 
+proc getX(wld: RTmWorld, x: int): int =
+  result =
+    if wld.wrapX: x mod wld.width
+    else: x
+
+proc getY(wld: RTmWorld, y: int): int =
+  result =
+    if wld.wrapY: y mod wld.height
+    else: y
+
 proc `[]`*[T](wld: RTmWorld[T], x, y: int): T =
   ## Returns a tile at the specified coordinates. If the coordinates are out \
   ## of bounds, returns the previously set OOB tile.
   result =
     if wld.isInbounds(x, y):
-      wld.tiles[y][x]
+      wld.tiles[wld.getY(y)][wld.getX(x)]
     else:
       wld.oobTile
 
 proc `[]=`*[T](wld: var RTmWorld[T], x, y: int, tile: T) =
   ## Sets a tile. If the coordinates are out of bounds, doesn't set anything.
   if wld.isInbounds(x, y):
-    let oldTile = wld.tiles[y][x]
-    wld.tiles[y][x] = tile
+    let oldTile = wld[x, y]
+    wld.tiles[wld.getY(y)][wld.getX(x)] = tile
     if not wld.onModify.isNil: wld.onModify(x, y, oldTile, tile)
 
 proc isSolid*(wld: RTmWorld, x, y: int): bool =
