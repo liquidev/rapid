@@ -36,7 +36,10 @@ method draw(plr: var Player, ctx: var RGfxContext, step: float) =
   ctx.begin()
   ctx.color = gray(255)
   ctx.noTexture()
-  ctx.rect(plr.pos.x * 4, plr.pos.y * 4, 32, 32)
+  transform(ctx):
+    ctx.translate(plr.pos.x * 4 + 16, plr.pos.y * 4 + 16)
+    # ctx.rotate(cpuTime() * 100)
+    ctx.rect(-16, -16, 32, 32)
   ctx.draw()
 
 method update(plr: var Player, step: float) =
@@ -80,7 +83,7 @@ proc main() =
       minFilter: fltNearest, magFilter: fltNearest,
       wrapH: wrapRepeat, wrapV: wrapRepeat)
     tileset = loadRTexture("sampleData/tileset.png", tc)
-    rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 32, 32)
+    rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 14)
     gfx = win.openGfx()
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
 
@@ -114,31 +117,22 @@ proc main() =
   win.onMouseRelease do (win: RWindow, btn: MouseButton, mode: int):
     pressed = false
 
-  let wave = gfx.newREffect("""
-    #define Width 10
-    #define Height 1
-    #define Area Width * Height
+  let quantize = gfx.newREffect("""
+    #define Quantize 4.0
 
     vec4 rEffect(vec2 pos) {
-      vec4 avg = vec4(0.0);
-      for (int y = 0; y < Height; ++y) {
-        for (int x = 0; x < Width; ++x) {
-          avg += rPixel(vec2(pos.x - float(x), pos.y - float(y)));
-        }
-      }
-      avg /= float(Area);
-      return avg;
+      vec2 quantized = floor(pos / Quantize) * Quantize;
+      return rPixel(quantized + 0.5);
     }
   """)
 
   gfx.loop:
     draw ctx, step:
       ctx.clear(rgb(32, 32, 32))
-      map.draw(ctx, step)
       effects(ctx):
-        ctx.text(rubik, 48, 48, "My Table\nx\ty\n123\t567\tnicely tabulated")
-        wave.param("time", cpuTime() * 100)
-        ctx.effect(wave)
+        map.draw(ctx, step)
+        ctx.effect(quantize)
+      ctx.text(rubik, 48, 48, "effect testing")
     update step:
       map.update(step)
 

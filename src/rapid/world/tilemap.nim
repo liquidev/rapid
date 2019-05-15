@@ -84,7 +84,7 @@ proc init*[T](wld: var RTmWorld[T]) =
   for y in 0..<wld.height:
     var row: seq[T] = @[]
     for x in 0..<wld.width:
-      var tile = wld.tile.initImpl()
+      let tile = wld.tile.initImpl()
       row.add(tile)
     wld.tiles.add(row)
 
