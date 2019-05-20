@@ -431,10 +431,11 @@ type
     indices: seq[int32]
     vertexCount: int
     # Painting
-    program: RProgram
-    color: RColor
-    textureEnabled: bool
-    texture: RTexture
+    # I hate prefixes, but this has to be done as a workaround to Nim/#11279
+    sProgram: RProgram
+    sColor: RColor
+    sTextureEnabled: bool
+    sTexture: RTexture
     # Transformations
     transform*: Mat3f
   RVertex* = tuple
@@ -471,7 +472,7 @@ converter toRVertex*(vert: RColVertex): RVertex =
 template uniformProc(T: typedesc): untyped {.dirty.} =
   proc uniform*(ctx: var RGfxContext, name: string, val: T) =
     ## Sets a uniform in the currently bound program.
-    ctx.program.uniform(name, val)
+    ctx.sProgram.uniform(name, val)
 uniformProc(float)
 uniformProc(Vec2f)
 uniformProc(Vec3f)
@@ -489,7 +490,7 @@ proc program*(ctx: RGfxContext): RProgram =
 proc `program=`*(ctx: var RGfxContext, program: RProgram) =
   ## Binds a shader program for drawing operations.
   glUseProgram(program.id)
-  ctx.program = program
+  ctx.sProgram = program
   ctx.updateTransform()
   ctx.uniform("rapid_width", ctx.gfx.width.float)
   ctx.uniform("rapid_height", ctx.gfx.height.float)
@@ -542,12 +543,12 @@ proc clear*(ctx: var RGfxContext, col: RColor) =
 proc `color=`*(ctx: var RGfxContext, col: RColor) =
   ## Sets a 'default' vertex color. This vertex color is used when no explicit \
   ## color is specified in the vertex.
-  ctx.color = col
+  ctx.sColor = col
 
 proc noTexture*(ctx: var RGfxContext) =
   ## Disables the texture, and draws with plain colors.
-  if ctx.textureEnabled:
-    ctx.textureEnabled = false
+  if ctx.sTextureEnabled:
+    ctx.sTextureEnabled = false
     ctx.uniform("rapid_textureEnabled", 0)
 
 proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
@@ -555,14 +556,14 @@ proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
   if tex.isNil:
     ctx.noTexture()
   else:
-    if not ctx.textureEnabled:
-      ctx.textureEnabled = true
+    if not ctx.sTextureEnabled:
+      ctx.sTextureEnabled = true
       ctx.uniform("rapid_textureEnabled", 1)
-    ctx.texture = tex
+    ctx.sTexture = tex
 
 proc texture*(ctx: RGfxContext): RTexture =
   ## Returns the currently bound texture.
-  if ctx.textureEnabled: result = ctx.texture
+  if ctx.sTextureEnabled: result = ctx.sTexture
   else: result = nil
 
 proc `lineWidth=`*(ctx: var RGfxContext, width: float) =
@@ -598,11 +599,11 @@ proc vertex*(ctx: var RGfxContext,
 
 proc vertex*(ctx: var RGfxContext,
              vert: RPointVertex): RVertexIndex {.discardable.} =
-  ctx.vertex((vert.x, vert.y, ctx.color, 0.0, 0.0))
+  ctx.vertex((vert.x, vert.y, ctx.sColor, 0.0, 0.0))
 
 proc vertex*(ctx: var RGfxContext,
              vert: RTexVertex): RVertexIndex {.discardable.} =
-  ctx.vertex((vert.x, vert.y, ctx.color, vert.u, vert.v))
+  ctx.vertex((vert.x, vert.y, ctx.sColor, vert.u, vert.v))
 
 proc index*(ctx: var RGfxContext, indices: varargs[RVertexIndex]) =
   ## Adds a vertex index to the shape. This is only required when the
@@ -708,7 +709,8 @@ proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
   ## Draws the previously built shape.
   if ctx.shape.len > 0:
     glActiveTexture(GL_TEXTURE0)
-    if not ctx.texture.isNil: glBindTexture(GL_TEXTURE_2D, ctx.texture.id)
+    if not ctx.texture.isNil:
+      currentGlc.tex2D = ctx.texture.id
     ctx.updateTransform()
     ctx.gfx.updateVbo(ctx.shape)
     case primitive
@@ -834,7 +836,7 @@ proc ctx*(gfx: RGfx): RGfxContext =
   ## would not work without it.
   result = RGfxContext(
     gfx: gfx,
-    color: gray(255),
+    sColor: gray(255),
     transform: mat3(vec3(1.0'f32, 1.0, 1.0))
   )
 

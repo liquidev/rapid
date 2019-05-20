@@ -14,7 +14,7 @@ type
   GLContext* = ref object
     ## An object used for storing OpenGL state.
     window*: glfw.Window
-    tex2D*: GLuint
+    tex2Did*: GLuint
 
 # I know global variables are bad, but the current OpenGL context is global to
 # the current process.
@@ -29,6 +29,13 @@ template with*(ctx: GLContext, body: untyped) =
   ctx.makeCurrent()
   body
   prevCtx.makeCurrent()
+
+proc tex2D*(ctx: GLContext): GLuint =
+  result = ctx.tex2Did
+
+proc `tex2D=`*(ctx: GLContext, tex: GLuint) =
+  glBindTexture(GL_TEXTURE_2D, tex)
+  ctx.tex2Did = tex
 
 template withTex2D*(ctx: GLContext, tex: GLuint, body: untyped) =
   let prevTex = ctx.tex2D

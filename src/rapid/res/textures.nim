@@ -29,6 +29,9 @@ type
     fmtRGBA8
     fmtRed8
 
+proc `$`*(tex: RTexture): string =
+  result = "RTexture " & $tex.id & " " & $tex.width & "×" & $tex.height
+
 proc GLenum*(flt: RTextureFilter): GLenum =
   case flt
   of fltNearest: GL_NEAREST

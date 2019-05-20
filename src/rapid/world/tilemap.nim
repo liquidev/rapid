@@ -50,12 +50,12 @@ proc implTile*[T](wld: var RTmWorld[T],
 
 proc getX(wld: RTmWorld, x: int): int =
   result =
-    if wld.wrapX: x mod wld.width
+    if wld.wrapX: floorMod(x, wld.width).int
     else: x
 
 proc getY(wld: RTmWorld, y: int): int =
   result =
-    if wld.wrapY: y mod wld.height
+    if wld.wrapY: floorMod(y, wld.height).int
     else: y
 
 proc `[]`*[T](wld: RTmWorld[T], x, y: int): T =
@@ -149,6 +149,9 @@ proc update*[T](wld: var RTmWorld[T], step: float) =
     spr.acc *= 0
 
     var p = spr.pos.xy
+    if wld.wrapX: p.x = floorMod(p.x, wld.width.float * wld.tileWidth)
+    if wld.wrapY: p.y = floorMod(p.y, wld.height.float * wld.tileWidth)
+
     p.x += spr.vel.x * step
 
     var
@@ -202,6 +205,7 @@ proc newRTmWorld*[T](width, height,
     width: width, height: height,
     tileWidth: tileWidth.float, tileHeight: tileHeight.float
   )
+  result.RWorld.init()
 
 proc load*[T; w, h: static[int]](wld: var RTmWorld[T],
                                  map: array[h, array[w, T]]) =

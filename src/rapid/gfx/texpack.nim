@@ -32,13 +32,12 @@ proc areaFree(tp: RTexturePacker, x, y, w, h: int): bool =
   return true
 
 proc rawPlace(tp: RTexturePacker, x, y, w, h: int, data: pointer) =
-  currentGlc.withTex2D(tp.texture.id):
-    glTexSubImage2D(GL_TEXTURE_2D, 0, x.GLint, GLint(tp.texture.height - y - h), w.GLsizei, h.GLsizei,
-                    tp.fmt.color, GL_UNSIGNED_BYTE, data)
+  glTexSubImage2D(GL_TEXTURE_2D, 0, x.GLint, GLint(tp.texture.height - y - h),
+                  w.GLsizei, h.GLsizei, tp.fmt.color, GL_UNSIGNED_BYTE, data)
 
-proc place*(tp: RTexturePacker, image: RImage): RTextureRect =
+proc pack(tp: RTexturePacker, image: RImage): RTextureRect =
   if image.width * image.height > 0:
-    var x, y = 0
+    var x, y = 1
     while y <= tp.texture.height - image.height - 1:
       while x <= tp.texture.width - image.width - 1:
         block placeTex:
@@ -49,11 +48,24 @@ proc place*(tp: RTexturePacker, image: RImage): RTextureRect =
           if tp.areaFree(x, y, image.width + 1, image.height + 1):
             tp.rawPlace(x, y, image.width, image.height, image.caddr)
             tp.occupyArea(x, y, image.width + 1, image.height + 1)
-            return (x / tp.texture.width, y / tp.texture.height,
-              image.width / tp.texture.width, image.height / tp.texture.height)
+            let
+              hp = 1 / tp.texture.width / tp.texture.width.float
+              vp = 1 / tp.texture.height / tp.texture.height.float
+            return (x / tp.texture.width + hp, y / tp.texture.height + vp,
+                    image.width / tp.texture.width - hp * 2,
+                    image.height / tp.texture.height - vp * 2)
           inc(x)
       x = 0
       inc(y)
+
+proc place*(tp: RTexturePacker, image: RImage): RTextureRect =
+  currentGlc.withTex2D(tp.texture.id):
+    result = tp.pack(image)
+
+proc place*(tp: RTexturePacker, images: openarray[RImage]): seq[RTextureRect] =
+  currentGlc.withTex2D(tp.texture.id):
+    for img in images:
+      result.add(tp.pack(img))
 
 proc newRTexturePacker*(width, height: Natural,
                         conf = DefaultTextureConfig,

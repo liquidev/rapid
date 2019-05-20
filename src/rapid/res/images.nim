@@ -39,6 +39,7 @@ proc subimg*(img: RImage, x, y, w, h: int): RImage =
   result = RImage(
     width: w, height: h
   )
-  for y in countdown(y + h - 1, y):
+  let trueY = img.height - y - h
+  for y in trueY..<trueY + h:
     let offset = y * img.width * 4
     result.data.add(img.data[offset + x * 4..<offset + (x + w) * 4])

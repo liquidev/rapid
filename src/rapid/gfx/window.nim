@@ -107,12 +107,13 @@ type
   #--
   # Events
   #--
-  RCharFn* = proc (win: RWindow, rune: Rune, mods: int)
+  RKeyMods* = set[glfw.ModifierKey]
+  RCharFn* = proc (win: RWindow, rune: Rune, mods: RKeyMods)
   RCursorEnterFn* = proc (win: RWindow)
   RCursorMoveFn* = proc (win: RWindow, x, y: float)
   RFilesDroppedFn* = proc (win: RWindow, filenames: seq[string])
-  RKeyFn* = proc (win: RWindow, key: glfw.Key, scancode: int, mods: int)
-  RMouseFn* = proc (win: RWindow, button: glfw.MouseButton, mods: int)
+  RKeyFn* = proc (win: RWindow, key: glfw.Key, scancode: int, mods: RKeyMods)
+  RMouseFn* = proc (win: RWindow, button: glfw.MouseButton, mods: RKeyMods)
   RScrollFn* = proc (win: RWindow, x, y: float)
   RCloseFn* = proc (win: RWindow): bool
   RResizeFn* = proc (win: RWindow, width, height: Natural)
@@ -181,6 +182,13 @@ builderBool(floating):
 builderBool(maximized):
   ## Defines if the built window will be maximized.
 
+converter toModsSet(mods: int32): RKeyMods =
+  result = {}
+  if (mods and glfw.mkShift.int) > 0: result = result + { glfw.mkShift }
+  if (mods and glfw.mkAlt.int) > 0: result = result + { glfw.mkAlt }
+  if (mods and glfw.mkCtrl.int) > 0: result = result + { glfw.mkCtrl }
+  if (mods and glfw.mkSuper.int) > 0: result = result + { glfw.mkSuper }
+
 proc glfwCallbacks(win: var RWindow) =
   win.callbacks = WindowCallbacks()
   template run(name, body: untyped): untyped {.dirty.} =
@@ -188,7 +196,7 @@ proc glfwCallbacks(win: var RWindow) =
     for fn in win.callbacks.name: body
   discard glfw.setCharModsCallback(win.handle,
     proc (w: glfw.Window, uchar: cuint, mods: int32) =
-      run(onChar): fn(win, Rune(uchar), int mods))
+      run(onChar): fn(win, Rune(uchar), mods))
   discard glfw.setCursorEnterCallback(win.handle,
     proc (w: glfw.Window, entered: int32) =
       if entered == 1:
@@ -205,18 +213,18 @@ proc glfwCallbacks(win: var RWindow) =
     proc (w: glfw.Window, key, scan, action, mods: int32) =
       case glfw.KeyAction(action)
       of glfw.kaDown:
-        run(onKeyPress, fn(win, glfw.Key(key), int scan, int mods))
+        run(onKeyPress, fn(win, glfw.Key(key), int scan, mods))
       of glfw.kaUp:
-        run(onKeyRelease, fn(win, glfw.Key(key), int scan, int mods))
+        run(onKeyRelease, fn(win, glfw.Key(key), int scan, mods))
       of glfw.kaRepeat:
-        run(onKeyRepeat, fn(win, glfw.Key(key), int scan, int mods)))
+        run(onKeyRepeat, fn(win, glfw.Key(key), int scan, mods)))
   discard glfw.setMouseButtonCallback(win.handle,
     proc (w: glfw.Window, button, action, mods: int32) =
       case glfw.KeyAction(action)
       of glfw.kaDown:
-        run(onMousePress, fn(win, glfw.MouseButton(button), int mods))
+        run(onMousePress, fn(win, glfw.MouseButton(button), mods))
       of glfw.kaUp:
-        run(onMouseRelease, fn(win, glfw.MouseButton(button), int mods))
+        run(onMouseRelease, fn(win, glfw.MouseButton(button), mods))
       else: discard)
   discard glfw.setScrollCallback(win.handle,
     proc (w: glfw.Window, x, y: cdouble) =
