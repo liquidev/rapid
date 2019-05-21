@@ -662,6 +662,10 @@ proc pie*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
   for n, i in rim:
     ctx.index(center, i, rim[(n + 1) mod rim.len])
 
+proc point*[T: SomeVertex](ctx: var RGfxContext, a: T) =
+  ## Adds a point, for use with ``prPoints``.
+  ctx.index(ctx.vertex(a))
+
 proc line*[T: SomeVertex](ctx: var RGfxContext, a, b: T) =
   ## Adds a line with the specified points, for use with ``prLineShape``.
   ctx.index(ctx.vertex(a))
