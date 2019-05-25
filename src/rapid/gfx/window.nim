@@ -416,6 +416,9 @@ proc `mousePos=`*(win: var RWindow, x, y: float) =
   glfw.setCursorPos(win.handle, float64 x, float64 y)
 
 proc time*(): float =
+  ## Returns the current process's time.
+  ## This should be used instead of ``cpuTime()``, because it properly deals \
+  ## with the game loop.
   result = glfw.getTime().float
 
 proc makeCurrent*(win: RWindow) =
