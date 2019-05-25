@@ -237,7 +237,7 @@ type
     # Framebuffers
     primaryFbo, fxFbo1, fxFbo2: GLuint
     target, fx1Target, fx2Target: RTexture
-    fxTexConf: RTextureConfig
+    texConf, fxTexConf: RTextureConfig
     # Buffer objects
     vaoID, vboID, eboID: GLuint
     vboSize, eboSize: int
@@ -334,6 +334,13 @@ proc updateEbo(gfx: RGfx, data: seq[int32]) =
     data[0].unsafeAddr)
 
 proc updateEffectFbos(gfx: RGfx) =
+  if gfx.fxFbo1 != 0:
+    glDeleteFramebuffers(1, addr gfx.fxFbo1)
+    gfx.fx1Target.unload()
+  if gfx.fxFbo2 != 0:
+    glDeleteFramebuffers(1, addr gfx.fxFbo2)
+    gfx.fx2Target.unload()
+
   glCreateFramebuffers(1, addr gfx.fxFbo1)
   gfx.fx1Target = newRTexture(gfx.width, gfx.height, nil, gfx.fxTexConf)
   glNamedFramebufferTexture(
@@ -343,6 +350,22 @@ proc updateEffectFbos(gfx: RGfx) =
   gfx.fx2Target = newRTexture(gfx.width, gfx.height, nil, gfx.fxTexConf)
   glNamedFramebufferTexture(
     gfx.fxFbo2, GL_COLOR_ATTACHMENT0, gfx.fx2Target.id, 0)
+
+proc resize*(gfx: var RGfx, width, height: int) =
+  doAssert gfx.win != nil,
+    "A window's Gfx cannot be resized using ``resize``. " &
+    "Resize the window itself"
+  gfx.width = width
+  gfx.height = height
+
+  if gfx.primaryFbo != 0:
+    glDeleteFramebuffers(1, addr gfx.primaryFbo)
+    gfx.target.unload()
+
+  glCreateFramebuffers(1, addr gfx.primaryFbo)
+  gfx.target = newRTexture(width, height, nil, gfx.texConf)
+  glNamedFramebufferTexture(
+    gfx.primaryFbo, GL_COLOR_ATTACHMENT0, gfx.target.id, 0)
 
 proc init(gfx: RGfx) =
   # Settings
@@ -386,6 +409,7 @@ proc initRoot(gfx: RGfx) =
     gfx.width = width
     gfx.height = height
     gfx.projection = ortho(0'f32, width.float, height.float, 0, -1, 1)
+    gfx.updateEffectFbos()
 
 proc texture*(gfx: RGfx): RTexture =
   ## Returns the texture the Gfx is drawing to. This is ``nil`` if the \
@@ -404,20 +428,25 @@ proc openGfx*(win: RWindow, fxTexConfig = DefaultTextureConfig): RGfx =
   result.init()
   result.initRoot()
 
-proc newGfx*(width, height: int, texConf: RTextureConfig,
-             fxTexConfig = DefaultTextureConfig): RGfx =
+proc newRGfx*(width, height: int,
+              texConf, fxTexConf = DefaultTextureConfig): RGfx =
   ## Creates a new, blank Gfx, with the specified size and texture config.
   ## The implementation uses framebuffers.
   result = RGfx(
     width: width,
     height: height,
-    fxTexConf: fxTexConfig
+    fxTexConf: fxTexConf
   )
-  glCreateFramebuffers(1, addr result.primaryFbo)
-  result.target = newRTexture(width, height, nil, texConf)
-  glNamedFramebufferTexture(
-    result.primaryFbo, GL_COLOR_ATTACHMENT0, result.target.id, 0)
   result.init()
+
+proc newRGfx*(win: var RWindow,
+              texConf, fxTexConf = DefaultTextureConfig): RGfx =
+  ## Creates a new "window-bound" Gfx. This means that the Gfx is \
+  ## automatically resized along with the window.
+  result = newRGfx(win.width, win.height, texConf, fxTexConf)
+  win.onResize do (win: RWindow, width, height: Natural):
+    result.resize(width, height)
+    result.updateEffectFbos()
 
 #--
 # Gfx context
@@ -485,7 +514,7 @@ proc updateTransform(ctx: var RGfxContext) =
 
 proc program*(ctx: RGfxContext): RProgram =
   ## Retrieves the currently bound shader program.
-  result = ctx.program
+  result = ctx.sProgram
 
 proc `program=`*(ctx: var RGfxContext, program: RProgram) =
   ## Binds a shader program for drawing operations.
@@ -926,13 +955,13 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
     while glfw.windowShouldClose(`gfx`.win.handle) == 0:
       let
         current = float(glfw.getTime())
-        elapsed = current - previous
+        delta = current - previous
       previous = current
-      lag += elapsed
+      lag += delta
 
       while lag >= millisPerUpdate:
         block update:
-          let `updateStepName` = elapsed / millisPer60fps
+          let `updateStepName` = delta / millisPer60fps
           `updateBody`
         lag -= millisPerUpdate
 

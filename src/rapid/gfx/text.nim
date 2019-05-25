@@ -20,8 +20,18 @@ proc text*(ctx: var RGfxContext, font: RFont, x, y: float, text: string) =
     runes = text.toRunes()
     previousTex = ctx.texture
   var
-    penX = x * 64
-    penY = y * 64
+    penX = floor(
+      case font.horzAlign
+      of taLeft: x
+      of taCenter: x - font.widthOf(text) / 2
+      of taRight: x - font.widthOf(text)
+    ) * 64
+    penY = floor(
+      case font.vertAlign
+      of taTop: y + font.height.float
+      of taMiddle: y + font.height / 2
+      of taBottom: y
+    ) * 64
   ctx.uniform("rapid_renderText", 1)
   ctx.texture = font.packer.texture
   ctx.begin()

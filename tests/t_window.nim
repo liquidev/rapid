@@ -58,7 +58,7 @@ proc newPlayer(win: var RWindow, x, y: float): Player =
   result = Player(win: win, width: 8, height: 8)
 
   let plr = result
-  win.onKeyPress do (win: RWindow, key: Key, scancode: int, mods: int):
+  win.onKeyPress do (win: RWindow, key: Key, scancode: int, mods: RModKeys):
     if key == keyUp:
       plr.force(vec2(0.0, -3.0))
 
@@ -89,7 +89,7 @@ proc main() =
 
   let atl = newRAtlas(tileset, 8, 8, 1)
 
-  map.implTile(initTile, isSolid)
+  map.implTile(initImpl = initTile, isSolidImpl = isSolid)
   map.init()
   map.load(Map)
 
@@ -112,9 +112,9 @@ proc main() =
     x = cx
     y = cy
 
-  win.onMousePress do (win: RWindow, btn: MouseButton, mode: int):
+  win.onMousePress do (win: RWindow, btn: MouseButton, mods: RModKeys):
     pressed = true
-  win.onMouseRelease do (win: RWindow, btn: MouseButton, mode: int):
+  win.onMouseRelease do (win: RWindow, btn: MouseButton, mods: RModKeys):
     pressed = false
 
   let quantize = gfx.newREffect("""
@@ -126,13 +126,15 @@ proc main() =
     }
   """)
 
+  rubik.horzAlign = taCenter
+
   gfx.loop:
     draw ctx, step:
       ctx.clear(rgb(32, 32, 32))
       effects(ctx):
         map.draw(ctx, step)
         ctx.effect(quantize)
-      ctx.text(rubik, 48, 48, "effect testing")
+      ctx.text(rubik, gfx.width / 2, 0, "effect testing")
     update step:
       map.update(step)
 

@@ -51,7 +51,7 @@ proc initGlfw(): InitErrorKind =
 
 proc onGlDebug(source, kind: GLenum, id: GLuint, severity: GLenum,
                length: GLsizei, msgPtr: ptr GLchar,
-               userParam: pointer) {.stdcall.} =
+               userParam: pointer) {.stdcall, used.} =
   var msg = newString(length)
   copyMem(msg[0].unsafeAddr, msgPtr, length)
   let kindStr =
@@ -78,11 +78,12 @@ proc initGl(win: glfw.Window): InitErrorKind =
   glfw.makeContextCurrent(win)
   if not gladLoadGL(glfw.getProcAddress):
     return ieGladLoadFailed
-  if GLAD_GL_KHR_debug:
-    glEnable(GL_DEBUG_OUTPUT)
-    glDebugMessageCallback(onGlDebug, nil)
-  else:
-    warn("KHR_debug is not present. OpenGL debug info will not be available")
+  when defined(glDebugOutput):
+    if GLAD_GL_KHR_debug:
+      glEnable(GL_DEBUG_OUTPUT)
+      glDebugMessageCallback(onGlDebug, nil)
+    else:
+      warn("KHR_debug is not present. OpenGL debug info will not be available")
   if not GLAD_GL_ARB_separate_shader_objects:
     error("ARB_separate_shader_objects is not available. ",
           "Please update your graphics drivers")
@@ -107,13 +108,13 @@ type
   #--
   # Events
   #--
-  RKeyMods* = set[glfw.ModifierKey]
-  RCharFn* = proc (win: RWindow, rune: Rune, mods: RKeyMods)
+  RModKeys* = set[glfw.ModifierKey]
+  RCharFn* = proc (win: RWindow, rune: Rune, mods: RModKeys)
   RCursorEnterFn* = proc (win: RWindow)
   RCursorMoveFn* = proc (win: RWindow, x, y: float)
   RFilesDroppedFn* = proc (win: RWindow, filenames: seq[string])
-  RKeyFn* = proc (win: RWindow, key: glfw.Key, scancode: int, mods: RKeyMods)
-  RMouseFn* = proc (win: RWindow, button: glfw.MouseButton, mods: RKeyMods)
+  RKeyFn* = proc (win: RWindow, key: glfw.Key, scancode: int, mods: RModKeys)
+  RMouseFn* = proc (win: RWindow, button: glfw.MouseButton, mods: RModKeys)
   RScrollFn* = proc (win: RWindow, x, y: float)
   RCloseFn* = proc (win: RWindow): bool
   RResizeFn* = proc (win: RWindow, width, height: Natural)
@@ -182,7 +183,7 @@ builderBool(floating):
 builderBool(maximized):
   ## Defines if the built window will be maximized.
 
-converter toModsSet(mods: int32): RKeyMods =
+converter toModsSet(mods: int32): RModKeys =
   result = {}
   if (mods and glfw.mkShift.int) > 0: result = result + { glfw.mkShift }
   if (mods and glfw.mkAlt.int) > 0: result = result + { glfw.mkAlt }
@@ -413,6 +414,9 @@ proc mouseY*(win: RWindow): float = win.mousePos.y
 
 proc `mousePos=`*(win: var RWindow, x, y: float) =
   glfw.setCursorPos(win.handle, float64 x, float64 y)
+
+proc time*(): float =
+  result = glfw.getTime().float
 
 proc makeCurrent*(win: RWindow) =
   ## Makes the window the current one for drawing actions.

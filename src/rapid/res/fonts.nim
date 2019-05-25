@@ -17,6 +17,14 @@ type
   RGlyph* = ref object
     rect*: RTextureRect
     width*, height*, bitmapLeft*, bitmapTop*, advanceX*: int
+  RTextHAlign* = enum
+    taLeft
+    taCenter
+    taRight
+  RTextVAlign* = enum
+    taTop
+    taBottom
+    taMiddle
   RFont* = ref object
     handle*: FT_Face
     glyphs*: TableRef[Rune, RGlyph]
@@ -24,6 +32,8 @@ type
     packer*: RTexturePacker
     width*, height*: int
     lineSpacing, tabWidth: float
+    halign: RTextHAlign
+    valign: RTextVAlign
   FreetypeError* = object of Exception
 
 var freetypeLib*: FT_Library
@@ -53,7 +63,7 @@ proc newRFont*(file: string, textureConfig: RTextureConfig,
   doAssert not err.bool, "Could not set font size"
 
 proc renderGlyph(font: RFont, rune: Rune): RGlyph =
-  var err = FT_Load_Char(font.handle, rune.FT_ulong, 0b100)
+  var err = FT_Load_Char(font.handle, rune.FT_ulong, 0b100 #[ FT_LOAD_RENDER ]#)
   doAssert not err.bool, "Could not render glyph '" & $rune & "'"
 
   let
@@ -72,6 +82,19 @@ proc renderGlyph(font: RFont, rune: Rune): RGlyph =
 proc render*(font: RFont, rune: Rune) =
   font.glyphs[rune] = font.renderGlyph(rune)
 
+proc widthOf*(font: RFont, rune: Rune): float =
+  if not font.glyphs.hasKey(rune):
+    font.render(rune)
+  let glyph = font.glyphs[rune]
+  result = glyph.width.float
+
+proc widthOf*(font: RFont, text: string): float =
+  for r in runes(text):
+    result += font.widthOf(r)
+
+proc widthOf*(font: RFont, ch: char): float =
+  result = font.widthOf(ch.Rune)
+
 proc `lineSpacing=`*(font: RFont, spacing: float) =
   font.lineSpacing = spacing
 
@@ -84,8 +107,20 @@ proc `tabWidth=`*(font: RFont, width: float) =
 proc tabWidth*(font: RFont): float =
   result = font.tabWidth
 
+proc `horzAlign=`*(font: RFont, align: RTextHAlign) =
+  font.halign = align
+
+proc horzAlign*(font: RFont): RTextHAlign =
+  result = font.halign
+
+proc `vertAlign=`*(font: RFont, align: RTextVAlign) =
+  font.valign = align
+
+proc vertAlign*(font: RFont): RTextVAlign =
+  result = font.valign
+
 proc unload*(font: var RFont) =
-  ## Unloads a texture. The font cannot be used afterwards.
+  ## Unloads a font. The font cannot be used afterwards.
   let err = FT_Done_Face(font.handle)
   doAssert not err.bool, "Could not unload font face"
   font.packer.texture.unload()
