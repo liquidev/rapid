@@ -149,10 +149,9 @@ proc update*[T](wld: var RTmWorld[T], step: float) =
     spr.acc *= 0
 
     var p = spr.pos.xy
-    if wld.wrapX: p.x = floorMod(p.x, wld.width.float * wld.tileWidth)
-    if wld.wrapY: p.y = floorMod(p.y, wld.height.float * wld.tileWidth)
 
     p.x += spr.vel.x * step
+    if wld.wrapX: p.x = floorMod(p.x, wld.width.float * wld.tileWidth)
 
     var
       s = newRAABB(p.x, p.y, spr.width, spr.height)
@@ -176,6 +175,8 @@ proc update*[T](wld: var RTmWorld[T], step: float) =
             p.x = t.right
 
     p.y += spr.vel.y * step
+    if wld.wrapY: p.y = floorMod(p.y, wld.height.float * wld.tileWidth)
+
     s = newRAABB(p.x, p.y, spr.width, spr.height)
     st = wld.tileAlignedHitbox(s)
 
