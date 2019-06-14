@@ -5,8 +5,7 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
-## This is a miniaudio wrapper using nimterop. Feel free to use it in your own
-## projects.
+## This is a miniaudio wrapper using nimterop.
 
 import os
 import strutils

@@ -190,9 +190,18 @@ gfx.loop:
 
  - Don't worry about using global variables. They are a very useful tool,
    especially for game resource storage. You should only avoid them in
-   libraries.
+   libraries, which should use state objects instead.
  - Draw in batches whenever possible. This reduces the amount of time the CPU
    has to spend sending data to the GPU, making your game run better.
  - Compile your game with `--opt:speed`. The performance vs compile time
-   tradeoff is not as terrible as you might think, especially when compiling
-   to C code.
+   tradeoff is not as terrible as you might think, especially when using
+   `nim c` (and not `nim cpp` or something else).
+
+## Legal
+
+The rapid game engine is licensed under the MIT license. It makes use of
+third-party libraries, which must be properly attributed within products making
+use of rapid.
+
+The `lib/licenses` module has the licenses available at compile-time. Check it
+out for instructions on including the licenses in your game.

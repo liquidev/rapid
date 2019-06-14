@@ -5,6 +5,10 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
+## This module implements font resource loading and rendering using the
+## FreeType library.
+## TTF and OTF formats are supported.
+
 import tables
 import unicode
 

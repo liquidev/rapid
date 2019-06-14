@@ -5,14 +5,15 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
+## This module handles rendering of text through the FreeType library.
+## See ``res/fonts`` for font loading and properties.
+
 import math
 import tables
 import unicode
 
 import surface
 import ../res/fonts
-
-## This module handles rendering of text through the FreeType library.
 
 proc text*(ctx: var RGfxContext, font: RFont, x, y: float, text: string) =
   ## Renders a string of text using the specified font, at the specified \

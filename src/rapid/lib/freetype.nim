@@ -5,8 +5,7 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
-## This is a wrapper for the FreeType library. Feel free to include it in your
-## own projects.
+## This is a wrapper for the FreeType library.
 
 import os
 
