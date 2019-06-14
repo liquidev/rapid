@@ -1,2 +1,4 @@
 glfw_src
 freetype_src
+soundio_src
+_nimterop*

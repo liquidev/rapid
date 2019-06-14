@@ -135,6 +135,17 @@ proc main() =
         map.draw(ctx, step)
         ctx.effect(quantize)
       ctx.text(rubik, gfx.width / 2, 0, "effect testing")
+
+      ctx.begin()
+      ctx.color = gray(0, 128)
+      ctx.rrect(32, 32, 128, 128, 32)
+      ctx.draw()
+
+      ctx.lineSmooth = true
+      ctx.begin()
+      ctx.color = gray(255)
+      ctx.lrrect(32, 32, 128, 128, 32)
+      ctx.draw(prLineShape)
     update step:
       map.update(step)
 

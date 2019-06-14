@@ -3,16 +3,50 @@
 A game engine written in Nim, optimized for rapid game development and
 easy prototyping.
 
+## Goals
+
+ - Be easy to understand, even for beginners,
+ - Have an easy-to-use, yet flexible API,
+ - Support as many platforms as possible,
+ - Compile all C libraries statically to avoid dependency/linker errors,
+ - Make game development a fun task for everyone.
+
+## Features
+
+ - Graphics
+   - Windowing (using GLFW)
+   - Easy-to-use graphics context
+   - Post-processing effects
+   - Texture atlas support
+   - Texture packer
+   - Text rendering
+   - Backends
+     - [x] OpenGL
+     - [ ] WebGL
+ - Audio
+   - [ ] Track-based mixer
+   - [ ] Effects
+ - Resource loading
+   - PNG images
+   - TTF/OTF fonts
+ - Game logic
+   - Built-in game loop macro
+   - [x] AABB-based tilemap worlds
+     - Physics
+     - Collision detection and response
+   - [ ] Line collision-based worlds
+
 ## Installing
 
 To install rapid, use the following command:
 ```
-$ nimble install https://github.com/liquid600pgm/rapid
+$ nimble install rapid
 ```
 
 ### Linux
 
 On Linux, the development headers for the following libraries must be installed:
+
  - GL
  - X11
  - Xrandr
@@ -151,3 +185,14 @@ gfx.loop:
     discard
 
 ```
+
+## Tips
+
+ - Don't worry about using global variables. They are a very useful tool,
+   especially for game resource storage. You should only avoid them in
+   libraries.
+ - Draw in batches whenever possible. This reduces the amount of time the CPU
+   has to spend sending data to the GPU, making your game run better.
+ - Compile your game with `--opt:speed`. The performance vs compile time
+   tradeoff is not as terrible as you might think, especially when compiling
+   to C code.

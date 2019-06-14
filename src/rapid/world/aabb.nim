@@ -2,6 +2,7 @@
 # rapid
 # a game engine optimized for rapid prototyping
 # copyright (c) 2019, iLiquid
+# licensed under the MIT license - see LICENSE file for more information
 #--
 
 ## A minimal axis aligned bounding box implementation for collision detection.

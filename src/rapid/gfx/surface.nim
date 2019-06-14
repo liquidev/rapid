@@ -2,6 +2,7 @@
 # rapid
 # a game engine optimized for rapid prototyping
 # copyright (c) 2019, iLiquid
+# licensed under the MIT license - see LICENSE file for more information
 #--
 
 ## This module handles drawing basic graphics. Other modules from the gfx \
@@ -84,7 +85,7 @@ const
       }
     }
 
-    vec4 rFragment(vec4 col, sampler2D tex, vec2 pos, vec2 uv);
+    vec4 rFragment(vec4 col, sampler2D tex, vec4 mask, vec2 pos, vec2 uv);
 
     void main(void) {
       rapid_fCol = rFragment(rapid_vfCol, rapid_texture,
@@ -235,8 +236,8 @@ type
     effectVertSh, effectFragLibSh: RShader
     defaultProgram: RProgram
     # Framebuffers
-    primaryFbo, fxFbo1, fxFbo2: GLuint
-    target, fx1Target, fx2Target: RTexture
+    primaryFbo, fxFbo1, fxFbo2, maskFbo: GLuint
+    target, fx1Target, fx2Target, maskTarget: RTexture
     texConf, fxTexConf: RTextureConfig
     # Buffer objects
     vaoID, vboID, eboID: GLuint
@@ -370,7 +371,7 @@ proc resize*(gfx: var RGfx, width, height: int) =
 proc init(gfx: RGfx) =
   # Settings
   glEnable(GL_BLEND)
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
   # Default program
   gfx.defaultProgram = gfx.newRProgram(RDefaultVshSrc, RDefaultFshSrc)
   # Allocate buffers
@@ -465,6 +466,8 @@ type
     sColor: RColor
     sTextureEnabled: bool
     sTexture: RTexture
+    sLineWidth: float
+    sLineSmooth: bool
     # Transformations
     transform*: Mat3f
   RVertex* = tuple
@@ -597,10 +600,12 @@ proc texture*(ctx: RGfxContext): RTexture =
 
 proc `lineWidth=`*(ctx: var RGfxContext, width: float) =
   ## Sets the line width.
+  ctx.sLineWidth = width
   glLineWidth(width)
 
 proc `lineSmooth=`*(ctx: var RGfxContext, enable: bool) =
   ## Sets if lines should be anti-aliased.
+  ctx.sLineSmooth = enable
   if enable: glEnable(GL_LINE_SMOOTH)
   else: glDisable(GL_LINE_SMOOTH)
 
@@ -688,26 +693,55 @@ proc pie*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
   for i in 0..<points:
     let angle = start + i / (points - 1) * (fin - start)
     rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
-  for n, i in rim:
-    ctx.index(center, i, rim[(n + 1) mod rim.len])
+  for n in 0..<rim.len - 1:
+    ctx.index(center, rim[n], rim[n + 1])
+
+proc rrect*(ctx: var RGfxContext, x, y, w, h, r: float, points = 8) =
+  ## Adds a rounded rectangle, at the specified posision, with the specified
+  ## size and corner radius.
+  const HPi = PI / 2
+  ctx.rect(x + r,     y,     w - r * 2, h)
+  ctx.rect(x,         y + r, r,         h - r * 2)
+  ctx.rect(x + w - r, y + r, r,         h - r * 2)
+  ctx.pie(x + w - r, y + h - r, r, 0,       1 * HPi, points)
+  ctx.pie(x + r,     y + h - r, r, 1 * HPi, 2 * HPi, points)
+  ctx.pie(x + r,     y + r,     r, 2 * HPi, 3 * HPi, points)
+  ctx.pie(x + w - r, y + r,     r, 3 * HPi, 4 * HPi, points)
 
 proc point*[T: SomeVertex](ctx: var RGfxContext, a: T) =
   ## Adds a point, for use with ``prPoints``.
   ctx.index(ctx.vertex(a))
 
+template lineAux(body) =
+  ## Make lines pixel-perfect by offsetting them by 0.5px when line width is odd
+  let offset = (ctx.sLineWidth + 1) mod 2 / 2
+  ctx.translate(offset, offset)
+  body
+  ctx.translate(-offset, -offset)
+
 proc line*[T: SomeVertex](ctx: var RGfxContext, a, b: T) =
   ## Adds a line with the specified points, for use with ``prLineShape``.
-  ctx.index(ctx.vertex(a))
-  ctx.index(ctx.vertex(b))
+  lineAux:
+    ctx.index(ctx.vertex(a))
+    ctx.index(ctx.vertex(b))
+
+proc ltri*[T: SomeVertex](ctx: var RGfxContext, a, b, c: T) =
+  lineAux:
+    let
+      i = ctx.vertex(a)
+      j = ctx.vertex(b)
+      k = ctx.vertex(c)
+    ctx.index(i, j, j, k, k, i)
 
 proc lquad*[T: SomeVertex](ctx: var RGfxContext, a, b, c, d: T) =
   ## Adds a quad outline, together with its indices.
-  let
-    i = ctx.vertex(a)
-    j = ctx.vertex(b)
-    k = ctx.vertex(c)
-    l = ctx.vertex(d)
-  ctx.index(i, j, j, k, k, l, l, i)
+  lineAux:
+    let
+      i = ctx.vertex(a)
+      j = ctx.vertex(b)
+      k = ctx.vertex(c)
+      l = ctx.vertex(d)
+    ctx.index(i, j, j, k, k, l, l, i)
 
 proc lrect*(ctx: var RGfxContext, x, y, w, h: float) =
   ## Adds a rectangle outline, at the specified coordinates, with the \
@@ -721,22 +755,37 @@ proc lrect*(ctx: var RGfxContext, x, y, w, h: float) =
 proc lcircle*(ctx: var RGfxContext, x, y, r: float, points = 32) =
   ## Adds a circle outline, with the specified center and radius. An amount of \
   ## points can be specified to create an equilateral polygon.
-  var rim: seq[RVertexIndex]
-  for i in 0..<points:
-    let angle = i / (points - 1) * (2 * PI)
-    rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
-  for n, i in rim:
-    ctx.index(i, rim[(n + 1) mod rim.len])
+  lineAux:
+    var rim: seq[RVertexIndex]
+    for i in 0..<points:
+      let angle = i / (points - 1) * (2 * PI)
+      rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
+    for n, i in rim:
+      ctx.index(i, rim[(n + 1) mod rim.len])
 
 proc arc*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
   ## Adds an arc, with the specified center, radius, and start and finish \
   ## angles. All angles should be expressed in radians.
-  var rim: seq[RVertexIndex]
-  for i in 0..<points:
-    let angle = start + i / (points - 1) * (fin - start)
-    rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
-  for n in 0..<rim.len - 1:
-    ctx.index(rim[n], rim[n + 1])
+  lineAux:
+    var rim: seq[RVertexIndex]
+    for i in 0..<points:
+      let angle = start + i / (points - 1) * (fin - start)
+      rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
+    for n in 0..<rim.len - 1:
+      ctx.index(rim[n], rim[n + 1])
+
+proc lrrect*(ctx: var RGfxContext, x, y, w, h, r: float, points = 8) =
+  ## Adds a rounded rectangle outline, at the specified posision, with the \
+  ## specified size and corner radius.
+  const HPi = PI / 2
+  ctx.line((x + r, y),     (x + w - r, y))
+  ctx.line((x + w, y + r), (x + w,     y + h - r))
+  ctx.line((x + r, y + h), (x + w - r, y + h))
+  ctx.line((x,     y + r), (x,         y + h - r))
+  ctx.arc(x + w - r, y + h - r, r, 0,       1 * HPi, points)
+  ctx.arc(x + r,     y + h - r, r, 1 * HPi, 2 * HPi, points)
+  ctx.arc(x + r,     y + r,     r, 2 * HPi, 3 * HPi, points)
+  ctx.arc(x + w - r, y + r,     r, 3 * HPi, 4 * HPi, points)
 
 proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
   ## Draws the previously built shape.
@@ -763,18 +812,11 @@ proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
         else:          GL_TRIANGLES,
         0, GLsizei ctx.vertexCount)
 
-proc `blitMode=`*(ctx: var RGfxContext, enabled: bool) =
-  ## Draws in blit mode (using premultiplied alpha blending).
+template blit*(ctx: var RGfxContext, body) =
+  ## Draw in blit mode (premultiplied alpha blending).
   ## Use this when using Gfxes as textures.
-  if enabled: glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
-  else:       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-template blit*(ctx: var RGfxContext, body: untyped) =
-  ## Enables blit mode for the specified block.
-  ## This should not be nested, and only used in single operations!
-  ctx.blitMode = true
-  body
-  ctx.blitMode = false
+  currentGlc.withBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA):
+    body
 
 proc newREffect*(gfx: RGfx, effect: string): REffect =
   ## Creates a new effect.
@@ -817,12 +859,6 @@ paramProc(Vec4f)
 paramProc(int)
 paramProc(Mat4f)
 
-proc beginEffects*(ctx: var RGfxContext) =
-  ## Begins drawing onto the Gfx's effect surface.
-  glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.fxFbo1)
-  glClearColor(0.0, 0.0, 0.0, 0.0)
-  glClear(GL_COLOR_BUFFER_BIT)
-
 proc effect*(ctx: var RGfxContext, fx: REffect) =
   ## Applies an effect to the contents on the Gfx's effect surface.
   let
@@ -837,7 +873,8 @@ proc effect*(ctx: var RGfxContext, fx: REffect) =
     ctx.`program=`(fx.program)
     ctx.begin()
     ctx.rect(-1, 1, 2, -2)
-    blit(ctx): ctx.draw()
+    currentGlc.withBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA):
+      ctx.draw()
     ctx.`program=`(prevProgram)
     ctx.`texture=`(prevTexture)
   (ctx.gfx.fxFbo1, ctx.gfx.fxFbo2) =
@@ -845,8 +882,12 @@ proc effect*(ctx: var RGfxContext, fx: REffect) =
   (ctx.gfx.fx1Target, ctx.gfx.fx2Target) =
     (ctx.gfx.fx2Target, ctx.gfx.fx1Target)
 
-proc blitEffects*(ctx: var RGfxContext) =
-  ## Blits the effect surface onto the primary surface.
+template effects*(ctx: var RGfxContext, body: untyped) =
+  ## Draws onto the effect surface in the specified block.
+  currentGlc.withFramebuffer(ctx.gfx.fxFbo1):
+    glClearColor(0.0, 0.0, 0.0, 0.0)
+    glClear(GL_COLOR_BUFFER_BIT)
+    body
   let prevTexture = ctx.texture
   glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.primaryFbo)
   ctx.`texture=`(ctx.gfx.fx1Target)
@@ -854,13 +895,6 @@ proc blitEffects*(ctx: var RGfxContext) =
   ctx.rect(0, 0, ctx.gfx.width.float, ctx.gfx.height.float)
   blit(ctx): ctx.draw()
   ctx.`texture=`(prevTexture)
-
-template effects*(ctx: var RGfxContext, body: untyped) =
-  ## Draws onto the effect surface in the specified block.
-  ## This should not be nested!
-  ctx.beginEffects()
-  body
-  ctx.blitEffects()
 
 proc ctx*(gfx: RGfx): RGfxContext =
   ## Creates a Gfx context for the specified Gfx.
