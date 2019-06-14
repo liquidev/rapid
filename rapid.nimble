@@ -17,6 +17,7 @@ srcDir =
 # Dependencies
 #~~
 
-requires "nim >= 0.19.4"
+requires "nim >= 0.20.0"
 requires "glm >= 1.1.1"
 requires "nimterop"
+requires "nimPNG"
