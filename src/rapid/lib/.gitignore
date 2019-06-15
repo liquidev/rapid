@@ -1,4 +1,6 @@
 glfw_src
 freetype_src
 soundio_src
+ogg_src
+vorbis_src
 _nimterop*

@@ -14,3 +14,4 @@ const
   LicenseGLFW* = slurp("LICENSE_GLFW.md")
   LicenseSoundIo* = slurp("LICENSE_libsoundio")
   LicenseVorbis* = slurp("LICENSE_libvorbis")
+  LicenseOgg* = slurp("LICENSE_libogg")
