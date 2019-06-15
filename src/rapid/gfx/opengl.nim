@@ -82,6 +82,6 @@ template withBlendFunc*(ctx: GLContext, src, dest: GLenum, body) =
 
 template withFramebuffer*(ctx: GLContext, fb: GLuint, body) =
   let prevFbs = ctx.framebuffers
-  ctx.framebuffer = fbs
+  ctx.framebuffer = fb
   body
   ctx.framebuffers = prevFbs

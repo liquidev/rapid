@@ -20,7 +20,7 @@ import ../lib/glad/gl
 from ../lib/glfw import nil
 
 export glm
-export opengl.GLError
+export opengl # unfortunate export, but it must be done
 
 include rcolor
 include window
@@ -815,7 +815,7 @@ proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
 template blit*(ctx: var RGfxContext, body) =
   ## Draw in blit mode (premultiplied alpha blending).
   ## Use this when using Gfxes as textures.
-  currentGlc.withBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA):
+  withBlendFunc(currentGlc, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA):
     body
 
 proc newREffect*(gfx: RGfx, effect: string): REffect =
@@ -884,7 +884,7 @@ proc effect*(ctx: var RGfxContext, fx: REffect) =
 
 template effects*(ctx: var RGfxContext, body: untyped) =
   ## Draws onto the effect surface in the specified block.
-  currentGlc.withFramebuffer(ctx.gfx.fxFbo1):
+  withFramebuffer(currentGlc, ctx.gfx.fxFbo1):
     glClearColor(0.0, 0.0, 0.0, 0.0)
     glClear(GL_COLOR_BUFFER_BIT)
     body
