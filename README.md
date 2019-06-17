@@ -24,8 +24,20 @@ easy prototyping.
      - [x] OpenGL
      - [ ] WebGL
  - Audio
-   - [ ] Track-based mixer
-   - [ ] Effects
+   - Node-based audio
+     - [x] Sampler - basic audio sampling
+     - [ ] Wave - audio file decoding
+       - [ ] WAV (own decoder)
+       - [ ] Vorbis (using libvorbis)
+     - [ ] Osc - audio synthesis using oscillators
+       - [ ] Pulse
+       - [ ] Sine
+       - [ ] Tri
+       - [ ] Saw
+       - [ ] Wave
+     - Mixer
+     - Effects
+     - DSP
  - Resource loading
    - PNG images
    - TTF/OTF fonts
@@ -42,6 +54,17 @@ To install rapid, use the following command:
 ```
 $ nimble install rapid
 ```
+
+Extra prerequisites:
+
+ - git
+
+### Windows
+
+*Not tested. If you're willing to test rapid on Windows, please verify that all
+the tests run correctly and report this here.*
+
+rapid should work fine on Windows out of the box, no outside dependencies.
 
 ### Linux
 

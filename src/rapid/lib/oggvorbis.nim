@@ -44,8 +44,8 @@ cIncludeDir(VorbisIncl)
 
 cOverride:
   type
-    ogg_int64 = int64
-    ogg_int64_t = int64
+    ogg_int64* = int64
+    ogg_int64_t* = int64
 
 cImport(OggIncl/"ogg/ogg.h")
 cImport(VorbisIncl/"vorbis/codec.h")
