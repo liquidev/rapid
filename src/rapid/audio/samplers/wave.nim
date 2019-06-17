@@ -21,11 +21,16 @@ method sample*(wave: RWave, dest: var seq[float], count: int) =
   ## Reads ``count`` samples of the wave file into ``dest``, if it's playing.
   ## Otherwise, outputs silence.
   # TODO: Sample rate conversion
-  wave.decoder.decode(dest, count)
+  dest.setLen(0)
+  if wave.playing:
+    wave.decoder.decode(dest, count)
+  else:
+    for n in 0..<count:
+      dest.add([0.0, 0.0])
 
-proc initRWave*(wave: var RWave, filename: string) =
+proc initRWave*(wave: RWave, filename: string) =
   ## Initializes a wave file sampler.
-  wave.RSampler.initRSampler()
+  wave.initRSampler()
   wave.decoder = newRAudioDecoder(filename)
   wave.playing = false
 

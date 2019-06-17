@@ -85,7 +85,7 @@ const
       }
     }
 
-    vec4 rFragment(vec4 col, sampler2D tex, vec4 mask, vec2 pos, vec2 uv);
+    vec4 rFragment(vec4 col, sampler2D tex, vec2 pos, vec2 uv);
 
     void main(void) {
       rapid_fCol = rFragment(rapid_vfCol, rapid_texture,

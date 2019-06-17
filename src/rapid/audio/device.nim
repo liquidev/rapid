@@ -8,6 +8,7 @@
 ## The base audio device, used for outputting audio to your speakers.
 
 import glm
+import math
 
 import ../lib/soundio
 import audiosettings
@@ -54,7 +55,7 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
           left = s * 2
           right = left + 1
           downmixed = (device.buffer[left] + device.buffer[right]) / 2
-          s16 = int16(downmixed.limit() * -low(int16).float)
+          s16 = int16(downmixed.limit() * high(int16).float)
         var
           pt = cast[ptr int16](areas[0].`ptr`[areas[0].step * s].unsafeAddr)
         pt[] = s16
@@ -63,8 +64,8 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
         let
           left = s * 2
           right = left + 1
-          ls16 = int16(device.buffer[left].limit() * -low(int16).float)
-          rs16 = int16(device.buffer[right].limit() * -low(int16).float)
+          ls16 = int16(device.buffer[left].limit() * high(int16).float)
+          rs16 = int16(device.buffer[right].limit() * high(int16).float)
         var
           lpt = cast[ptr int16](areas[0].`ptr`[areas[0].step * s].unsafeAddr)
           rpt = cast[ptr int16](areas[1].`ptr`[areas[1].step * s].unsafeAddr)
@@ -76,7 +77,6 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
         "Could not finish writing samples: " & $soundio_strerror(error))
 
     framesLeft -= frameCount
-
 
 proc teardownDevice(device: ref RAudioDeviceObj) =
   soundio_outstream_destroy(device.ostream)
@@ -105,6 +105,7 @@ proc newRAudioDevice*(name = "rapid/audio device"): RAudioDevice =
     when cpuEndian == littleEndian: SoundIoFormatS16LE
     else: SoundIoFormatS16BE
   outstream.sample_rate = OutputSampleRate
+  outstream.software_latency = 0.001
   outstream.name = "rapid/audio"
   outstream.userdata = cast[pointer](result)
   outstream.write_callback = writeCallback
@@ -116,7 +117,7 @@ proc newRAudioDevice*(name = "rapid/audio device"): RAudioDevice =
 
   if outstream.layout_error != 0:
     raise newException(AudioError,
-      "Could not set channel layouts: " &
+      "Could not set channel layout: " &
       $soundio_strerror(outstream.layout_error))
 
   result.buffer = @[]
@@ -130,21 +131,34 @@ proc attach*(device: RAudioDevice, sampler: RSampler) =
   ## play from multiple samplers at once.
   device.sampler = sampler
 
-proc play*(device: RAudioDevice) =
+proc start*(device: RAudioDevice) =
   ## Starts playback from the audio device, using the attached sampler to
   ## generate audio samples.
-  ## Usually used with the ``loop`` macro from ``gfx/surface``. If a
-  ## graphics context is not needed, the ``wait`` proc can be used.
+  ## After the device is started, either ``poll`` or ``wait`` must be called
+  ## to prevent deadlocks. Check their respective documentation for usage.
   var error: cint
   if (error = soundio_outstream_start(device.ostream); error != 0):
     raise newException(AudioError,
       "Unable to start playback: " & $soundio_strerror(error))
 
 proc wait*(device: RAudioDevice) =
-  ## Blocks program execution to allow audio playback. Use this in a while loop.
+  ## Blocks program execution to allow audio playback. Use this in a while loop
+  ## when you do not use a graphics context.
   runnableExamples:
     while true:
       # waits until the program is interrupted
       device.wait()
 
   soundio_wait_events(device.sio)
+
+proc poll*(device: RAudioDevice) =
+  ## Flushes the device's events. This should be called every frame of a game
+  ## loop.
+  runnableExamples:
+    win.loop:
+      draw ctx, step:
+        discard
+      update step:
+        device.poll
+
+  soundio_flush_events(device.sio)

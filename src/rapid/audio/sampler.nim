@@ -11,6 +11,8 @@
 
 import macros
 
+import samplerutils
+
 type
   RSampler* = ref object of RootObj
 
@@ -34,11 +36,11 @@ method sample*(sampler: RSampler, dest: var seq[float], count: int) {.base.} =
   ## that means there's a sample leak somewhere and a segfault will occur due to
   ## a buffer underflow.
   dest.setLen(0)
-  for n in 0..<count:
-    dest.add([0.0, 0.0])
+  dest.fill(count * 2, 0.0)
 
-proc initRSampler*(sampler: var RSampler) =
+proc initRSampler*(sampler: RSampler) =
   ## Initialize a silent sampler.
+  ## Currently, this doesn't do anything.
   discard
 
 proc newRSampler*(): RSampler =

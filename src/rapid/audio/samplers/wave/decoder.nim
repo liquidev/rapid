@@ -10,6 +10,7 @@
 import os
 
 import ../../../lib/oggvorbis
+import ../../audiosettings
 
 type
   AudioDecodeError* = object of Exception
@@ -78,6 +79,8 @@ proc newRAudioDecoder*(filename: string): RAudioDecoder =
     raise newException(AudioDecodeError,
       "Invalid audio container (currently only Ogg is supported)")
 
+  result.buffer = newSeqOfCap[int16](AudioBufferCap)
+
 const
   ChannelMappings: array[1..8, array[2, int]] = [
     [0, 0], [0, 1], [0, 2], [0, 1],
@@ -88,6 +91,7 @@ const
 
 proc decodeVorbis(decoder: RAudioDecoder, dest: var seq[float], count: int) =
   # decode raw s16le samples
+  decoder.buffer.setLen(decoder.channels * count)
   var left = count
   while left > 0:
     let decoded = ov_read(
@@ -109,7 +113,7 @@ proc decodeVorbis(decoder: RAudioDecoder, dest: var seq[float], count: int) =
       for n in 0..<left:
         for o in 0..<decoder.channels:
           decoder.buffer.add(0)
-      return
+      left = 0
     else:
       left -= count
   # remap channels to stereo
