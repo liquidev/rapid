@@ -8,14 +8,19 @@
 ## Audio file decoder interface.
 
 import os
+import streams
 
 import ../../../lib/oggvorbis
 import ../../audiosettings
+import ../../samplerutils
 
 type
   AudioDecodeError* = object of Exception
   RAudioDecoderKind* = enum
     adkVorbis
+  RAudioDecoderMode* = enum
+    admSample
+    admStream
   RAudioDecoderObj = object
     file*: File
 
@@ -23,12 +28,17 @@ type
     sampleRate*: int
     atEnd*: bool
 
-    buffer: seq[int16]
+    case mode*: RAudioDecoderMode
+    of admSample:
+      sampleBuffer: seq[int16]
+      sample: seq[int16]
+      samplePos: int
+    of admStream:
+      discard
 
     case kind*: RAudioDecoderKind
     of adkVorbis:
       vorbisFile: OggVorbis_File
-      vorbisCurrentSection: cint
   RAudioDecoder* = ref RAudioDecoderObj
 
 const
@@ -49,6 +59,50 @@ const
         result = cast[File](file).getFilePos().clong
   )
 
+const
+  ChannelRemapTable: array[1..8, array[2, int]] = [
+    [0, 0], [0, 1], [0, 2], [0, 1],
+    [0, 2], [0, 2], [0, 2], [0, 2]
+  ]
+
+proc preloadVorbis(decoder: RAudioDecoder) =
+  var
+    readBuffer: array[4096, uint8]
+    u8buffer: seq[uint8]
+    atEnd = false
+    bitstream: cint
+  while not atEnd:
+    let decoded = ov_read(
+      addr decoder.vorbisFile,
+      cast[cstring](readBuffer[0].unsafeAddr), sizeof(readBuffer).cint,
+      cint(cpuEndian == bigEndian), 2, 1,
+      addr bitstream)
+    if decoded == 0:
+      atEnd = true
+    elif decoded > 0:
+      u8buffer.add(readBuffer[0..<decoded])
+    else:
+      raise newException(AudioDecodeError,
+        "The Vorbis file is invalid or corrupted")
+  decoder.sampleBuffer.setLen(int(u8buffer.len / sizeof(int16)))
+  copyMem(decoder.sampleBuffer[0].unsafeAddr, u8buffer[0].unsafeAddr,
+          u8buffer.len)
+  for i in 0..<int(decoder.sampleBuffer.len / decoder.channels):
+    let
+      offset = i * decoder.channels
+      leftOffset = offset + ChannelRemapTable[decoder.channels][0]
+      rightOffset = offset + ChannelRemapTable[decoder.channels][1]
+    decoder.sample.add([
+      decoder.sampleBuffer[leftOffset],
+      decoder.sampleBuffer[rightOffset]
+    ])
+
+proc preload(decoder: RAudioDecoder) =
+  case decoder.kind
+  of adkVorbis:
+    decoder.samplePos = 0
+    decoder.preloadVorbis()
+
 proc closeVorbis(decoder: RAudioDecoder) =
   discard ov_clear(addr decoder.vorbisFile)
 
@@ -57,7 +111,7 @@ proc closeDecoder(decoder: ref RAudioDecoderObj) =
   of adkVorbis: decoder.closeVorbis()
   decoder.file.close()
 
-proc newRAudioDecoder*(filename: string): RAudioDecoder =
+proc newRAudioDecoder*(filename: string, mode = admSample): RAudioDecoder =
   ## Creates a new audio decoder reading from the specified file.
   new(result, closeDecoder)
 
@@ -79,59 +133,10 @@ proc newRAudioDecoder*(filename: string): RAudioDecoder =
     raise newException(AudioDecodeError,
       "Invalid audio container (currently only Ogg is supported)")
 
-  result.buffer = newSeqOfCap[int16](AudioBufferCap)
-
-const
-  ChannelMappings: array[1..8, array[2, int]] = [
-    [0, 0], [0, 1], [0, 2], [0, 1],
-    [0, 2], [0, 2], [0, 2], [0, 2]
-  ] ## \
-  ## An array of channel mappings from the source format (array index represents
-  ## number of channels) to stereo.
-
-proc decodeVorbis(decoder: RAudioDecoder, dest: var seq[float], count: int) =
-  # decode raw s16le samples
-  decoder.buffer.setLen(decoder.channels * count)
-  var left = count
-  while left > 0:
-    let decoded = ov_read(
-      addr decoder.vorbisFile,
-      cast[cstring](decoder.buffer[0].unsafeAddr), left.cint,
-      cint(cpuEndian == bigEndian), 2, 1,
-      addr decoder.vorbisCurrentSection)
-    if decoded == OV_HOLE:
-      raise newException(AudioDecodeError,
-        "Hole in Vorbis data stream, the audio file is probably corrupted")
-    elif decoded == OV_EBADLINK:
-      raise newException(AudioDecodeError,
-        "Invalid Vorbis stream section, the audio file is probably corrupted")
-    elif decoded == OV_EBADHEADER:
-      raise newException(AudioDecodeError,
-        "Vorbis file headers are invalid or corrupted")
-    elif decoded == 0:
-      decoder.atEnd = true
-      for n in 0..<left:
-        for o in 0..<decoder.channels:
-          decoder.buffer.add(0)
-      left = 0
-    else:
-      left -= count
-  # remap channels to stereo
-  for n in 0..<count:
-    let
-      i = n * decoder.channels
-      l = i + ChannelMappings[decoder.channels][0]
-      r = i + ChannelMappings[decoder.channels][1]
-    dest.add([
-      decoder.buffer[l] / high(int16),
-      decoder.buffer[r] / high(int16)
-    ])
-
-proc decode*(decoder: RAudioDecoder, dest: var seq[float], count: int) =
-  ## Decodes an amount of samples from the source file.
-  case decoder.kind
-  of adkVorbis:
-    decoder.decodeVorbis(dest, count)
+  if mode == admSample:
+    result.preload()
+  else:
+    discard # TODO: Sample streaming
 
 proc seekSampleVorbis(decoder: RAudioDecoder, sample: int) =
   let result = ov_pcm_seek(addr decoder.vorbisFile, sample.ogg_int64_t)
@@ -148,9 +153,31 @@ proc seekSampleVorbis(decoder: RAudioDecoder, sample: int) =
       else: "An unknown error occured while seeking")
 
 proc seekSample*(decoder: RAudioDecoder, sample: int) =
-  ## Seeks to the specified PCM sample. To seek to a point in time, use
-  ## ``decoder.sampleRate * time``.
-  case decoder.kind
-  of adkVorbis:
-    decoder.seekSampleVorbis(sample)
+  ## Seeks to the specified PCM sample.
+  case decoder.mode
+  of admSample:
+    decoder.samplePos = sample
+  of admStream:
+    case decoder.kind
+    of adkVorbis:
+      decoder.seekSampleVorbis(sample)
   decoder.atEnd = false
+
+proc sampleAt(decoder: RAudioDecoder, i: int): int16 =
+  result =
+    if i in 0..<decoder.sample.len: decoder.sample[i]
+    else: 0
+
+proc read*(decoder: RAudioDecoder, dest: var seq[float], count: int) =
+  case decoder.mode
+  of admSample:
+    for i in decoder.samplePos..<decoder.samplePos + count:
+      dest.add([
+        decoder.sampleAt(i * 2) / high(int16),
+        decoder.sampleAt(i * 2 + 1) / high(int16)
+      ])
+    decoder.samplePos += count
+    if decoder.samplePos * 2 > decoder.sample.len:
+      decoder.atEnd = true
+  of admStream:
+    discard # TODO: Implement streaming samples from disk

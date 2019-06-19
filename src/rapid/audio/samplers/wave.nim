@@ -23,7 +23,7 @@ method sample*(wave: RWave, dest: var seq[float], count: int) =
   # TODO: Sample rate conversion
   dest.setLen(0)
   if wave.playing:
-    wave.decoder.decode(dest, count)
+    wave.decoder.read(dest, count)
   else:
     for n in 0..<count:
       dest.add([0.0, 0.0])
@@ -55,3 +55,6 @@ proc stop*(wave: RWave) =
   ## Stops playback and rewinds to the beginning of the wave.
   wave.pause()
   wave.seek(0)
+
+proc finished*(wave: RWave): bool =
+  result = wave.decoder.atEnd
