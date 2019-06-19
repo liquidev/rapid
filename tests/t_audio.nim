@@ -8,15 +8,22 @@ proc main() =
   var
     dev = newRAudioDevice()
     # osc = newROsc(oscSine)
-    wave = newRWave("sampleData/coin_48000.ogg")
-  dev.attach(wave)
+    waveA = newRWave("sampleData/coin_48000.ogg")
+    waveB = newRWave("sampleData/coin_44100.ogg")
+    i = 0
+  dev.attach(waveA)
   # osc.play(440)
   dev.start()
-  wave.play()
+  waveA.play()
   while true:
-    if wave.finished:
-      wave.stop()
-      wave.play()
+    if waveA.finished:
+      echo i mod 2
+      waveA.stop()
+      swap(waveA, waveB)
+      sleep(300)
+      dev.attach(waveA)
+      waveA.play()
+      inc(i)
     dev.poll()
 
 main()
