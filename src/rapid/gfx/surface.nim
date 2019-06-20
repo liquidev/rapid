@@ -196,33 +196,32 @@ proc link(program: var RProgram) =
     glGetProgramInfoLog(GLuint(program.id), logLength, addr logLength, log)
     raise newException(ShaderError, $log)
 
-template uniformCheck(): untyped {.dirty.} =
+template uniformCheck() {.dirty.} =
   if not prog.uniformLocations.hasKey(name):
     prog.uniformLocations[name] = glGetUniformLocation(prog.id, name)
   var val = val
 
-proc uniform(prog: RProgram, name: string, val: float) =
-  ## Sets a uniform in the specified program.
-  uniformCheck()
-  glProgramUniform1f(prog.id, prog.uniformLocations[name], val)
-proc uniform(prog: RProgram, name: string, val: Vec2f) =
-  uniformCheck()
-  glProgramUniform2fv(prog.id, prog.uniformLocations[name], 1, val.caddr)
-proc uniform(prog: RProgram, name: string, val: Vec3f) =
-  uniformCheck()
-  glProgramUniform3fv(prog.id, prog.uniformLocations[name], 1, val.caddr)
-proc uniform(prog: RProgram, name: string, val: Vec4f) =
-  uniformCheck()
-  glProgramUniform4fv(prog.id, prog.uniformLocations[name], 1, val.caddr)
+template progUniform(T: typedesc, body) {.dirty.} =
+  proc uniform*(prog: RProgram, name: string, val: T) =
+    uniformCheck()
+    let
+      p = prog.id
+      l = prog.uniformLocations[name]
+    body
 
-proc uniform(prog: RProgram, name: string, val: int) =
-  uniformCheck()
-  glProgramUniform1i(prog.id, prog.uniformLocations[name], GLint val)
+template progPrimitiveUniform(T, suffix) {.dirty.} =
+  progUniform(T):
+    `glProgramUniform1 suffix`(p, l, val)
+  progUniform(`Vec2 suffix`):
+    `glProgramUniform2 suffix`(p, l, val.x, val.y)
+  progUniform(`Vec3 suffix`):
+    `glProgramUniform3 suffix`(p, l, val.x, val.y, val.z)
+  progUniform(`Vec4 suffix`):
+    `glProgramUniform4 suffix`(p, l, val.x, val.y, val.z, val.w)
 
-proc uniform(prog: RProgram, name: string, val: Mat4) =
-  uniformCheck()
-  glProgramUniformMatrix4fv(prog.id, prog.uniformLocations[name], 1, false,
-                            val.caddr)
+progPrimitiveUniform(float, f)
+progUniform(int): glProgramUniform1i(p, l, val.GLint)
+progUniform(Mat4): glProgramUniformMatrix4fv(p, l, 1, false, val.caddr)
 
 #--
 # Canvas
@@ -570,6 +569,7 @@ proc `color=`*(ctx: var RGfxContext, col: RColor) =
 
 proc noTexture*(ctx: var RGfxContext) =
   ## Disables the texture, and draws with plain colors.
+  currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
   if ctx.sTextureEnabled:
     ctx.sTextureEnabled = false
     ctx.uniform("rapid_textureEnabled", 0)
