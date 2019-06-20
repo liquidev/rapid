@@ -43,8 +43,8 @@ type
 
 var freetypeLib*: FT_Library
 
-proc newRFont*(file: string, textureConfig: RTextureConfig,
-               height: Natural, width = 0.Natural,
+proc newRFont*(file: string, height: Natural, width = 0.Natural,
+               textureConfig = DefaultTextureConfig,
                texWidth = 512.Natural, texHeight = 512.Natural): RFont =
   once:
     let err = FT_Init_Freetype(addr freetypeLib).bool
@@ -91,7 +91,7 @@ proc widthOf*(font: RFont, rune: Rune): float =
   if not font.glyphs.hasKey(rune):
     font.render(rune)
   let glyph = font.glyphs[rune]
-  result = glyph.width.float
+  result = glyph.advanceX / 64
 
 proc widthOf*(font: RFont, text: string): float =
   for r in runes(text):
