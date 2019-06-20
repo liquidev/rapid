@@ -7,6 +7,8 @@
 
 ## This module implements a simple texture packer.
 
+import algorithm
+
 import glm
 
 import ../gfx/opengl
@@ -65,7 +67,10 @@ proc place*(tp: RTexturePacker, image: RImage): RTextureRect =
 
 proc place*(tp: RTexturePacker, images: openarray[RImage]): seq[RTextureRect] =
   currentGlc.withTex2D(tp.texture.id):
-    for img in images:
+    let sorted = images.sorted(proc (a, b: RImage): int =
+                                 cmp(a.width * a.height, b.width * b.height),
+                               Descending)
+    for img in sorted:
       result.add(tp.pack(img))
 
 proc newRTexturePacker*(width, height: Natural,
