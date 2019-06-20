@@ -371,7 +371,7 @@ proc renameProcs(n: NimNode) {.compileTime.} =
     else:
       renameProcs(s)
 
-macro generateProcs(): typed =
+macro generateProcs() =
   template getProcs {.dirty.} =
     proc init*(): int32
     proc terminate*()
