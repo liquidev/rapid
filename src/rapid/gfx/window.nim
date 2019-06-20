@@ -367,7 +367,7 @@ proc floating*(win: RWindow): bool =
 #~~
 
 template callbackProc(name, T, doc: untyped): untyped {.dirty.} =
-  proc name*(win: var RWindow, callback: T) =
+  proc name*(win: RWindow, callback: T) =
     doc
     win.callbacks.name.add(callback)
 callbackProc(onChar, RCharFn):

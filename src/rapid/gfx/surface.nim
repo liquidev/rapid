@@ -44,16 +44,16 @@ const
     layout (location = 1) in vec4 rapid_vCol;
     layout (location = 2) in vec2 rapid_vUV;
 
-    uniform mat4 rapid_transform;
+    uniform mat4 rapid_projection;
 
     out vec4 rapid_vfCol;
     out vec2 rapid_vfUV;
 
-    vec4 rVertex(vec4 pos, mat4 transform);
+    vec4 rVertex(vec4 pos, mat4 projection);
 
     void main(void) {
       gl_Position =
-        rVertex(vec4(rapid_vPos.x, rapid_vPos.y, 0.0, 1.0), rapid_transform);
+        rVertex(vec4(rapid_vPos.x, rapid_vPos.y, 0.0, 1.0), rapid_projection);
       rapid_vfCol = rapid_vCol;
       rapid_vfUV = rapid_vUV;
     }
@@ -93,8 +93,8 @@ const
     }
   """
   RDefaultVshSrc* = """
-    vec4 rVertex(vec4 pos, mat4 transform) {
-      return transform * pos;
+    vec4 rVertex(vec4 pos, mat4 projection) {
+      return projection * pos;
     }
   """
   RDefaultFshSrc* = """
@@ -221,7 +221,61 @@ proc uniform(prog: RProgram, name: string, val: int) =
 
 proc uniform(prog: RProgram, name: string, val: Mat4) =
   uniformCheck()
-  glProgramUniformMatrix4fv(prog.id, prog.uniformLocations[name], 1, false, val.caddr)
+  glProgramUniformMatrix4fv(prog.id, prog.uniformLocations[name], 1, false,
+                            val.caddr)
+
+#--
+# Canvas
+#--
+
+type
+  RCanvas* = ref object
+    width*, height*: int
+    fb: GLuint
+    target: RTexture
+    texConf: RTextureConfig
+
+proc updateFb(canvas: RCanvas) =
+  if canvas.fb != 0:
+    glDeleteFramebuffers(1, addr canvas.fb)
+    canvas.target.unload()
+  glCreateFramebuffers(1, addr canvas.fb)
+  canvas.target = newRTexture(canvas.width, canvas.height, nil, canvas.texConf)
+  glNamedFramebufferTexture(
+    canvas.fb, GL_COLOR_ATTACHMENT0, canvas.target.id, 0)
+
+proc resize*(canvas: RCanvas, width, height: int) =
+  canvas.width = width
+  canvas.height = height
+  canvas.updateFb()
+
+proc init(canvas: RCanvas, width, height: int, conf: RTextureConfig) =
+  canvas.width = width
+  canvas.height = height
+  canvas.texConf = conf
+  canvas.updateFb()
+
+proc newRCanvas*(width, height: int, conf = DefaultTextureConfig): RCanvas =
+  ## Creates a new RCanvas with the specified dimensions.
+  result = RCanvas()
+  result.init(width, height, conf)
+
+proc init(canvas: RCanvas, window: RWindow, conf: RTextureConfig) =
+  canvas.width = window.width
+  canvas.height = window.height
+  canvas.texConf = conf
+  canvas.updateFb()
+  window.onResize do (win: RWindow, width, height: Natural):
+    canvas.resize(width, height)
+
+proc newRCanvas*(window: RWindow, conf = DefaultTextureConfig): RCanvas =
+  ## Creates a new RCanvas bound to the dimensions of the specified window.
+  result = RCanvas()
+  result.init(window, conf)
+
+template renderTo*(canvas: RCanvas, body) =
+  withFramebuffer(currentGlc, canvas.fb):
+    body
 
 #--
 # Gfx
@@ -236,9 +290,8 @@ type
     effectVertSh, effectFragLibSh: RShader
     defaultProgram: RProgram
     # Framebuffers
-    primaryFbo, fxFbo1, fxFbo2, maskFbo: GLuint
-    target, fx1Target, fx2Target, maskTarget: RTexture
-    texConf, fxTexConf: RTextureConfig
+    fx1, fx2, mask: RCanvas
+    fxTexConf: RTextureConfig
     # Buffer objects
     vaoID, vboID, eboID: GLuint
     vboSize, eboSize: int
@@ -334,40 +387,6 @@ proc updateEbo(gfx: RGfx, data: seq[int32]) =
     0, dataSize,
     data[0].unsafeAddr)
 
-proc updateEffectFbos(gfx: RGfx) =
-  if gfx.fxFbo1 != 0:
-    glDeleteFramebuffers(1, addr gfx.fxFbo1)
-    gfx.fx1Target.unload()
-  if gfx.fxFbo2 != 0:
-    glDeleteFramebuffers(1, addr gfx.fxFbo2)
-    gfx.fx2Target.unload()
-
-  glCreateFramebuffers(1, addr gfx.fxFbo1)
-  gfx.fx1Target = newRTexture(gfx.width, gfx.height, nil, gfx.fxTexConf)
-  glNamedFramebufferTexture(
-    gfx.fxFbo1, GL_COLOR_ATTACHMENT0, gfx.fx1Target.id, 0)
-
-  glCreateFramebuffers(1, addr gfx.fxFbo2)
-  gfx.fx2Target = newRTexture(gfx.width, gfx.height, nil, gfx.fxTexConf)
-  glNamedFramebufferTexture(
-    gfx.fxFbo2, GL_COLOR_ATTACHMENT0, gfx.fx2Target.id, 0)
-
-proc resize*(gfx: var RGfx, width, height: int) =
-  doAssert gfx.win != nil,
-    "A window's Gfx cannot be resized using ``resize``. " &
-    "Resize the window itself"
-  gfx.width = width
-  gfx.height = height
-
-  if gfx.primaryFbo != 0:
-    glDeleteFramebuffers(1, addr gfx.primaryFbo)
-    gfx.target.unload()
-
-  glCreateFramebuffers(1, addr gfx.primaryFbo)
-  gfx.target = newRTexture(width, height, nil, gfx.texConf)
-  glNamedFramebufferTexture(
-    gfx.primaryFbo, GL_COLOR_ATTACHMENT0, gfx.target.id, 0)
-
 proc init(gfx: RGfx) =
   # Settings
   glEnable(GL_BLEND)
@@ -402,52 +421,24 @@ proc init(gfx: RGfx) =
   # Projection
   gfx.projection = ortho(0'f32, gfx.width.float, gfx.height.float, 0, -1, 1)
   # Effects
-  gfx.updateEffectFbos()
-
-proc initRoot(gfx: RGfx) =
+  gfx.fx1 = newRCanvas(gfx.win, gfx.fxTexConf)
+  gfx.fx2 = newRCanvas(gfx.win, gfx.fxTexConf)
+  # Resizing
   gfx.win.onResize do (win: RWindow, width, height: Natural):
     glViewport(0, 0, GLsizei(width), GLsizei(height))
     gfx.width = width
     gfx.height = height
     gfx.projection = ortho(0'f32, width.float, height.float, 0, -1, 1)
-    gfx.updateEffectFbos()
-
-proc texture*(gfx: RGfx): RTexture =
-  ## Returns the texture the Gfx is drawing to. This is ``nil`` if the \
-  ## Gfx's target is a window!
-  result = gfx.target
 
 proc openGfx*(win: RWindow, fxTexConfig = DefaultTextureConfig): RGfx =
   ## Opens a Gfx for a window.
   result = RGfx(
     win: win,
-    primaryFbo: 0,
     width: win.width,
     height: win.height,
     fxTexConf: fxTexConfig
   )
   result.init()
-  result.initRoot()
-
-proc newRGfx*(width, height: int,
-              texConf, fxTexConf = DefaultTextureConfig): RGfx =
-  ## Creates a new, blank Gfx, with the specified size and texture config.
-  ## The implementation uses framebuffers.
-  result = RGfx(
-    width: width,
-    height: height,
-    fxTexConf: fxTexConf
-  )
-  result.init()
-
-proc newRGfx*(win: var RWindow,
-              texConf, fxTexConf = DefaultTextureConfig): RGfx =
-  ## Creates a new "window-bound" Gfx. This means that the Gfx is \
-  ## automatically resized along with the window.
-  result = newRGfx(win.width, win.height, texConf, fxTexConf)
-  win.onResize do (win: RWindow, width, height: Natural):
-    result.resize(width, height)
-    result.updateEffectFbos()
 
 #--
 # Gfx context
@@ -512,8 +503,8 @@ uniformProc(Vec4f)
 uniformProc(int)
 uniformProc(Mat4f)
 
-proc updateTransform(ctx: var RGfxContext) =
-  ctx.uniform("rapid_transform", ctx.gfx.projection)
+proc updateProjection(ctx: var RGfxContext) =
+  ctx.uniform("rapid_projection", ctx.gfx.projection)
 
 proc program*(ctx: RGfxContext): RProgram =
   ## Retrieves the currently bound shader program.
@@ -523,7 +514,7 @@ proc `program=`*(ctx: var RGfxContext, program: RProgram) =
   ## Binds a shader program for drawing operations.
   glUseProgram(program.id)
   ctx.sProgram = program
-  ctx.updateTransform()
+  ctx.updateProjection()
   ctx.uniform("rapid_width", ctx.gfx.width.float)
   ctx.uniform("rapid_height", ctx.gfx.height.float)
 
@@ -583,8 +574,7 @@ proc noTexture*(ctx: var RGfxContext) =
     ctx.sTextureEnabled = false
     ctx.uniform("rapid_textureEnabled", 0)
 
-proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
-  ## Sets the texture to draw with.
+proc setTextureImpl(ctx: var RGfxContext, tex: RTexture) =
   if tex.isNil:
     ctx.noTexture()
   else:
@@ -592,6 +582,16 @@ proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
       ctx.sTextureEnabled = true
       ctx.uniform("rapid_textureEnabled", 1)
     ctx.sTexture = tex
+
+proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
+  ## Sets the texture to draw with.
+  currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  ctx.setTextureImpl(tex)
+
+proc `texture=`*(ctx: var RGfxContext, canvas: RCanvas) =
+  ## Draws using a canvas as a texture.
+  currentGlc.blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
+  ctx.setTextureImpl(canvas.target)
 
 proc texture*(ctx: RGfxContext): RTexture =
   ## Returns the currently bound texture.
@@ -793,7 +793,7 @@ proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
     glActiveTexture(GL_TEXTURE0)
     if not ctx.texture.isNil:
       currentGlc.tex2D = ctx.texture.id
-    ctx.updateTransform()
+    ctx.updateProjection()
     ctx.gfx.updateVbo(ctx.shape)
     case primitive
     of prTriShape, prLineShape:
@@ -811,12 +811,6 @@ proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
         of prTriFan:   GL_TRIANGLE_FAN
         else:          GL_TRIANGLES,
         0, GLsizei ctx.vertexCount)
-
-template blit*(ctx: var RGfxContext, body) =
-  ## Draw in blit mode (premultiplied alpha blending).
-  ## Use this when using Gfxes as textures.
-  withBlendFunc(currentGlc, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA):
-    body
 
 proc newREffect*(gfx: RGfx, effect: string): REffect =
   ## Creates a new effect.
@@ -864,36 +858,32 @@ proc effect*(ctx: var RGfxContext, fx: REffect) =
   let
     prevProgram = ctx.program
     prevTexture = ctx.texture
-  glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.fxFbo2)
-  glClearColor(0.0, 0.0, 0.0, 0.0)
-  glClear(GL_COLOR_BUFFER_BIT)
-  transform(ctx):
-    ctx.resetTransform()
-    ctx.`texture=`(ctx.gfx.fx1Target)
-    ctx.`program=`(fx.program)
-    ctx.begin()
-    ctx.rect(-1, 1, 2, -2)
-    currentGlc.withBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA):
-      ctx.draw()
-    ctx.`program=`(prevProgram)
-    ctx.`texture=`(prevTexture)
-  (ctx.gfx.fxFbo1, ctx.gfx.fxFbo2) =
-    (ctx.gfx.fxFbo2, ctx.gfx.fxFbo1)
-  (ctx.gfx.fx1Target, ctx.gfx.fx2Target) =
-    (ctx.gfx.fx2Target, ctx.gfx.fx1Target)
+  renderTo(ctx.gfx.fx2):
+    glClearColor(0.0, 0.0, 0.0, 0.0)
+    glClear(GL_COLOR_BUFFER_BIT)
+    transform(ctx):
+      ctx.resetTransform()
+      ctx.`texture=`(ctx.gfx.fx1)
+      ctx.`program=`(fx.program)
+      ctx.begin()
+      ctx.rect(-1, 1, 2, -2)
+      currentGlc.withBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA):
+        ctx.draw()
+      ctx.`program=`(prevProgram)
+      ctx.`texture=`(prevTexture)
+  swap(ctx.gfx.fx1, ctx.gfx.fx2)
 
 template effects*(ctx: var RGfxContext, body: untyped) =
   ## Draws onto the effect surface in the specified block.
-  withFramebuffer(currentGlc, ctx.gfx.fxFbo1):
+  renderTo(ctx.gfx.fx1):
     glClearColor(0.0, 0.0, 0.0, 0.0)
     glClear(GL_COLOR_BUFFER_BIT)
     body
   let prevTexture = ctx.texture
-  glBindFramebuffer(GL_FRAMEBUFFER, ctx.gfx.primaryFbo)
-  ctx.`texture=`(ctx.gfx.fx1Target)
+  ctx.`texture=`(ctx.gfx.fx1)
   ctx.begin()
   ctx.rect(0, 0, ctx.gfx.width.float, ctx.gfx.height.float)
-  blit(ctx): ctx.draw()
+  ctx.draw()
   ctx.`texture=`(prevTexture)
 
 proc ctx*(gfx: RGfx): RGfxContext =
@@ -911,16 +901,16 @@ proc ctx*(gfx: RGfx): RGfxContext =
 # Rendering
 #--
 
-template render*(gfx: RGfx, ctx, body: untyped): untyped =
+template render*(gfx: RGfx, ctvar, body: untyped): untyped =
   ## Renders a single frame onto the specified window.
   with(gfx.win):
-    var ctx {.inject.} = gfx.ctx()
-    glBindFramebuffer(GL_FRAMEBUFFER, gfx.primaryFbo)
-    ctx.defaultProgram()
-    glBindVertexArray(gfx.vaoID)
-    glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gfx.eboID)
-    body
+    var ctvar {.inject.} = gfx.ctx()
+    withFramebuffer(currentGlc, 0):
+      ctvar.defaultProgram()
+      glBindVertexArray(gfx.vaoID)
+      glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gfx.eboID)
+      body
     glfw.swapBuffers(gfx.win.handle)
     glfw.pollEvents()
 
