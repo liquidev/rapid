@@ -1,14 +1,14 @@
 # rapid
 
-A game engine written in Nim, optimized for rapid game development and
-easy prototyping.
+A game engine written in Nim, optimized for rapid game development and easy
+prototyping. Made for convenience while coding, not striking performance.
 
 ## Goals
 
  - Be easy to understand, even for beginners,
- - Have an easy-to-use, yet flexible API,
+ - Have an easy-to-use, convenient, yet flexible API,
  - Support as many platforms as possible,
- - Compile all C libraries statically to avoid dependency/linker errors,
+ - Compile all C libraries statically to avoid dependency hell/linker errors,
  - Make game development a fun task for everyone.
 
 ## Features
@@ -26,16 +26,16 @@ easy prototyping.
  - Audio
    - Node-based audio
      - [x] Sampler - basic audio sampling
-     - [ ] Wave - audio file decoding
+     - [x] Wave - audio file decoding
        - [ ] WAV (own decoder)
-       - [ ] Vorbis (using libvorbis)
-     - [ ] Osc - audio synthesis using oscillators
+       - [x] Vorbis (using libogg and libvorbis)
+     - [x] Osc - audio synthesis using oscillators
        - [ ] Pulse
-       - [ ] Sine
+       - [x] Sine
        - [ ] Tri
        - [ ] Saw
        - [ ] Wave
-     - Mixer
+     - [ ] Mixer
      - Effects
      - DSP
  - Resource loading
@@ -220,11 +220,15 @@ gfx.loop:
    tradeoff is not as terrible as you might think, especially when using
    `nim c` (and not `nim cpp` or something else).
 
+## Contributing
+
+When contributing code, closely follow the [coding style guidelines](code_style.md).
+
 ## Legal
 
 The rapid game engine is licensed under the MIT license. It makes use of
-third-party libraries, which must be properly attributed within products making
+third-party libraries, which must be properly attributed within software making
 use of rapid.
 
 The `lib/licenses` module has the licenses available at compile-time. Check it
-out for instructions on including the licenses in your game.
+out for instructions on including the licenses in your software.
