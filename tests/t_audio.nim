@@ -1,29 +1,18 @@
 import os
 
-import rapid/audio/samplers/[osc, wave]
-import rapid/audio/sampler
+import rapid/audio/samplers/[wave, mixer]
 import rapid/audio/device
 
-proc main() =
-  var
-    dev = newRAudioDevice()
-    # osc = newROsc(oscSine)
-    waveA = newRWave("sampleData/coin_48000.ogg")
-    waveB = newRWave("sampleData/coin_44100.ogg")
-    i = 0
-  dev.attach(waveA)
-  # osc.play(440)
-  dev.start()
-  waveA.play()
-  while true:
-    if waveA.finished:
-      echo i mod 2
-      waveA.stop()
-      swap(waveA, waveB)
-      sleep(300)
-      dev.attach(waveA)
-      waveA.play()
-      inc(i)
-    dev.poll()
-
-main()
+var
+  dev = newRAudioDevice()
+  coin1 = newRWave("sampleData/coin1.ogg")
+  coin2 = newRWave("sampleData/coin2.ogg")
+  mix = newRMixer()
+  track1 = mix.add(coin1)
+  track2 = mix.add(coin2)
+dev.attach(mix)
+dev.start()
+coin1.play()
+coin2.play()
+while true:
+  dev.wait()

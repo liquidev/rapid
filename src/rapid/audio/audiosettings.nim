@@ -7,4 +7,3 @@
 
 const
   OutputSampleRate* = 48000
-  AudioBufferCap* = 8192
