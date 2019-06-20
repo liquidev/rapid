@@ -209,6 +209,53 @@ gfx.loop:
 
 ```
 
+### Audio playback
+
+rapid provides a natural API for audio playback. It revolves around the idea of
+connecting different samplers together to produce sound, while maintaining
+easy-to-understand code without global state.
+
+```nim
+import os
+
+import rapid/audio/device
+import rapid/audio/[wave, mixer]
+
+var
+  dev = newRAudioDevice("My game")
+  # rapid/audio does not provide an implicit mixer within the device, so we must
+  # create our own
+  mix = newRMixer()
+  # Only Ogg Vorbis decoding is supported
+  jump = newRWave("data/jump.ogg")
+  jumpTrack = mix.add(jump) # Attach the sampler to the mixer
+  # We load the wave using the ``admStream`` audio decode mode, to load the
+  # file dynamically during playback and avoid long loading times
+  music = newRWave("data/music.ogg", admStream)
+  musicTrack = mix.add(music)
+
+# First, we must attach the root sampler to the device. In this case, we use
+# our previously created mixer.
+dev.attach(mix)
+# Then, we can start audio playback.
+dev.start()
+
+# Start playing the music immediately
+music.play()
+
+# To prevent the program from closing immediately, we use a while true loop.
+# The same can be done using a game loop.
+while true:
+  # Play our jump sample every second
+  jump.play()
+  sleep(1000)
+  # Poll for any events, such as the program quitting.
+  # This must be called in a loop, eg. a game loop, to stop the audio playback
+  # thread when we're done.
+  device.poll()
+
+```
+
 ## Tips
 
  - Don't worry about using global variables. They are a very useful tool,
