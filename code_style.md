@@ -25,6 +25,8 @@ The following rules take precedence over NEP 1:
    call syntax `SomeType a` for variable declarations, like `var i = int a / 2`.
  - Put whitespace around all operators except `..`, `..<` and `..^`.
  - Use `proc ()` instead of `proc()` for anonymous procs.
+ - Order imports in three sections: system modules, Nimble modules, and own
+   modules. Order each import in a section alphabetically.
  - For other things, NEP 1 rules apply.
 
 ## 4. Coding conventions

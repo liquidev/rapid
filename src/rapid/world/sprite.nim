@@ -7,7 +7,7 @@
 
 import glm
 
-import ../gfx/surface
+import ../gfx
 
 type
   RSpriteImpl* = tuple

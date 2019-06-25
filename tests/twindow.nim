@@ -1,15 +1,12 @@
 import glm
 
+import random
 import times
 
-import rapid/res/textures
-import rapid/res/fonts
-import rapid/gfx/texatlas
-import rapid/gfx/surface
-import rapid/gfx/text
+import rapid/res/[textures, fonts]
+import rapid/gfx, rapid/gfx/[texatlas, text]
 import rapid/lib/glad/gl
-import rapid/world/sprite
-import rapid/world/tilemap
+import rapid/world/[sprite, tilemap]
 
 type
   Tile = object
@@ -34,12 +31,12 @@ type
 
 method draw(plr: var Player, ctx: var RGfxContext, step: float) =
   ctx.begin()
-  ctx.color = gray(255)
+  ctx.color = rgb(0, 128, 255)
   ctx.noTexture()
   transform(ctx):
     ctx.translate(plr.pos.x * 4 + 16, plr.pos.y * 4 + 16)
-    # ctx.rotate(cpuTime() * 100)
     ctx.rect(-16, -16, 32, 32)
+  ctx.color = gray(255)
   ctx.draw()
 
 method update(plr: var Player, step: float) =
@@ -77,15 +74,16 @@ proc main() =
   var
     win = initRWindow()
       .size(640, 480)
-      .title("A rapid window")
+      .title("twindow")
       .open()
     tc = (
       minFilter: fltNearest, magFilter: fltNearest,
       wrapH: wrapRepeat, wrapV: wrapRepeat)
     tileset = loadRTexture("sampleData/tileset.png", tc)
-    rubik = newRFont("sampleData/Rubik-Regular.ttf", tc, 14)
+    rubik = newRFont("sampleData/Rubik-Regular.ttf", 14, 14, tc)
     gfx = win.openGfx()
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
+    mapCanvas = newRCanvas(win)
 
   let atl = newRAtlas(tileset, 8, 8, 1)
 
@@ -117,35 +115,59 @@ proc main() =
   win.onMouseRelease do (win: RWindow, btn: MouseButton, mods: RModKeys):
     pressed = false
 
-  let quantize = gfx.newREffect("""
-    #define Quantize 4.0
-
+  let eff = gfx.newREffect("""
     vec4 rEffect(vec2 pos) {
-      vec2 quantized = floor(pos / Quantize) * Quantize;
-      return rPixel(quantized + 0.5);
+      return rPixel(vec2(pos.x + sin(pos.y / 10.0) * 10.0, pos.y));
     }
   """)
 
   rubik.horzAlign = taCenter
 
+  render(gfx, ctx):
+    ctx.clearStencil(255)
+
   gfx.loop:
     draw ctx, step:
-      ctx.clear(rgb(32, 32, 32))
-      effects(ctx):
+      ctx.clear(gray(32))
+
+      renderTo(mapCanvas):
+        ctx.clear(gray(0, 0))
         map.draw(ctx, step)
-        ctx.effect(quantize)
-      ctx.text(rubik, gfx.width / 2, 0, "effect testing")
+
+      ctx.stencilTest = (scNotEq, 0)
 
       ctx.begin()
-      ctx.color = gray(0, 128)
-      ctx.rrect(32, 32, 128, 128, 32)
+      ctx.texture = mapCanvas
+      ctx.rect(0, 0, gfx.width.float, gfx.height.float)
       ctx.draw()
+      # ctx.clearStencil(255)
+      effects(ctx):
+        ctx.begin()
+        ctx.texture = mapCanvas
+        ctx.rect(0, 0, gfx.width.float, gfx.height.float)
+        ctx.draw()
+        stencil(ctx, saInvert, 0):
+          ctx.begin()
+          let
+            a = rand(128..256)
+            b = rand(128..256)
+          ctx.rect(rand(0..<gfx.width - a).float, rand(0..<gfx.height - b).float,
+                   a.float, b.float)
+          ctx.draw()
+        ctx.effect(eff)
 
-      ctx.lineSmooth = true
-      ctx.begin()
-      ctx.color = gray(255)
-      ctx.lrrect(32, 32, 128, 128, 32)
-      ctx.draw(prLineShape)
+      # ctx.text(rubik, gfx.width / 2, 0, "effect testing")
+
+      # ctx.begin()
+      # ctx.color = gray(0, 128)
+      # ctx.rrect(32, 32, 128, 128, 32)
+      # ctx.draw()
+
+      # ctx.lineSmooth = true
+      # ctx.begin()
+      # ctx.color = gray(255)
+      # ctx.lrrect(32, 32, 128, 128, 32)
+      # ctx.draw(prLineShape)
     update step:
       map.update(step)
 

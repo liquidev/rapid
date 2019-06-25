@@ -10,7 +10,7 @@ import math
 import aabb
 import sprite
 import worldbase
-import ../gfx/surface
+import ../gfx
 
 export worldbase
 

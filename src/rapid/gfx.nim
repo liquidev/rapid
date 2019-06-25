@@ -14,27 +14,20 @@ import tables
 
 import glm
 
-import opengl
-import ../res/textures
-import ../lib/glad/gl
-from ../lib/glfw import nil
+import gfx/opengl
+import res/textures
+import lib/glad/gl
+from lib/glfw import nil
 
 export glm
 export opengl # unfortunate export, but it must be done
 
-include rcolor
-include window
+include gfx/rcolor
+include gfx/window
 
 #--
-# Shaders
+# Default shaders
 #--
-
-type
-  RShader* = distinct GLuint
-  RShaderKind* = enum
-    shVertex
-    shFragment
-  ShaderError* = object of Exception
 
 const
   RVshLibSrc = """
@@ -76,12 +69,12 @@ const
     vec4 rTexel(sampler2D tex, vec2 uv) {
       if (rapid_textureEnabled) {
         if (rapid_renderText) {
-          return vec4(1.0, 1.0, 1.0, texture(tex, uv).r);
+          return vec4(vec3(1.0), texture(tex, uv).r);
         } else {
           return texture(tex, uv);
         }
       } else {
-        return vec4(1.0, 1.0, 1.0, 1.0);
+        return vec4(1.0);
       }
     }
 
@@ -89,7 +82,7 @@ const
 
     void main(void) {
       rapid_fCol = rFragment(rapid_vfCol, rapid_texture,
-                             vec2(gl_FragCoord), rapid_vfUV);
+                             gl_FragCoord.xy, rapid_vfUV);
     }
   """
   RDefaultVshSrc* = """
@@ -130,98 +123,17 @@ const
 
     vec4 rPixel(vec2 pos) {
       return texture(rapid_surface, vec2(pos.x / rapid_width,
-                                        (pos.y / rapid_height)));
+                                         pos.y / rapid_height));
     }
 
     vec4 rEffect(vec2 scrPos);
 
     void main(void) {
-      rapid_fCol = rEffect(vec2(gl_FragCoord));
+      rapid_fCol = rEffect(gl_FragCoord.xy);
     }
   """
 
-proc newShader*(kind: RShaderKind, source: string): RShader =
-  ## Creates a new vertex or fragment shader, as specified by ``kind``, and
-  ## compiles it. Raises a ``ShaderError`` when compiling fails.
-  result = RShader(glCreateShader(
-    case kind
-    of shVertex:   GL_VERTEX_SHADER
-    of shFragment: GL_FRAGMENT_SHADER
-  ))
-  let cstr = allocCStringArray([source])
-  glShaderSource(result.GLuint, 1, cstr, nil)
-  deallocCStringArray(cstr)
-  glCompileShader(result.GLuint)
-  var isuccess: GLint
-  glGetShaderiv(result.GLuint, GL_COMPILE_STATUS, addr isuccess)
-  let success = isuccess.bool
-  if not success:
-    var logLength: GLint
-    glGetShaderiv(result.GLuint, GL_INFO_LOG_LENGTH, addr logLength)
-    var log = cast[ptr GLchar](alloc(logLength))
-    glGetShaderInfoLog(result.GLuint, logLength, addr logLength, log)
-    raise newException(ShaderError, $log)
-
-type
-  RProgram* = ref object
-    id: GLuint
-    uniformLocations: Table[string, GLint]
-    vPosLoc: GLint
-  ProgramError* = object of Exception
-
-proc newProgram(): RProgram =
-  ## Creates a new ``RProgram``.
-  result = RProgram(
-    id: glCreateProgram(),
-    uniformLocations: initTable[string, GLint]()
-  )
-
-proc attach(program: var RProgram, shader: RShader) =
-  ## Attaches a shader to a program.
-  ## The ``RProgram`` is not a ``var RProgram``, because without it being \
-  ## ``var`` we can easily chain calls together.
-  glAttachShader(program.id, GLuint(shader))
-
-proc link(program: var RProgram) =
-  ## Links the program. This does not destroy attached shaders!
-  glLinkProgram(program.id)
-  # Error checking
-  var isuccess: GLint
-  glGetProgramiv(program.id, GL_LINK_STATUS, addr isuccess)
-  let success = bool(isuccess)
-  if not success:
-    var logLength: GLint
-    glGetProgramiv(GLuint(program.id), GL_INFO_LOG_LENGTH, addr logLength)
-    var log = cast[ptr GLchar](alloc(logLength))
-    glGetProgramInfoLog(GLuint(program.id), logLength, addr logLength, log)
-    raise newException(ShaderError, $log)
-
-template uniformCheck() {.dirty.} =
-  if not prog.uniformLocations.hasKey(name):
-    prog.uniformLocations[name] = glGetUniformLocation(prog.id, name)
-  var val = val
-
-template progUniform(T: typedesc, body) {.dirty.} =
-  proc uniform*(prog: RProgram, name: string, val: T) =
-    uniformCheck()
-    let
-      p = prog.id
-      l = prog.uniformLocations[name]
-    body
-
-template progPrimitiveUniform(T, suffix) {.dirty.} =
-  progUniform(T):
-    `glProgramUniform1 suffix`(p, l, val)
-  progUniform(`Vec2 suffix`):
-    `glProgramUniform2 suffix`(p, l, val.x, val.y)
-  progUniform(`Vec3 suffix`):
-    `glProgramUniform3 suffix`(p, l, val.x, val.y, val.z)
-  progUniform(`Vec4 suffix`):
-    `glProgramUniform4 suffix`(p, l, val.x, val.y, val.z, val.w)
-
-progPrimitiveUniform(float, f)
-progUniform(int): glProgramUniform1i(p, l, val.GLint)
-progUniform(Mat4): glProgramUniformMatrix4fv(p, l, 1, false, val.caddr)
+include gfx/shaders
 
 #--
 # Canvas
@@ -230,7 +142,7 @@ progUniform(Mat4): glProgramUniformMatrix4fv(p, l, 1, false, val.caddr)
 type
   RCanvas* = ref object
     width*, height*: int
-    fb: GLuint
+    fb, rb: GLuint
     target: RTexture
     texConf: RTextureConfig
 
@@ -238,10 +150,21 @@ proc updateFb(canvas: RCanvas) =
   if canvas.fb != 0:
     glDeleteFramebuffers(1, addr canvas.fb)
     canvas.target.unload()
+  if canvas.rb != 0:
+    glDeleteRenderbuffers(1, addr canvas.rb)
   glCreateFramebuffers(1, addr canvas.fb)
   canvas.target = newRTexture(canvas.width, canvas.height, nil, canvas.texConf)
-  glNamedFramebufferTexture(
-    canvas.fb, GL_COLOR_ATTACHMENT0, canvas.target.id, 0)
+  glNamedFramebufferTexture(canvas.fb, GL_COLOR_ATTACHMENT0,
+                            canvas.target.id, 0)
+  glCreateRenderbuffers(1, addr canvas.rb)
+  glNamedRenderbufferStorage(canvas.rb, GL_DEPTH24_STENCIL8,
+                             canvas.width.GLsizei, canvas.height.GLsizei)
+  glNamedFramebufferRenderbuffer(canvas.fb, GL_DEPTH_STENCIL_ATTACHMENT,
+                                 GL_RENDERBUFFER, canvas.rb)
+  withFramebuffer(currentGlc, canvas.fb):
+    glClearColor(0.0, 0.0, 0.0, 1.0)
+    glClearStencil(255)
+    glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
 
 proc resize*(canvas: RCanvas, width, height: int) =
   canvas.width = width
@@ -260,10 +183,7 @@ proc newRCanvas*(width, height: int, conf = DefaultTextureConfig): RCanvas =
   result.init(width, height, conf)
 
 proc init(canvas: RCanvas, window: RWindow, conf: RTextureConfig) =
-  canvas.width = window.width
-  canvas.height = window.height
-  canvas.texConf = conf
-  canvas.updateFb()
+  canvas.init(window.width, window.height, conf)
   window.onResize do (win: RWindow, width, height: Natural):
     canvas.resize(width, height)
 
@@ -289,7 +209,7 @@ type
     effectVertSh, effectFragLibSh: RShader
     defaultProgram: RProgram
     # Framebuffers
-    fx1, fx2, mask: RCanvas
+    fx1, fx2, ofx1, ofx2: RCanvas
     fxTexConf: RTextureConfig
     # Buffer objects
     vaoID, vboID, eboID: GLuint
@@ -334,15 +254,15 @@ proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
       """)
   result = newProgram()
   if int(gfx.vertexLibSh) == 0:
-    gfx.vertexLibSh = newShader(shVertex, RVshLibSrc)
+    gfx.vertexLibSh = newRShader(shVertex, RVshLibSrc)
   if int(gfx.fragmentLibSh) == 0:
-    gfx.fragmentLibSh = newShader(shFragment, RFshLibSrc)
+    gfx.fragmentLibSh = newRShader(shFragment, RFshLibSrc)
   let
-    vsh = newShader(shVertex, """
+    vsh = newRShader(shVertex, """
       uniform float rapid_width;
       uniform float rapid_height;
     """ & vertexSrc)
-    fsh = newShader(shFragment, """
+    fsh = newRShader(shFragment, """
       uniform float rapid_width;
       uniform float rapid_height;
 
@@ -355,6 +275,7 @@ proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
   result.link()
   glDeleteShader(vsh.GLuint)
   glDeleteShader(fsh.GLuint)
+  result.uniform("rapid_texture", 0)
 
 proc reallocVbo(gfx: RGfx) =
   glBufferData(GL_ARRAY_BUFFER,
@@ -390,6 +311,7 @@ proc init(gfx: RGfx) =
   # Settings
   glEnable(GL_BLEND)
   currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  glEnable(GL_STENCIL_TEST)
   # Default program
   gfx.defaultProgram = gfx.newRProgram(RDefaultVshSrc, RDefaultFshSrc)
   # Allocate buffers
@@ -415,13 +337,13 @@ proc init(gfx: RGfx) =
   glEnableVertexAttribArray(2)
   glVertexAttribPointer(
     2, 2, cGL_FLOAT, false, Stride, cast[pointer](6 * sizeof(float32)))
-  # Textures
-  glActiveTexture(GL_TEXTURE0)
   # Projection
   gfx.projection = ortho(0'f32, gfx.width.float, gfx.height.float, 0, -1, 1)
   # Effects
-  gfx.fx1 = newRCanvas(gfx.win, gfx.fxTexConf)
-  gfx.fx2 = newRCanvas(gfx.win, gfx.fxTexConf)
+  gfx.ofx1 = newRCanvas(gfx.win, gfx.fxTexConf)
+  gfx.ofx2 = newRCanvas(gfx.win, gfx.fxTexConf)
+  gfx.fx1 = gfx.ofx1
+  gfx.fx2 = gfx.ofx2
   # Resizing
   gfx.win.onResize do (win: RWindow, width, height: Natural):
     glViewport(0, 0, GLsizei(width), GLsizei(height))
@@ -481,6 +403,18 @@ type
     prTriShape, prLineShape
   REffect* = ref object
     program: RProgram
+  RStencilAction* = enum
+    saReplace
+    saInc, saDec
+    saIncWrap, saDecWrap
+    saInvert
+  RStencilCondition* = enum
+    scLess
+    scLessEq
+    scGreater
+    scGreaterEq
+    scEq
+    scNotEq
 
 converter toRVertex*(vert: RPointVertex): RVertex =
   (vert.x, vert.y, gray(255), 0.0, 0.0)
@@ -558,8 +492,7 @@ template transform*(ctx: var RGfxContext, body: untyped): untyped =
 
 proc clear*(ctx: var RGfxContext, col: RColor) =
   ## Clears the Gfx with the specified color.
-  glClearColor(
-    col.red, col.green, col.blue, col.alpha)
+  glClearColor(col.red, col.green, col.blue, col.alpha)
   glClear(GL_COLOR_BUFFER_BIT)
 
 proc `color=`*(ctx: var RGfxContext, col: RColor) =
@@ -790,27 +723,60 @@ proc lrrect*(ctx: var RGfxContext, x, y, w, h, r: float, points = 8) =
 proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
   ## Draws the previously built shape.
   if ctx.shape.len > 0:
-    glActiveTexture(GL_TEXTURE0)
     if not ctx.texture.isNil:
       currentGlc.tex2D = ctx.texture.id
-    ctx.updateProjection()
     ctx.gfx.updateVbo(ctx.shape)
     case primitive
     of prTriShape, prLineShape:
       ctx.gfx.updateEbo(ctx.indices)
-      glDrawElements(
-        case primitive
-        of prTriShape: GL_TRIANGLES
-        else: GL_LINES, GLsizei ctx.indices.len, GL_UNSIGNED_INT, nil)
+      glDrawElements(case primitive
+                     of prTriShape: GL_TRIANGLES
+                     else: GL_LINES, GLsizei ctx.indices.len, GL_UNSIGNED_INT,
+                     nil)
     else:
-      glDrawArrays(
-        case primitive
-        of prPoints:   GL_POINTS
-        of prLines:    GL_LINES
-        of prTriStrip: GL_TRIANGLE_STRIP
-        of prTriFan:   GL_TRIANGLE_FAN
-        else:          GL_TRIANGLES,
-        0, GLsizei ctx.vertexCount)
+      glDrawArrays(case primitive
+                   of prPoints:   GL_POINTS
+                   of prLines:    GL_LINES
+                   of prTriStrip: GL_TRIANGLE_STRIP
+                   of prTriFan:   GL_TRIANGLE_FAN
+                   else:          GL_TRIANGLES, 0, GLsizei ctx.vertexCount)
+
+proc clearStencil*(ctx: var RGfxContext, value = 255) =
+  glClearStencil(value.GLint)
+  glClear(GL_STENCIL_BUFFER_BIT)
+
+template stencil*(ctx: var RGfxContext, action: RStencilAction, value: int,
+                  body) =
+  ## Draw to the stencil buffer. Color operations are disabled in the body.
+  ## Use the ``stencilTest=`` proc to set the stencil test.
+  ## This should not be nested!
+  glColorMask(false, false, false, false)
+  withStencilFunc(currentGlc, (GL_ALWAYS, value.GLint, 0xffffffff.GLuint)):
+    withStencilOp(currentGlc, (GL_KEEP, GL_KEEP,
+                  case action
+                  of saReplace: GL_REPLACE
+                  of saDec: GL_DECR
+                  of saDecWrap: GL_DECR_WRAP
+                  of saInc: GL_INCR
+                  of saIncWrap: GL_INCR_WRAP
+                  of saInvert: GL_INVERT)):
+      body
+  glColorMask(true, true, true, true)
+
+proc `stencilTest=`*(ctx: var RGfxContext,
+                     test: tuple[condition: RStencilCondition, value: int]) =
+  ## Sets the stencil test. For each fragment, if the test succeeds, the
+  ## fragment is drawn. Otherwise, it's discarded.
+  ## This should not be used inside of ``stencil()``.
+  currentGlc.stencilFunc = (
+    (case test.condition
+     of scEq: GL_EQUAL
+     of scNotEq: GL_NOTEQUAL
+     of scLess: GL_GREATER
+     of scLessEq: GL_GEQUAL
+     of scGreater: GL_LESS
+     of scGreaterEq: GL_LEQUAL), test.value.GLint, 0xffffffff.GLuint)
+  currentGlc.stencilOp = (GL_KEEP, GL_KEEP, GL_KEEP)
 
 proc newREffect*(gfx: RGfx, effect: string): REffect =
   ## Creates a new effect.
@@ -825,10 +791,10 @@ proc newREffect*(gfx: RGfx, effect: string): REffect =
     """)
   var program = newProgram()
   if int(gfx.effectVertSh) == 0:
-    gfx.effectVertSh = newShader(shVertex, REffectVshSrc)
+    gfx.effectVertSh = newRShader(shVertex, REffectVshSrc)
   if int(gfx.effectFragLibSh) == 0:
-    gfx.effectFragLibSh = newShader(shFragment, REffectLibSrc)
-  let fsh = newShader(shFragment, """
+    gfx.effectFragLibSh = newRShader(shFragment, REffectLibSrc)
+  let fsh = newRShader(shFragment, """
     uniform float rapid_width;
     uniform float rapid_height;
 
@@ -839,6 +805,7 @@ proc newREffect*(gfx: RGfx, effect: string): REffect =
   program.attach(fsh)
   program.link()
   glDeleteShader(fsh.GLuint)
+  program.uniform("rapid_surface", 0)
   result = REffect(
     program: program
   )
@@ -859,8 +826,7 @@ proc effect*(ctx: var RGfxContext, fx: REffect) =
     prevProgram = ctx.program
     prevTexture = ctx.texture
   renderTo(ctx.gfx.fx2):
-    glClearColor(0.0, 0.0, 0.0, 0.0)
-    glClear(GL_COLOR_BUFFER_BIT)
+    ctx.clear(gray(0, 0))
     transform(ctx):
       ctx.resetTransform()
       ctx.`texture=`(ctx.gfx.fx1)
@@ -876,8 +842,7 @@ proc effect*(ctx: var RGfxContext, fx: REffect) =
 template effects*(ctx: var RGfxContext, body: untyped) =
   ## Draws onto the effect surface in the specified block.
   renderTo(ctx.gfx.fx1):
-    glClearColor(0.0, 0.0, 0.0, 0.0)
-    glClear(GL_COLOR_BUFFER_BIT)
+    ctx.clear(gray(0, 0))
     body
   let prevTexture = ctx.texture
   ctx.`texture=`(ctx.gfx.fx1)
@@ -885,6 +850,8 @@ template effects*(ctx: var RGfxContext, body: untyped) =
   ctx.rect(0, 0, ctx.gfx.width.float, ctx.gfx.height.float)
   ctx.draw()
   ctx.`texture=`(prevTexture)
+  ctx.gfx.fx1 = ctx.gfx.ofx1
+  ctx.gfx.fx2 = ctx.gfx.ofx2
 
 proc ctx*(gfx: RGfx): RGfxContext =
   ## Creates a Gfx context for the specified Gfx.
@@ -896,6 +863,8 @@ proc ctx*(gfx: RGfx): RGfxContext =
     sColor: gray(255),
     transform: mat3(vec3(1.0'f32, 1.0, 1.0))
   )
+  result.defaultProgram()
+  result.updateProjection()
 
 #--
 # Rendering
@@ -906,7 +875,6 @@ template render*(gfx: RGfx, ctvar, body: untyped): untyped =
   with(gfx.win):
     var ctvar {.inject.} = gfx.ctx()
     withFramebuffer(currentGlc, 0):
-      ctvar.defaultProgram()
       glBindVertexArray(gfx.vaoID)
       glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gfx.eboID)
@@ -974,11 +942,11 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
       # work with in update functions, because this is the typical monitor
       # refresh rate
     var
-      previous = float(glfw.getTime())
+      previous = float(time())
       lag = 0.0
     while glfw.windowShouldClose(`gfx`.win.handle) == 0:
       let
-        current = float(glfw.getTime())
+        current = float(time())
         delta = current - previous
       previous = current
       lag += delta

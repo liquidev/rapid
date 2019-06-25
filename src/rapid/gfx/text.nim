@@ -12,7 +12,7 @@ import math
 import tables
 import unicode
 
-import surface
+import ../gfx
 import ../res/fonts
 
 proc text*(ctx: var RGfxContext, font: RFont, x, y: float, text: string) =

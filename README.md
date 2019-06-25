@@ -104,7 +104,7 @@ sudo zypper in \
 ### Opening a window
 
 ```nim
-import rapid/gfx/surface
+import rapid/gfx
 
 # Building a window is fairly straightforward:
 var win = initRWindow()
@@ -127,7 +127,7 @@ gfx.loop:
 ### Loading data
 
 ```nim
-import rapid/gfx/surface
+import rapid/gfx
 import rapid/res/textures
 
 var win = initRWindow()
@@ -156,7 +156,7 @@ rapid does not have a distinct sprite batch, you just add more than 1 shape and
 call `draw()`.
 
 ```nim
-import rapid/gfx/surface
+import rapid/gfx
 import rapid/gfx/texpack
 import rapid/res/textures
 
@@ -219,7 +219,7 @@ easy-to-understand code without global state.
 import os
 
 import rapid/audio/device
-import rapid/audio/[wave, mixer]
+import rapid/audio/samplers/[wave, mixer]
 
 var
   dev = newRAudioDevice("My game")
@@ -260,16 +260,16 @@ while true:
 
  - Don't worry about using global variables. They are a very useful tool,
    especially for game resource storage. You should only avoid them in
-   libraries, which should use state objects instead.
+   libraries, which should use objects for state.
  - Draw in batches whenever possible. This reduces the amount of time the CPU
    has to spend sending data to the GPU, making your game run better.
  - Compile your game with `--opt:speed`. The performance vs compile time
    tradeoff is not as terrible as you might think, especially when using
-   `nim c` (and not `nim cpp` or something else).
+   `nim c` instead of `nim cpp` (or something else).
 
 ## Contributing
 
-When contributing code, closely follow the [coding style guidelines](code_style.md).
+When contributing code, please follow the [coding style guidelines](code_style.md).
 
 ## Legal
 

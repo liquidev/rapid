@@ -18,8 +18,12 @@ type
     fTex2D: GLuint
     fFramebuffers: FbPair
     fSrcBlend, fDestBlend: GLenum
+    fStencilFunc: StencilFunc
+    fStencilOp: StencilOp
   FbPair* = tuple[read, draw: GLuint]
   BlendFunc* = tuple[src, dest: GLenum]
+  StencilFunc* = tuple[fn: GLenum, refer: GLint, mask: GLuint]
+  StencilOp* = tuple[fail, zfail, zpass: GLenum]
 
 # I know global variables are bad, but the current OpenGL context is global to
 # the current process.
@@ -62,6 +66,20 @@ proc blendFunc*(ctx: GLContext, src, dest: GLenum) =
   ctx.fSrcBlend = src
   ctx.fDestBlend = dest
 
+proc `stencilFunc=`*(ctx: GLContext, fn: StencilFunc) =
+  glStencilFunc(fn.fn, fn.refer, fn.mask)
+  ctx.fStencilFunc = fn
+
+proc stencilFunc*(ctx: GLContext): StencilFunc =
+  result = ctx.fStencilFunc
+
+proc `stencilOp=`*(ctx: GLContext, op: StencilOp) =
+  glStencilOp(op.fail, op.zfail, op.zpass)
+  ctx.fStencilOp = op
+
+proc stencilOp*(ctx: GLContext): StencilOp =
+  result = ctx.fStencilOp
+
 template withFor(name, field, T) {.dirty.} =
   template `with name`*(ctx: GLContext, val: T, body) =
     let prev = ctx.field
@@ -71,6 +89,8 @@ template withFor(name, field, T) {.dirty.} =
 
 withFor(Tex2D, tex2D, GLuint)
 withFor(Framebuffers, framebuffers, FbPair)
+withFor(StencilFunc, stencilFunc, StencilFunc)
+withFor(StencilOp, stencilOp, StencilOp)
 
 template withBlendFunc*(ctx: GLContext, src, dest: GLenum, body) =
   let
@@ -84,4 +104,17 @@ template withFramebuffer*(ctx: GLContext, fb: GLuint, body) =
   let prevFbs = ctx.framebuffers
   ctx.framebuffer = fb
   body
-  ctx.framebuffers = prevFbs
+  if prevFbs.read != prevFbs.draw:
+    ctx.framebuffers = prevFbs
+  else:
+    ctx.framebuffer = prevFbs.read
+
+proc newGLContext*(win: glfw.Window): GLContext =
+  GLContext(
+    window: win,
+    fTex2D: 0,
+    fFramebuffers: (0.GLuint, 0.GLuint),
+    fSrcBlend: GL_ONE, fDestBlend: GL_ZERO,
+    fStencilFunc: (GL_ALWAYS, 0.GLint, 255.GLuint),
+    fStencilOp: (GL_KEEP, GL_KEEP, GL_KEEP)
+  )

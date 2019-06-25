@@ -6,7 +6,7 @@
 #--
 
 ## This module has everything related to windows.
-## **Do not import this directly, it's included by the surface module.**
+## **Do not import this directly, it's included by the gfx module.**
 
 import deques
 import macros

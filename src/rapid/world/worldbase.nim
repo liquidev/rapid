@@ -8,7 +8,7 @@
 import tables
 
 import sprite
-import ../gfx/surface
+import ../gfx
 
 type
   RWorld* = ref object of RootObj

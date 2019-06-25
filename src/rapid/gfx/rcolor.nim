@@ -6,7 +6,7 @@
 #--
 
 ## This module has some utility color manipulation procs.
-## **Do not import this directly, it's included by the surface module.**
+## **Do not import this directly, it's included by the gfx module.**
 
 type
   ColorCh* = range[0..255]
