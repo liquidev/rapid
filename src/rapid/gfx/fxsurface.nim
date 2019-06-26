@@ -41,7 +41,7 @@ const
 
     vec4 rPixel(vec2 pos) {
       return texture(rapid_surface, vec2(pos.x / rapid_width,
-                                          pos.y / rapid_height));
+                                         pos.y / rapid_height));
     }
 
     vec4 rEffect(vec2 scrPos);
@@ -67,7 +67,6 @@ proc reset(fx: RFxSurface) =
 proc newAuxCanvas(fx: RFxSurface, conf = DefaultTextureConfig): RCanvas =
   let canvas = newRCanvas(fx.target.width, fx.target.height, conf)
   fx.target.onResize do (_: RCanvas, width, height: float):
-    echo "resizing canvas"
     canvas.resize(width, height)
   result = canvas
 
