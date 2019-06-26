@@ -4,7 +4,7 @@ import random
 import times
 
 import rapid/res/[textures, fonts]
-import rapid/gfx, rapid/gfx/[texatlas, text]
+import rapid/gfx, rapid/gfx/[fxsurface, texatlas, text]
 import rapid/lib/glad/gl
 import rapid/world/[sprite, tilemap]
 
@@ -29,7 +29,7 @@ type
   Player = ref object of RSprite
     win: RWindow
 
-method draw(plr: var Player, ctx: var RGfxContext, step: float) =
+method draw(plr: var Player, ctx: RGfxContext, step: float) =
   ctx.begin()
   ctx.color = rgb(0, 128, 255)
   ctx.noTexture()
@@ -70,6 +70,33 @@ let Map = [
   [st(0, 1), st(1, 1), st(1, 1), st(1, 1), st(1, 1), st(1, 1), st(1, 1), st(2, 1)]
 ]
 
+proc drawWindow(ctx: RGfxContext, fx: RFxSurface, eff: REffect,
+                x, y, w, h: float) =
+  fx.begin(ctx, copyTarget = true)
+
+  ctx.clearStencil(0)
+  stencil(ctx, saReplace, 255):
+    ctx.begin()
+    ctx.rrect(x, y, w, h, 8)
+    ctx.draw()
+
+  ctx.stencilTest = (scEq, 255)
+  fx.effect(eff, stencil = true)
+  fx.effect(eff, stencil = true)
+  ctx.noStencilTest()
+
+  fx.finish()
+
+  ctx.begin()
+  ctx.color = gray(0, 128)
+  ctx.rrect(x, y, w, h, 8)
+  ctx.draw()
+
+  ctx.begin()
+  ctx.color = gray(255)
+  ctx.lrrect(x, y, w, h, 8)
+  ctx.draw(prLineShape)
+
 proc main() =
   var
     win = initRWindow()
@@ -84,6 +111,7 @@ proc main() =
     gfx = win.openGfx()
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
     mapCanvas = newRCanvas(win)
+    fx = newRFxSurface(gfx.canvas)
 
   let atl = newRAtlas(tileset, 8, 8, 1)
 
@@ -91,7 +119,7 @@ proc main() =
   map.init()
   map.load(Map)
 
-  proc drawMap(ctx: var RGfxContext, wld: RTmWorld[Tile], step: float) =
+  proc drawMap(ctx: RGfxContext, wld: RTmWorld[Tile], step: float) =
     ctx.begin()
     ctx.texture = tileset
     for x, y, t in tiles(wld):
@@ -115,9 +143,16 @@ proc main() =
   win.onMouseRelease do (win: RWindow, btn: MouseButton, mods: RModKeys):
     pressed = false
 
-  let eff = gfx.newREffect("""
+  let eff = fx.newREffect("""
     vec4 rEffect(vec2 pos) {
-      return rPixel(vec2(pos.x + sin(pos.y / 10.0) * 10.0, pos.y));
+      vec4 avg = vec4(0.0);
+      for (int y = -3; y <= 3; ++y) {
+        for (int x = -3; x <= 3; ++x) {
+          avg += rPixel(pos + vec2(x, y));
+        }
+      }
+      avg /= 7.0 * 7.0;
+      return avg;
     }
   """)
 
@@ -125,36 +160,37 @@ proc main() =
 
   render(gfx, ctx):
     ctx.clearStencil(255)
+    ctx.lineSmooth = true
+    ctx.lineWidth = 1
 
   gfx.loop:
     draw ctx, step:
       ctx.clear(gray(32))
+      ctx.clearStencil(255)
 
       renderTo(mapCanvas):
         ctx.clear(gray(0, 0))
         map.draw(ctx, step)
 
-      ctx.stencilTest = (scNotEq, 0)
-
       ctx.begin()
       ctx.texture = mapCanvas
       ctx.rect(0, 0, gfx.width.float, gfx.height.float)
       ctx.draw()
+      ctx.noTexture
+      ctx.drawWindow(fx, eff, 32, 32, 128, 128)
       # ctx.clearStencil(255)
-      effects(ctx):
-        ctx.begin()
-        ctx.texture = mapCanvas
-        ctx.rect(0, 0, gfx.width.float, gfx.height.float)
-        ctx.draw()
-        stencil(ctx, saInvert, 0):
-          ctx.begin()
-          let
-            a = rand(128..256)
-            b = rand(128..256)
-          ctx.rect(rand(0..<gfx.width - a).float, rand(0..<gfx.height - b).float,
-                   a.float, b.float)
-          ctx.draw()
-        ctx.effect(eff)
+      # fx.begin(ctx, copyTarget = true)
+      # stencil(ctx, saInvert, 0):
+      #   ctx.begin()
+      #   let
+      #     a = rand(128..256)
+      #     b = rand(128..256)
+      #   ctx.rect(rand(0..<gfx.width.int - a).float,
+      #            rand(0..<gfx.height.int - b).float,
+      #            a.float, b.float)
+      #   ctx.draw()
+      # fx.effect(eff, stencil = true)
+      # fx.finish()
 
       # ctx.text(rubik, gfx.width / 2, 0, "effect testing")
 

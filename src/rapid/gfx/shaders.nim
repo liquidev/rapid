@@ -24,11 +24,9 @@ type
 proc newRShader*(kind: RShaderKind, source: string): RShader =
   ## Creates a new vertex or fragment shader, as specified by ``kind``, and
   ## compiles it. Raises a ``ShaderError`` when compiling fails.
-  result = RShader(glCreateShader(
-    case kind
-    of shVertex:   GL_VERTEX_SHADER
-    of shFragment: GL_FRAGMENT_SHADER
-  ))
+  result = RShader(glCreateShader(case kind
+                                  of shVertex:   GL_VERTEX_SHADER
+                                  of shFragment: GL_FRAGMENT_SHADER))
   let cstr = allocCStringArray([source])
   glShaderSource(result.GLuint, 1, cstr, nil)
   deallocCStringArray(cstr)
@@ -45,25 +43,24 @@ proc newRShader*(kind: RShaderKind, source: string): RShader =
 
 type
   RProgram* = ref object
-    id: GLuint
+    id*: GLuint
     uniformLocations: Table[string, GLint]
-    vPosLoc: GLint
   ProgramError* = object of Exception
 
-proc newProgram(): RProgram =
+proc newRProgram*(): RProgram =
   ## Creates a new ``RProgram``.
   result = RProgram(
     id: glCreateProgram(),
     uniformLocations: initTable[string, GLint]()
   )
 
-proc attach(program: var RProgram, shader: RShader) =
+proc attach*(program: var RProgram, shader: RShader) =
   ## Attaches a shader to a program.
   ## The ``RProgram`` is not a ``var RProgram``, because without it being \
   ## ``var`` we can easily chain calls together.
   glAttachShader(program.id, GLuint(shader))
 
-proc link(program: var RProgram) =
+proc link*(program: var RProgram) =
   ## Links the program. This does not destroy attached shaders!
   glLinkProgram(program.id)
   # Error checking

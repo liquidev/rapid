@@ -11,14 +11,14 @@ import ../gfx
 
 type
   RSpriteImpl* = tuple
-    draw: proc (ctx: var RGfxContext, spr: var RSprite, step: float) {.nimcall.}
+    draw: proc (ctx: RGfxContext, spr: var RSprite, step: float) {.nimcall.}
     update: proc (spr: var RSprite, step: float) {.nimcall.}
   RSprite* = ref object of RootObj
     width*, height*: float
     pos*, vel*, acc*: Vec2[float]
     friction*: float
 
-method draw*(spr: var RSprite, ctx: var RGfxContext, step: float) {.base.} =
+method draw*(spr: var RSprite, ctx: RGfxContext, step: float) {.base.} =
   ## The base draw implementation. It just draws a rectangle at the sprite's \
   ## position, with the sprite's dimensions.
   ctx.rect(spr.pos.x, spr.pos.y, spr.width, spr.height)

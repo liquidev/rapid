@@ -15,7 +15,7 @@ import unicode
 import ../gfx
 import ../res/fonts
 
-proc text*(ctx: var RGfxContext, font: RFont, x, y: float, text: string) =
+proc text*(ctx: RGfxContext, font: RFont, x, y: float, text: string) =
   ## Renders a string of text using the specified font, at the specified \
   ## position. The text must be UTF-8-encoded.
   let

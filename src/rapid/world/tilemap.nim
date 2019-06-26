@@ -28,7 +28,7 @@ type
 
     wrapX*, wrapY*: bool
 
-    drawImpl*: proc (ctx: var RGfxContext, wld: RTmWorld[T], step: float)
+    drawImpl*: proc (ctx: RGfxContext, wld: RTmWorld[T], step: float)
     onModify*: proc (x, y: int, previousTile, currentTile: T)
 
 proc isInbounds*(wld: RTmWorld, x, y: int): bool =
@@ -125,7 +125,7 @@ proc wldPos*(wld: RTmWorld, x, y: int): tuple[x, y: float] =
   ## Converts tile coordinates into world coordinates.
   result = (x.float * wld.tileWidth.float, y.float * wld.tileHeight.float)
 
-proc draw*[T](wld: RTmWorld[T], ctx: var RGfxContext, step: float) =
+proc draw*[T](wld: RTmWorld[T], ctx: RGfxContext, step: float) =
   ## Draws the world onto the specified Gfx context.
   ## Drawing is implementation dependent, and largely specific to the world's
   ## tile type. That's why it doesn't have a default implementation.

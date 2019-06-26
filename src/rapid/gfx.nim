@@ -15,12 +15,14 @@ import tables
 import glm
 
 import gfx/opengl
+import gfx/shaders
 import res/textures
 import lib/glad/gl
 from lib/glfw import nil
 
 export glm
 export opengl # unfortunate export, but it must be done
+export shaders
 
 include gfx/rcolor
 include gfx/window
@@ -95,56 +97,30 @@ const
       return rTexel(tex, uv) * col;
     }
   """
-  REffectVshSrc = """
-    #version 330 core
-
-    layout (location = 0) in vec2 rapid_vPos;
-    layout (location = 1) in vec4 rapid_vCol;
-    layout (location = 2) in vec2 rapid_vUV;
-
-    out vec2 rapid_vfUV;
-
-    void main(void) {
-      gl_Position = vec4(rapid_vPos.x, rapid_vPos.y, 0.0, 1.0);
-      rapid_vfUV = rapid_vUV;
-    }
-  """
-  REffectLibSrc = """
-    #version 330 core
-
-    in vec2 rapid_vfUV;
-
-    uniform sampler2D rapid_surface;
-
-    uniform float rapid_width;
-    uniform float rapid_height;
-
-    out vec4 rapid_fCol;
-
-    vec4 rPixel(vec2 pos) {
-      return texture(rapid_surface, vec2(pos.x / rapid_width,
-                                         pos.y / rapid_height));
-    }
-
-    vec4 rEffect(vec2 scrPos);
-
-    void main(void) {
-      rapid_fCol = rEffect(gl_FragCoord.xy);
-    }
-  """
-
-include gfx/shaders
 
 #--
 # Canvas
 #--
 
 type
+  RCanvasResizeFn* = proc (canvas: RCanvas, width, height: float)
   RCanvas* = ref object
-    width*, height*: int
+    fWidth, fHeight: int
+    fWindow: RWindow
     fb, rb: GLuint
     target: RTexture
     texConf: RTextureConfig
+    cOnResize: seq[RCanvasResizeFn]
+
+proc id*(canvas: RCanvas): GLuint = canvas.fb
+
+proc width*(canvas: RCanvas): float = canvas.fWidth.float
+proc height*(canvas: RCanvas): float = canvas.fHeight.float
+
+proc window*(canvas: RCanvas): RWindow = canvas.fWindow
+
+proc onResize*(canvas: RCanvas, callback: RCanvasResizeFn) =
+  canvas.cOnResize.add(callback)
 
 proc updateFb(canvas: RCanvas) =
   if canvas.fb != 0:
@@ -153,7 +129,8 @@ proc updateFb(canvas: RCanvas) =
   if canvas.rb != 0:
     glDeleteRenderbuffers(1, addr canvas.rb)
   glCreateFramebuffers(1, addr canvas.fb)
-  canvas.target = newRTexture(canvas.width, canvas.height, nil, canvas.texConf)
+  canvas.target = newRTexture(canvas.fWidth, canvas.fHeight, nil,
+                              canvas.texConf)
   glNamedFramebufferTexture(canvas.fb, GL_COLOR_ATTACHMENT0,
                             canvas.target.id, 0)
   glCreateRenderbuffers(1, addr canvas.rb)
@@ -162,30 +139,32 @@ proc updateFb(canvas: RCanvas) =
   glNamedFramebufferRenderbuffer(canvas.fb, GL_DEPTH_STENCIL_ATTACHMENT,
                                  GL_RENDERBUFFER, canvas.rb)
   withFramebuffer(currentGlc, canvas.fb):
-    glClearColor(0.0, 0.0, 0.0, 1.0)
+    glClearColor(0.0, 0.0, 0.0, 0.0)
     glClearStencil(255)
     glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
 
-proc resize*(canvas: RCanvas, width, height: int) =
-  canvas.width = width
-  canvas.height = height
+proc resize*(canvas: RCanvas, width, height: float) =
+  canvas.fWidth = width.int
+  canvas.fHeight = height.int
   canvas.updateFb()
+  for cb in canvas.cOnResize:
+    cb(canvas, width.float, height.float)
 
 proc init(canvas: RCanvas, width, height: int, conf: RTextureConfig) =
-  canvas.width = width
-  canvas.height = height
+  canvas.fWidth = width
+  canvas.fHeight = height
   canvas.texConf = conf
   canvas.updateFb()
 
-proc newRCanvas*(width, height: int, conf = DefaultTextureConfig): RCanvas =
+proc newRCanvas*(width, height: float, conf = DefaultTextureConfig): RCanvas =
   ## Creates a new RCanvas with the specified dimensions.
-  result = RCanvas()
-  result.init(width, height, conf)
+  new(result)
+  result.init(width.int, height.int, conf)
 
 proc init(canvas: RCanvas, window: RWindow, conf: RTextureConfig) =
   canvas.init(window.width, window.height, conf)
   window.onResize do (win: RWindow, width, height: Natural):
-    canvas.resize(width, height)
+    canvas.resize(width.float, height.float)
 
 proc newRCanvas*(window: RWindow, conf = DefaultTextureConfig): RCanvas =
   ## Creates a new RCanvas bound to the dimensions of the specified window.
@@ -203,14 +182,11 @@ template renderTo*(canvas: RCanvas, body) =
 type
   RGfx* = ref object
     win: RWindow
-    width*, height*: int
+    fWidth, fHeight: int
+    fCanvas: RCanvas
     # Default state
     vertexLibSh, fragmentLibSh: RShader
-    effectVertSh, effectFragLibSh: RShader
     defaultProgram: RProgram
-    # Framebuffers
-    fx1, fx2, ofx1, ofx2: RCanvas
-    fxTexConf: RTextureConfig
     # Buffer objects
     vaoID, vboID, eboID: GLuint
     vboSize, eboSize: int
@@ -252,7 +228,7 @@ proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
           return rTexel(tex, uv) * col * myColor;
         }
       """)
-  result = newProgram()
+  result = newRProgram()
   if int(gfx.vertexLibSh) == 0:
     gfx.vertexLibSh = newRShader(shVertex, RVshLibSrc)
   if int(gfx.fragmentLibSh) == 0:
@@ -276,6 +252,11 @@ proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
   glDeleteShader(vsh.GLuint)
   glDeleteShader(fsh.GLuint)
   result.uniform("rapid_texture", 0)
+
+proc width*(gfx: RGfx): float = gfx.fWidth.float
+proc height*(gfx: RGfx): float = gfx.fHeight.float
+
+proc canvas*(gfx: RGfx): RCanvas = gfx.fCanvas
 
 proc reallocVbo(gfx: RGfx) =
   glBufferData(GL_ARRAY_BUFFER,
@@ -339,25 +320,24 @@ proc init(gfx: RGfx) =
     2, 2, cGL_FLOAT, false, Stride, cast[pointer](6 * sizeof(float32)))
   # Projection
   gfx.projection = ortho(0'f32, gfx.width.float, gfx.height.float, 0, -1, 1)
-  # Effects
-  gfx.ofx1 = newRCanvas(gfx.win, gfx.fxTexConf)
-  gfx.ofx2 = newRCanvas(gfx.win, gfx.fxTexConf)
-  gfx.fx1 = gfx.ofx1
-  gfx.fx2 = gfx.ofx2
+  # Root canvas
+  gfx.fCanvas = RCanvas(fWidth: gfx.fWidth, fHeight: gfx.fHeight, fb: 0)
   # Resizing
   gfx.win.onResize do (win: RWindow, width, height: Natural):
-    glViewport(0, 0, GLsizei(width), GLsizei(height))
-    gfx.width = width
-    gfx.height = height
+    glViewport(0, 0, width.GLsizei, height.GLsizei)
+    gfx.fWidth = width
+    gfx.fHeight = height
+    gfx.canvas.fWidth = width
+    gfx.canvas.fHeight = height
+    for cb in gfx.canvas.cOnResize: cb(gfx.canvas, width.float, height.float)
     gfx.projection = ortho(0'f32, width.float, height.float, 0, -1, 1)
 
 proc openGfx*(win: RWindow, fxTexConfig = DefaultTextureConfig): RGfx =
   ## Opens a Gfx for a window.
   result = RGfx(
     win: win,
-    width: win.width,
-    height: win.height,
-    fxTexConf: fxTexConfig
+    fWidth: win.width,
+    fHeight: win.height
   )
   result.init()
 
@@ -401,8 +381,6 @@ type
     prLines, prLineStrip, prLineLoop
     prTris, prTriStrip, prTriFan
     prTriShape, prLineShape
-  REffect* = ref object
-    program: RProgram
   RStencilAction* = enum
     saReplace
     saInc, saDec
@@ -426,7 +404,7 @@ converter toRVertex*(vert: RColVertex): RVertex =
   (vert.x, vert.y, vert.color, 0.0, 0.0)
 
 template uniformProc(T: typedesc): untyped {.dirty.} =
-  proc uniform*(ctx: var RGfxContext, name: string, val: T) =
+  proc uniform*(ctx: RGfxContext, name: string, val: T) =
     ## Sets a uniform in the currently bound program.
     ctx.sProgram.uniform(name, val)
 uniformProc(float)
@@ -436,14 +414,14 @@ uniformProc(Vec4f)
 uniformProc(int)
 uniformProc(Mat4f)
 
-proc updateProjection(ctx: var RGfxContext) =
+proc updateProjection(ctx: RGfxContext) =
   ctx.uniform("rapid_projection", ctx.gfx.projection)
 
 proc program*(ctx: RGfxContext): RProgram =
   ## Retrieves the currently bound shader program.
   result = ctx.sProgram
 
-proc `program=`*(ctx: var RGfxContext, program: RProgram) =
+proc `program=`*(ctx: RGfxContext, program: RProgram) =
   ## Binds a shader program for drawing operations.
   glUseProgram(program.id)
   ctx.sProgram = program
@@ -451,11 +429,11 @@ proc `program=`*(ctx: var RGfxContext, program: RProgram) =
   ctx.uniform("rapid_width", ctx.gfx.width.float)
   ctx.uniform("rapid_height", ctx.gfx.height.float)
 
-proc defaultProgram*(ctx: var RGfxContext) =
+proc defaultProgram*(ctx: RGfxContext) =
   ## Binds the default shader program.
   ctx.`program=`(ctx.gfx.defaultProgram)
 
-proc translate*(ctx: var RGfxContext, x, y: float) =
+proc translate*(ctx: RGfxContext, x, y: float) =
   ## Translates the transform matrix.
   ctx.transform = ctx.transform * mat3f(
     vec3f(1.0, 0.0, 0.0),
@@ -463,7 +441,7 @@ proc translate*(ctx: var RGfxContext, x, y: float) =
     vec3f(x, y, 1.0)
   )
 
-proc scale*(ctx: var RGfxContext, x, y: float) =
+proc scale*(ctx: RGfxContext, x, y: float) =
   ## Scales the transform matrix.
   ctx.transform = ctx.transform * mat3f(
     vec3f(x, 0.0, 0.0),
@@ -471,7 +449,7 @@ proc scale*(ctx: var RGfxContext, x, y: float) =
     vec3f(0.0, 0.0, 1.0)
   )
 
-proc rotate*(ctx: var RGfxContext, angle: float) =
+proc rotate*(ctx: RGfxContext, angle: float) =
   ## Rotates the transform matrix.
   ctx.transform = ctx.transform * mat3f(
     vec3f(cos(angle), sin(angle), 0.0),
@@ -479,35 +457,35 @@ proc rotate*(ctx: var RGfxContext, angle: float) =
     vec3f(0.0, 0.0, 1.0)
   )
 
-proc resetTransform*(ctx: var RGfxContext) =
+proc resetTransform*(ctx: RGfxContext) =
   ## Resets the transform matrix.
   ctx.transform = mat3f(1.0)
 
-template transform*(ctx: var RGfxContext, body: untyped): untyped =
+template transform*(ctx: RGfxContext, body: untyped): untyped =
   ## Isolates the current transform matrix, returning to the previous one \
   ## after the block.
   let prevTransform = ctx.transform
   body
   ctx.transform = prevTransform
 
-proc clear*(ctx: var RGfxContext, col: RColor) =
+proc clear*(ctx: RGfxContext, col: RColor) =
   ## Clears the Gfx with the specified color.
   glClearColor(col.red, col.green, col.blue, col.alpha)
   glClear(GL_COLOR_BUFFER_BIT)
 
-proc `color=`*(ctx: var RGfxContext, col: RColor) =
+proc `color=`*(ctx: RGfxContext, col: RColor) =
   ## Sets a 'default' vertex color. This vertex color is used when no explicit \
   ## color is specified in the vertex.
   ctx.sColor = col
 
-proc noTexture*(ctx: var RGfxContext) =
+proc noTexture*(ctx: RGfxContext) =
   ## Disables the texture, and draws with plain colors.
   currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
   if ctx.sTextureEnabled:
     ctx.sTextureEnabled = false
     ctx.uniform("rapid_textureEnabled", 0)
 
-proc setTextureImpl(ctx: var RGfxContext, tex: RTexture) =
+proc setTextureImpl(ctx: RGfxContext, tex: RTexture) =
   if tex.isNil:
     ctx.noTexture()
   else:
@@ -516,12 +494,12 @@ proc setTextureImpl(ctx: var RGfxContext, tex: RTexture) =
       ctx.uniform("rapid_textureEnabled", 1)
     ctx.sTexture = tex
 
-proc `texture=`*(ctx: var RGfxContext, tex: RTexture) =
+proc `texture=`*(ctx: RGfxContext, tex: RTexture) =
   ## Sets the texture to draw with.
   currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
   ctx.setTextureImpl(tex)
 
-proc `texture=`*(ctx: var RGfxContext, canvas: RCanvas) =
+proc `texture=`*(ctx: RGfxContext, canvas: RCanvas) =
   ## Draws using a canvas as a texture.
   currentGlc.blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
   ctx.setTextureImpl(canvas.target)
@@ -531,24 +509,24 @@ proc texture*(ctx: RGfxContext): RTexture =
   if ctx.sTextureEnabled: result = ctx.sTexture
   else: result = nil
 
-proc `lineWidth=`*(ctx: var RGfxContext, width: float) =
+proc `lineWidth=`*(ctx: RGfxContext, width: float) =
   ## Sets the line width.
   ctx.sLineWidth = width
   glLineWidth(width)
 
-proc `lineSmooth=`*(ctx: var RGfxContext, enable: bool) =
+proc `lineSmooth=`*(ctx: RGfxContext, enable: bool) =
   ## Sets if lines should be anti-aliased.
   ctx.sLineSmooth = enable
   if enable: glEnable(GL_LINE_SMOOTH)
   else: glDisable(GL_LINE_SMOOTH)
 
-proc begin*(ctx: var RGfxContext) =
+proc begin*(ctx: RGfxContext) =
   ## Begins a new shape.
   ctx.vertexCount = 0
   ctx.shape.setLen(0)
   ctx.indices.setLen(0)
 
-proc vertex*(ctx: var RGfxContext,
+proc vertex*(ctx: RGfxContext,
              vert: RVertex): RVertexIndex {.discardable.} =
   ## Adds a vertex to the shape.
   result = RVertexIndex(ctx.vertexCount)
@@ -564,26 +542,26 @@ proc vertex*(ctx: var RGfxContext,
   ])
   inc(ctx.vertexCount)
 
-proc vertex*(ctx: var RGfxContext,
+proc vertex*(ctx: RGfxContext,
              vert: RPointVertex): RVertexIndex {.discardable.} =
   ctx.vertex((vert.x, vert.y, ctx.sColor, 0.0, 0.0))
 
-proc vertex*(ctx: var RGfxContext,
+proc vertex*(ctx: RGfxContext,
              vert: RTexVertex): RVertexIndex {.discardable.} =
   ctx.vertex((vert.x, vert.y, ctx.sColor, vert.u, vert.v))
 
-proc index*(ctx: var RGfxContext, indices: varargs[RVertexIndex]) =
+proc index*(ctx: RGfxContext, indices: varargs[RVertexIndex]) =
   ## Adds a vertex index to the shape. This is only required when the
   ## ``prShape`` primitive is used.
   for idx in indices: ctx.indices.add(int32(idx))
 
-proc tri*[T: SomeVertex](ctx: var RGfxContext, a, b, c: T) =
+proc tri*[T: SomeVertex](ctx: RGfxContext, a, b, c: T) =
   ## Adds a triangle, together with its indices.
   ctx.index(ctx.vertex(a))
   ctx.index(ctx.vertex(b))
   ctx.index(ctx.vertex(c))
 
-proc quad*[T: SomeVertex](ctx: var RGfxContext, a, b, c, d: T) =
+proc quad*[T: SomeVertex](ctx: RGfxContext, a, b, c, d: T) =
   ## Adds a quad, together with its indices.
   let
     i = ctx.vertex(a)
@@ -592,7 +570,7 @@ proc quad*[T: SomeVertex](ctx: var RGfxContext, a, b, c, d: T) =
     l = ctx.vertex(d)
   ctx.index(i, j, l, j, k, l)
 
-proc rect*(ctx: var RGfxContext,
+proc rect*(ctx: RGfxContext,
            x, y, w, h: float,
            uv: tuple[x, y, w, h: float] = (0.0, 0.0, 1.0, 1.0)) =
   ## Adds a rectangle, at the specified coordinates, with the specified
@@ -605,7 +583,7 @@ proc rect*(ctx: var RGfxContext,
     (x + w, y + h, uv.x + uv.w, uv.y + uv.h),
     (x,     y + h, uv.x,        uv.y + uv.h))
 
-proc circle*(ctx: var RGfxContext, x, y, r: float, points = 32) =
+proc circle*(ctx: RGfxContext, x, y, r: float, points = 32) =
   ## Adds a circle, with the specified center and radius. An amount of points \
   ## can be specified to create an equilateral polygon.
   ## This proc does not use texture coordinates, since there are many ways of \
@@ -618,7 +596,7 @@ proc circle*(ctx: var RGfxContext, x, y, r: float, points = 32) =
   for n, i in rim:
     ctx.index(center, i, rim[(n + 1) mod rim.len])
 
-proc pie*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
+proc pie*(ctx: RGfxContext, x, y, r, start, fin: float, points = 16) =
   ## Adds a pie, with the specified center, radius, and start and finish \
   ## angles. All angles should be expressed in radians.
   let center = ctx.vertex((x, y))
@@ -629,7 +607,7 @@ proc pie*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
   for n in 0..<rim.len - 1:
     ctx.index(center, rim[n], rim[n + 1])
 
-proc rrect*(ctx: var RGfxContext, x, y, w, h, r: float, points = 8) =
+proc rrect*(ctx: RGfxContext, x, y, w, h, r: float, points = 8) =
   ## Adds a rounded rectangle, at the specified posision, with the specified
   ## size and corner radius.
   const HPi = PI / 2
@@ -641,7 +619,7 @@ proc rrect*(ctx: var RGfxContext, x, y, w, h, r: float, points = 8) =
   ctx.pie(x + r,     y + r,     r, 2 * HPi, 3 * HPi, points)
   ctx.pie(x + w - r, y + r,     r, 3 * HPi, 4 * HPi, points)
 
-proc point*[T: SomeVertex](ctx: var RGfxContext, a: T) =
+proc point*[T: SomeVertex](ctx: RGfxContext, a: T) =
   ## Adds a point, for use with ``prPoints``.
   ctx.index(ctx.vertex(a))
 
@@ -652,13 +630,13 @@ template lineAux(body) =
   body
   ctx.translate(-offset, -offset)
 
-proc line*[T: SomeVertex](ctx: var RGfxContext, a, b: T) =
+proc line*[T: SomeVertex](ctx: RGfxContext, a, b: T) =
   ## Adds a line with the specified points, for use with ``prLineShape``.
   lineAux:
     ctx.index(ctx.vertex(a))
     ctx.index(ctx.vertex(b))
 
-proc ltri*[T: SomeVertex](ctx: var RGfxContext, a, b, c: T) =
+proc ltri*[T: SomeVertex](ctx: RGfxContext, a, b, c: T) =
   lineAux:
     let
       i = ctx.vertex(a)
@@ -666,7 +644,7 @@ proc ltri*[T: SomeVertex](ctx: var RGfxContext, a, b, c: T) =
       k = ctx.vertex(c)
     ctx.index(i, j, j, k, k, i)
 
-proc lquad*[T: SomeVertex](ctx: var RGfxContext, a, b, c, d: T) =
+proc lquad*[T: SomeVertex](ctx: RGfxContext, a, b, c, d: T) =
   ## Adds a quad outline, together with its indices.
   lineAux:
     let
@@ -676,7 +654,7 @@ proc lquad*[T: SomeVertex](ctx: var RGfxContext, a, b, c, d: T) =
       l = ctx.vertex(d)
     ctx.index(i, j, j, k, k, l, l, i)
 
-proc lrect*(ctx: var RGfxContext, x, y, w, h: float) =
+proc lrect*(ctx: RGfxContext, x, y, w, h: float) =
   ## Adds a rectangle outline, at the specified coordinates, with the \
   ## specified dimensions.
   ## This isn't to be used with texturing; for rendering textures, see \
@@ -685,7 +663,7 @@ proc lrect*(ctx: var RGfxContext, x, y, w, h: float) =
     (x,     y),     (x + w, y),
     (x + w, y + h), (x,     y + h))
 
-proc lcircle*(ctx: var RGfxContext, x, y, r: float, points = 32) =
+proc lcircle*(ctx: RGfxContext, x, y, r: float, points = 32) =
   ## Adds a circle outline, with the specified center and radius. An amount of \
   ## points can be specified to create an equilateral polygon.
   lineAux:
@@ -696,7 +674,7 @@ proc lcircle*(ctx: var RGfxContext, x, y, r: float, points = 32) =
     for n, i in rim:
       ctx.index(i, rim[(n + 1) mod rim.len])
 
-proc arc*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
+proc arc*(ctx: RGfxContext, x, y, r, start, fin: float, points = 16) =
   ## Adds an arc, with the specified center, radius, and start and finish \
   ## angles. All angles should be expressed in radians.
   lineAux:
@@ -707,20 +685,20 @@ proc arc*(ctx: var RGfxContext, x, y, r, start, fin: float, points = 16) =
     for n in 0..<rim.len - 1:
       ctx.index(rim[n], rim[n + 1])
 
-proc lrrect*(ctx: var RGfxContext, x, y, w, h, r: float, points = 8) =
+proc lrrect*(ctx: RGfxContext, x, y, w, h, r: float, points = 8) =
   ## Adds a rounded rectangle outline, at the specified posision, with the \
   ## specified size and corner radius.
   const HPi = PI / 2
-  ctx.line((x + r, y),     (x + w - r, y))
-  ctx.line((x + w, y + r), (x + w,     y + h - r))
-  ctx.line((x + r, y + h), (x + w - r, y + h))
-  ctx.line((x,     y + r), (x,         y + h - r))
+  ctx.line((x + r, y),     (x + w - r,     y))
+  ctx.line((x + w, y + r), (x + w,         y + h - r))
+  ctx.line((x + r, y + h), (x + w - r + 1, y + h))
+  ctx.line((x,     y + r), (x,             y + h - r + 1))
   ctx.arc(x + w - r, y + h - r, r, 0,       1 * HPi, points)
   ctx.arc(x + r,     y + h - r, r, 1 * HPi, 2 * HPi, points)
   ctx.arc(x + r,     y + r,     r, 2 * HPi, 3 * HPi, points)
   ctx.arc(x + w - r, y + r,     r, 3 * HPi, 4 * HPi, points)
 
-proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
+proc draw*(ctx: RGfxContext, primitive = prTriShape) =
   ## Draws the previously built shape.
   if ctx.shape.len > 0:
     if not ctx.texture.isNil:
@@ -741,11 +719,11 @@ proc draw*(ctx: var RGfxContext, primitive = prTriShape) =
                    of prTriFan:   GL_TRIANGLE_FAN
                    else:          GL_TRIANGLES, 0, GLsizei ctx.vertexCount)
 
-proc clearStencil*(ctx: var RGfxContext, value = 255) =
+proc clearStencil*(ctx: RGfxContext, value = 255) =
   glClearStencil(value.GLint)
   glClear(GL_STENCIL_BUFFER_BIT)
 
-template stencil*(ctx: var RGfxContext, action: RStencilAction, value: int,
+template stencil*(ctx: RGfxContext, action: RStencilAction, value: int,
                   body) =
   ## Draw to the stencil buffer. Color operations are disabled in the body.
   ## Use the ``stencilTest=`` proc to set the stencil test.
@@ -763,7 +741,7 @@ template stencil*(ctx: var RGfxContext, action: RStencilAction, value: int,
       body
   glColorMask(true, true, true, true)
 
-proc `stencilTest=`*(ctx: var RGfxContext,
+proc `stencilTest=`*(ctx: RGfxContext,
                      test: tuple[condition: RStencilCondition, value: int]) =
   ## Sets the stencil test. For each fragment, if the test succeeds, the
   ## fragment is drawn. Otherwise, it's discarded.
@@ -778,80 +756,10 @@ proc `stencilTest=`*(ctx: var RGfxContext,
      of scGreaterEq: GL_LEQUAL), test.value.GLint, 0xffffffff.GLuint)
   currentGlc.stencilOp = (GL_KEEP, GL_KEEP, GL_KEEP)
 
-proc newREffect*(gfx: RGfx, effect: string): REffect =
-  ## Creates a new effect.
-  ## Effects are a simple way of adding post-processing effects to a Gfx. \
-  ## All that has to be specified is a fragment shader with an ``rEffect`` \
-  ## function (see example).
-  runnableExamples:
-    let myEffect = gfx.newREffect("""
-      vec4 rEffect(vec2 pos) {
-        return rPixel(pos + sin(pos.x / rapid_height * 3.0) * 8.0);
-      }
-    """)
-  var program = newProgram()
-  if int(gfx.effectVertSh) == 0:
-    gfx.effectVertSh = newRShader(shVertex, REffectVshSrc)
-  if int(gfx.effectFragLibSh) == 0:
-    gfx.effectFragLibSh = newRShader(shFragment, REffectLibSrc)
-  let fsh = newRShader(shFragment, """
-    uniform float rapid_width;
-    uniform float rapid_height;
-
-    vec4 rPixel(vec2 pos);
-  """ & effect)
-  program.attach(gfx.effectVertSh)
-  program.attach(gfx.effectFragLibSh)
-  program.attach(fsh)
-  program.link()
-  glDeleteShader(fsh.GLuint)
-  program.uniform("rapid_surface", 0)
-  result = REffect(
-    program: program
-  )
-
-template paramProc(T: typedesc): untyped {.dirty.} =
-  proc param*(eff: REffect, name: string, val: T) =
-    eff.program.uniform(name, val)
-paramProc(float)
-paramProc(Vec2f)
-paramProc(Vec3f)
-paramProc(Vec4f)
-paramProc(int)
-paramProc(Mat4f)
-
-proc effect*(ctx: var RGfxContext, fx: REffect) =
-  ## Applies an effect to the contents on the Gfx's effect surface.
-  let
-    prevProgram = ctx.program
-    prevTexture = ctx.texture
-  renderTo(ctx.gfx.fx2):
-    ctx.clear(gray(0, 0))
-    transform(ctx):
-      ctx.resetTransform()
-      ctx.`texture=`(ctx.gfx.fx1)
-      ctx.`program=`(fx.program)
-      ctx.begin()
-      ctx.rect(-1, 1, 2, -2)
-      currentGlc.withBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA):
-        ctx.draw()
-      ctx.`program=`(prevProgram)
-      ctx.`texture=`(prevTexture)
-  swap(ctx.gfx.fx1, ctx.gfx.fx2)
-
-template effects*(ctx: var RGfxContext, body: untyped) =
-  ## Draws onto the effect surface in the specified block.
-  renderTo(ctx.gfx.fx1):
-    ctx.clear(gray(0, 0))
-    body
-  let prevTexture = ctx.texture
-  ctx.`texture=`(ctx.gfx.fx1)
-  ctx.begin()
-  ctx.rect(0, 0, ctx.gfx.width.float, ctx.gfx.height.float)
-  ctx.draw()
-  ctx.`texture=`(prevTexture)
-  ctx.gfx.fx1 = ctx.gfx.ofx1
-  ctx.gfx.fx2 = ctx.gfx.ofx2
+proc noStencilTest*(ctx: RGfxContext) =
+  ## Disables the stencil test.
+  currentGlc.stencilFunc = (GL_ALWAYS, 0.GLint, 255.GLuint)
+  currentGlc.stencilOp = (GL_KEEP, GL_KEEP, GL_KEEP)
 
 proc ctx*(gfx: RGfx): RGfxContext =
   ## Creates a Gfx context for the specified Gfx.

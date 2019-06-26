@@ -26,7 +26,7 @@ iterator pairs*(wld: RWorld): (string, RSprite) =
   for name, spr in wld.namedSprites:
     yield (name, spr)
 
-proc drawSprites*(wld: RWorld, ctx: var RGfxContext, step: float) =
+proc drawSprites*(wld: RWorld, ctx: RGfxContext, step: float) =
   ## Draws all of the world's sprites.
   for spr in mitems(wld.sprites):
     spr.draw(ctx, step)
