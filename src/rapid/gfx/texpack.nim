@@ -7,6 +7,11 @@
 
 ## This module implements a simple texture packer.
 
+# TODO: This can be optimized further. (Details)
+# Instead of starting from scratch every time a new texture is to be added,
+# strore the position in the texture packer. Also, when a line is reset,
+# check all hitboxes and travel instantly to the line with the lowest free Y.
+
 import algorithm
 
 import glm
@@ -22,11 +27,13 @@ type
     texture*: RTexture
     occupied: seq[RAABounds]
     fmt: RTexturePixelFormat
+    x, y: int
   RTextureRect* = tuple
     x, y, w, h: float
 
 proc occupyArea(tp: RTexturePacker, x, y, w, h: int) =
-  tp.occupied.add(newRAABB(x.float, y.float, w.float, h.float))
+  let aabb = newRAABB(x.float, y.float, w.float, h.float)
+  tp.occupied.add(aabb)
 
 proc areaFree(tp: RTexturePacker, x, y, w, h: int): bool =
   let area = newRAABB(x.float, y.float, w.float, h.float)
@@ -40,26 +47,30 @@ proc rawPlace(tp: RTexturePacker, x, y, w, h: int, data: pointer) =
 
 proc pack(tp: RTexturePacker, image: RImage): RTextureRect =
   if image.width * image.height > 0:
-    var x, y = 1
-    while y <= tp.texture.height - image.height - 1:
-      while x <= tp.texture.width - image.width - 1:
+    var
+      x = tp.x
+      y = tp.y
+    while y <= tp.texture.height - image.height:
+      while x <= tp.texture.width - image.width:
         block placeTex:
           for area in tp.occupied:
             if area.has(vec2f(x.float, y.float)):
-              x = int(area.x + area.width)
+              x = int area.x + area.width
               break placeTex
-          if tp.areaFree(x, y, image.width + 1, image.height + 1):
+          if tp.areaFree(x, y, image.width, image.height):
             tp.rawPlace(x, y, image.width, image.height, image.caddr)
-            tp.occupyArea(x, y, image.width + 1, image.height + 1)
+            tp.occupyArea(x, y, image.width, image.height)
             let
-              hp = 1 / tp.texture.width / tp.texture.width.float
-              vp = 1 / tp.texture.height / tp.texture.height.float
+              hp = 1 / tp.texture.width / tp.texture.width.float / 2
+              vp = 1 / tp.texture.height / tp.texture.height.float / 2
             return (x / tp.texture.width + hp, y / tp.texture.height + vp,
                     image.width / tp.texture.width - hp * 2,
                     image.height / tp.texture.height - vp * 2)
           inc(x)
       x = 0
       inc(y)
+    tp.x = x
+    tp.y = y
 
 proc place*(tp: RTexturePacker, image: RImage): RTextureRect =
   currentGlc.withTex2D(tp.texture.id):
