@@ -20,10 +20,12 @@ type
     fSrcBlend, fDestBlend: GLenum
     fStencilFunc: StencilFunc
     fStencilOp: StencilOp
+    viewport: Viewport
   FbPair* = tuple[read, draw: GLuint]
   BlendFunc* = tuple[src, dest: GLenum]
   StencilFunc* = tuple[fn: GLenum, refer: GLint, mask: GLuint]
   StencilOp* = tuple[fail, zfail, zpass: GLenum]
+  Viewport* = tuple[x, y: GLint, w, h: GLsizei]
 
 # I know global variables are bad, but the current OpenGL context is global to
 # the current process.
@@ -80,6 +82,13 @@ proc `stencilOp=`*(ctx: GLContext, op: StencilOp) =
 proc stencilOp*(ctx: GLContext): StencilOp =
   result = ctx.fStencilOp
 
+proc `viewport=`*(ctx: GLContext, vp: Viewport) =
+  glViewport(vp.x, vp.y, vp.w, vp.h)
+  ctx.viewport = vp
+
+proc viewport*(ctx: GLContext): Viewport =
+  result = ctx.viewport
+
 template withFor(name, field, T) {.dirty.} =
   template `with name`*(ctx: GLContext, val: T, body) =
     let prev = ctx.field
@@ -91,6 +100,7 @@ withFor(Tex2D, tex2D, GLuint)
 withFor(Framebuffers, framebuffers, FbPair)
 withFor(StencilFunc, stencilFunc, StencilFunc)
 withFor(StencilOp, stencilOp, StencilOp)
+withFor(Viewport, viewport, Viewport)
 
 template withBlendFunc*(ctx: GLContext, src, dest: GLenum, body) =
   let

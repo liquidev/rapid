@@ -171,10 +171,6 @@ proc newRCanvas*(window: RWindow, conf = DefaultTextureConfig): RCanvas =
   result = RCanvas()
   result.init(window, conf)
 
-template renderTo*(canvas: RCanvas, body) =
-  withFramebuffer(currentGlc, canvas.fb):
-    body
-
 #--
 # Gfx
 #--
@@ -219,7 +215,7 @@ proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
       """
         vec4 rFragment(vec4 col, sampler2D tex, vec2 pos, vec2 uv) {
           // ``rapid_width`` and ``rapid_height`` contain the width and height
-          // of the drawing surface, be it a window or a framebuffer;
+          // of the drawing surface, be it a window or a canvas;
           // the ``pos`` argument contains the fragment's position on the screen
           vec4 myColor =
             // get normalized fragment coordinates
@@ -324,7 +320,7 @@ proc init(gfx: RGfx) =
   gfx.fCanvas = RCanvas(fWidth: gfx.fWidth, fHeight: gfx.fHeight, fb: 0)
   # Resizing
   gfx.win.onResize do (win: RWindow, width, height: Natural):
-    glViewport(0, 0, width.GLsizei, height.GLsizei)
+    currentGlc.viewport = (0.GLint, 0.GLint, width.GLsizei, height.GLsizei)
     gfx.fWidth = width
     gfx.fHeight = height
     gfx.canvas.fWidth = width
@@ -347,7 +343,7 @@ proc openGfx*(win: RWindow, fxTexConfig = DefaultTextureConfig): RGfx =
 
 type
   RGfxContext* = ref object
-    gfx: RGfx
+    fGfx: RGfx
     # Shapes
     shape: seq[float32]
     indices: seq[int32]
@@ -394,6 +390,8 @@ type
     scEq
     scNotEq
 
+proc gfx*(ctx: RGfxContext): RGfx = ctx.fGfx
+
 converter toRVertex*(vert: RPointVertex): RVertex =
   (vert.x, vert.y, gray(255), 0.0, 0.0)
 
@@ -414,8 +412,8 @@ uniformProc(Vec4f)
 uniformProc(int)
 uniformProc(Mat4f)
 
-proc updateProjection(ctx: RGfxContext) =
-  ctx.uniform("rapid_projection", ctx.gfx.projection)
+proc updateProjection*(ctx: RGfxContext) =
+  ctx.uniform("rapid_projection", ctx.fGfx.projection)
 
 proc program*(ctx: RGfxContext): RProgram =
   ## Retrieves the currently bound shader program.
@@ -426,12 +424,12 @@ proc `program=`*(ctx: RGfxContext, program: RProgram) =
   glUseProgram(program.id)
   ctx.sProgram = program
   ctx.updateProjection()
-  ctx.uniform("rapid_width", ctx.gfx.width.float)
-  ctx.uniform("rapid_height", ctx.gfx.height.float)
+  ctx.uniform("rapid_width", ctx.fGfx.width.float)
+  ctx.uniform("rapid_height", ctx.fGfx.height.float)
 
 proc defaultProgram*(ctx: RGfxContext) =
   ## Binds the default shader program.
-  ctx.`program=`(ctx.gfx.defaultProgram)
+  ctx.`program=`(ctx.fGfx.defaultProgram)
 
 proc translate*(ctx: RGfxContext, x, y: float) =
   ## Translates the transform matrix.
@@ -703,10 +701,10 @@ proc draw*(ctx: RGfxContext, primitive = prTriShape) =
   if ctx.shape.len > 0:
     if not ctx.texture.isNil:
       currentGlc.tex2D = ctx.texture.id
-    ctx.gfx.updateVbo(ctx.shape)
+    ctx.fGfx.updateVbo(ctx.shape)
     case primitive
     of prTriShape, prLineShape:
-      ctx.gfx.updateEbo(ctx.indices)
+      ctx.fGfx.updateEbo(ctx.indices)
       glDrawElements(case primitive
                      of prTriShape: GL_TRIANGLES
                      else: GL_LINES, GLsizei ctx.indices.len, GL_UNSIGNED_INT,
@@ -767,7 +765,7 @@ proc ctx*(gfx: RGfx): RGfxContext =
   ## Use ``render`` and ``loop`` instead. This proc is exported because they \
   ## would not work without it.
   result = RGfxContext(
-    gfx: gfx,
+    fGfx: gfx,
     sColor: gray(255),
     transform: mat3(vec3(1.0'f32, 1.0, 1.0))
   )
@@ -777,6 +775,15 @@ proc ctx*(gfx: RGfx): RGfxContext =
 #--
 # Rendering
 #--
+
+template renderTo*(ctx: RGfxContext, canvas: RCanvas, body) =
+  withFramebuffer(currentGlc, canvas.fb):
+    let prevProj = ctx.gfx.projection
+    ctx.gfx.projection = ortho(0'f32, canvas.width, canvas.height, 0, -1, 1)
+    ctx.updateProjection()
+    body
+    ctx.gfx.projection = prevProj
+    ctx.updateProjection()
 
 template render*(gfx: RGfx, ctvar, body: untyped): untyped =
   ## Renders a single frame onto the specified window.
