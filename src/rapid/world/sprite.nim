@@ -18,12 +18,12 @@ type
     pos*, vel*, acc*: Vec2[float]
     friction*: float
 
-method draw*(spr: var RSprite, ctx: RGfxContext, step: float) {.base.} =
+method draw*(spr: RSprite, ctx: RGfxContext, step: float) {.base.} =
   ## The base draw implementation. It just draws a rectangle at the sprite's \
   ## position, with the sprite's dimensions.
   ctx.rect(spr.pos.x, spr.pos.y, spr.width, spr.height)
 
-method update*(spr: var RSprite, step: float) {.base.} =
+method update*(spr: RSprite, step: float) {.base.} =
   ## The base update implementation. It doesn't do anything.
   discard
 
