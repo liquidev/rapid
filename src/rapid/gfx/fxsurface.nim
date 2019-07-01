@@ -126,6 +126,7 @@ proc begin*(fx: RFxSurface, ctx: RGfxContext,
                            0, 0, fx.a.width.GLint, fx.a.height.GLint,
                            GL_COLOR_BUFFER_BIT,
                            GL_NEAREST)
+    renderTo(ctx, fx.b): fx.ctx.clear(gray(0, 0))
   else:
     renderTo(ctx, fx.a): fx.ctx.clear(gray(0, 0))
     renderTo(ctx, fx.b): fx.ctx.clear(gray(0, 0))

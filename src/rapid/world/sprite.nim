@@ -17,6 +17,7 @@ type
     width*, height*: float
     pos*, vel*, acc*: Vec2[float]
     friction*: float
+    delete*: bool
 
 method draw*(spr: RSprite, ctx: RGfxContext, step: float) {.base.} =
   ## The base draw implementation. It just draws a rectangle at the sprite's \
@@ -25,6 +26,10 @@ method draw*(spr: RSprite, ctx: RGfxContext, step: float) {.base.} =
 
 method update*(spr: RSprite, step: float) {.base.} =
   ## The base update implementation. It doesn't do anything.
+  discard
+
+method collideSprite*(a, b: RSprite) {.base.} =
+  ## The base collide with sprite implementation. It doesn't do anything.
   discard
 
 proc force*(spr: RSprite, force: Vec2[float]) =

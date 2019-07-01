@@ -110,25 +110,25 @@ type
   # Events
   #--
   RModKeys* = set[glfw.ModifierKey]
-  RCharFn* = proc (win: RWindow, rune: Rune, mods: RModKeys)
-  RCursorEnterFn* = proc (win: RWindow)
-  RCursorMoveFn* = proc (win: RWindow, x, y: float)
-  RFilesDroppedFn* = proc (win: RWindow, filenames: seq[string])
-  RKeyFn* = proc (win: RWindow, key: glfw.Key, scancode: int, mods: RModKeys)
-  RMouseFn* = proc (win: RWindow, button: glfw.MouseButton, mods: RModKeys)
-  RScrollFn* = proc (win: RWindow, x, y: float)
-  RCloseFn* = proc (win: RWindow): bool
-  RResizeFn* = proc (win: RWindow, width, height: Natural)
+  RCharProc* = proc (win: RWindow, rune: Rune, mods: RModKeys)
+  RCursorEnterProc* = proc (win: RWindow)
+  RCursorMoveProc* = proc (win: RWindow, x, y: float)
+  RFilesDroppedProc* = proc (win: RWindow, filenames: seq[string])
+  RKeyProc* = proc (win: RWindow, key: glfw.Key, scancode: int, mods: RModKeys)
+  RMouseProc* = proc (win: RWindow, button: glfw.MouseButton, mods: RModKeys)
+  RScrollProc* = proc (win: RWindow, x, y: float)
+  RCloseProc* = proc (win: RWindow): bool
+  RResizeProc* = proc (win: RWindow, width, height: Natural)
   WindowCallbacks = object
-    onChar: seq[RCharFn]
-    onCursorEnter, onCursorLeave: seq[RCursorEnterFn]
-    onCursorMove: seq[RCursorMoveFn]
-    onFilesDropped: seq[RFilesDroppedFn]
-    onKeyPress, onKeyRelease, onKeyRepeat: seq[RKeyFn]
-    onMousePress, onMouseRelease: seq[RMouseFn]
-    onScroll: seq[RScrollFn]
-    onClose: seq[RCloseFn]
-    onResize: seq[RResizeFn]
+    onChar: seq[RCharProc]
+    onCursorEnter, onCursorLeave: seq[RCursorEnterProc]
+    onCursorMove: seq[RCursorMoveProc]
+    onFilesDropped: seq[RFilesDroppedProc]
+    onKeyPress, onKeyRelease, onKeyRepeat: seq[RKeyProc]
+    onMousePress, onMouseRelease: seq[RMouseProc]
+    onScroll: seq[RScrollProc]
+    onClose: seq[RCloseProc]
+    onResize: seq[RResizeProc]
   #--
   # Windows
   #--
@@ -195,50 +195,50 @@ proc glfwCallbacks(win: var RWindow) =
   win.callbacks = WindowCallbacks()
   template run(name, body: untyped): untyped {.dirty.} =
     let win = cast[RWindow](glfw.getWindowUserPointer(w))
-    for fn in win.callbacks.name: body
+    for cb in win.callbacks.name: body
   discard glfw.setCharModsCallback(win.handle,
     proc (w: glfw.Window, uchar: cuint, mods: int32) =
-      run(onChar): fn(win, Rune(uchar), mods))
+      run(onChar): cb(win, Rune(uchar), mods))
   discard glfw.setCursorEnterCallback(win.handle,
     proc (w: glfw.Window, entered: int32) =
       if entered == 1:
-        run(onCursorEnter, fn(win))
+        run(onCursorEnter, cb(win))
       else:
-        run(onCursorLeave, fn(win)))
+        run(onCursorLeave, cb(win)))
   discard glfw.setCursorPosCallback(win.handle,
     proc (w: glfw.Window, x, y: cdouble) =
-      run(onCursorMove, fn(win, x, y)))
+      run(onCursorMove, cb(win, x, y)))
   discard glfw.setDropCallback(win.handle,
     proc (w: glfw.Window, n: int32, files: cstringArray) =
-      run(onFilesDropped, fn(win, cstringArrayToSeq(files, n))))
+      run(onFilesDropped, cb(win, cstringArrayToSeq(files, n))))
   discard glfw.setKeyCallback(win.handle,
     proc (w: glfw.Window, key, scan, action, mods: int32) =
       case glfw.KeyAction(action)
       of glfw.kaDown:
-        run(onKeyPress, fn(win, glfw.Key(key), int scan, mods))
+        run(onKeyPress, cb(win, glfw.Key(key), int scan, mods))
       of glfw.kaUp:
-        run(onKeyRelease, fn(win, glfw.Key(key), int scan, mods))
+        run(onKeyRelease, cb(win, glfw.Key(key), int scan, mods))
       of glfw.kaRepeat:
-        run(onKeyRepeat, fn(win, glfw.Key(key), int scan, mods)))
+        run(onKeyRepeat, cb(win, glfw.Key(key), int scan, mods)))
   discard glfw.setMouseButtonCallback(win.handle,
     proc (w: glfw.Window, button, action, mods: int32) =
       case glfw.KeyAction(action)
       of glfw.kaDown:
-        run(onMousePress, fn(win, glfw.MouseButton(button), mods))
+        run(onMousePress, cb(win, glfw.MouseButton(button), mods))
       of glfw.kaUp:
-        run(onMouseRelease, fn(win, glfw.MouseButton(button), mods))
+        run(onMouseRelease, cb(win, glfw.MouseButton(button), mods))
       else: discard)
   discard glfw.setScrollCallback(win.handle,
     proc (w: glfw.Window, x, y: cdouble) =
-      run(onScroll, fn(win, x, y)))
+      run(onScroll, cb(win, x, y)))
   discard glfw.setWindowCloseCallback(win.handle,
     proc (w: glfw.Window) =
       var close = true
-      run(onClose): close = close and fn(win)
+      run(onClose): close = close and cb(win)
       glfw.setWindowShouldClose(w, int32 close))
   discard glfw.setWindowSizeCallback(win.handle,
     proc (w: glfw.Window, width, height: int32) =
-      run(onResize, fn(win, width, height)))
+      run(onResize, cb(win, width, height)))
 
 converter toInt32(hint: glfw.Hint): int32 =
   int32 hint
@@ -370,34 +370,34 @@ template callbackProc(name, T, doc: untyped): untyped {.dirty.} =
   proc name*(win: RWindow, callback: T) =
     doc
     win.callbacks.name.add(callback)
-callbackProc(onChar, RCharFn):
+callbackProc(onChar, RCharProc):
   ## Adds a callback executed when a character is typed on the keyboard.
-callbackProc(onCursorEnter, RCursorEnterFn):
+callbackProc(onCursorEnter, RCursorEnterProc):
   ## Adds a callback executed when the cursor enters the window.
-callbackProc(onCursorLeave, RCursorEnterFn):
+callbackProc(onCursorLeave, RCursorEnterProc):
   ## Adds a callback executed when the cursor leaves the window.
-callbackProc(onCursorMove, RCursorMoveFn):
+callbackProc(onCursorMove, RCursorMoveProc):
   ## Adds a callback executed when the cursor moves in the window.
-callbackProc(onFilesDropped, RFilesDroppedFn):
+callbackProc(onFilesDropped, RFilesDroppedProc):
   ## Adds a callback executed when files are dropped onto the window.
-callbackProc(onKeyPress, RKeyFn):
+callbackProc(onKeyPress, RKeyProc):
   ## Adds a callback executed when a key is pressed on the keyboard.
-callbackProc(onKeyRelease, RKeyFn):
+callbackProc(onKeyRelease, RKeyProc):
   ## Adds a callback executed when a key is released on the keyboard.
-callbackProc(onKeyRepeat, RKeyFn):
+callbackProc(onKeyRepeat, RKeyProc):
   ## Adds a callback executed when a repeat is triggered by holding down a key \
   ## on the keyboard.
-callbackProc(onMousePress, RMouseFn):
+callbackProc(onMousePress, RMouseProc):
   ## Adds a callback executed when a mouse button is pressed.
-callbackProc(onMouseRelease, RMouseFn):
+callbackProc(onMouseRelease, RMouseProc):
   ## Adds a callback executed when a mouse button is released.
-callbackProc(onScroll, RScrollFn):
+callbackProc(onScroll, RScrollProc):
   ## Adds a callback executed when the scroll wheel is moved.
-callbackProc(onClose, RCloseFn):
+callbackProc(onClose, RCloseProc):
   ## Adds a callback executed when there's an attempt to close the window.
   ## The callback should return ``true`` if the window is to be closed, or \
   ## ``false`` if closing should be canceled.
-callbackProc(onResize, RResizeFn):
+callbackProc(onResize, RResizeProc):
   ## Adds a callback executed when the window is resized.
 
 proc key*(win: RWindow, key: glfw.Key): glfw.KeyAction =

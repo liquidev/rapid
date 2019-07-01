@@ -24,6 +24,8 @@ export glm
 export opengl # unfortunate export, but it must be done
 export shaders
 
+export GLint, GLuint
+
 include gfx/rcolor
 include gfx/window
 
@@ -357,7 +359,7 @@ type
     sLineWidth: float
     sLineSmooth: bool
     # Transformations
-    transform*: Mat3f
+    fTransform: Mat3f
   RVertex* = tuple
     x, y: float
     color: RColor
@@ -430,6 +432,10 @@ proc `program=`*(ctx: RGfxContext, program: RProgram) =
 proc defaultProgram*(ctx: RGfxContext) =
   ## Binds the default shader program.
   ctx.`program=`(ctx.fGfx.defaultProgram)
+
+proc `transform=`*(ctx: RGfxContext, transform: Mat3f) =
+  ctx.fTransform = transform
+proc transform*(ctx: RGfxContext): Mat3f = ctx.fTransform
 
 proc translate*(ctx: RGfxContext, x, y: float) =
   ## Translates the transform matrix.
@@ -623,7 +629,7 @@ proc point*[T: SomeVertex](ctx: RGfxContext, a: T) =
 
 template lineAux(body) =
   ## Make lines pixel-perfect by offsetting them by 0.5px when line width is odd
-  let offset = (ctx.sLineWidth + 1) mod 2 / 2
+  let offset = ctx.sLineWidth mod 2 / 2
   ctx.translate(offset, offset)
   body
   ctx.translate(-offset, -offset)
@@ -657,9 +663,10 @@ proc lrect*(ctx: RGfxContext, x, y, w, h: float) =
   ## specified dimensions.
   ## This isn't to be used with texturing; for rendering textures, see \
   ## ``rect()``.
-  ctx.lquad(
-    (x,     y),     (x + w, y),
-    (x + w, y + h), (x,     y + h))
+  ctx.line((x - 0.5,     y,         ), (x + w + 0.5, y))
+  ctx.line((x + w,       y - 0.5,   ), (x + w,       y + h + 0.5))
+  ctx.line((x + w + 0.5, y + h,     ), (x - 0.5,     y + h))
+  ctx.line((x,           y + h + 0.5), (x,           y - 0.5))
 
 proc lcircle*(ctx: RGfxContext, x, y, r: float, points = 32) =
   ## Adds a circle outline, with the specified center and radius. An amount of \
@@ -767,7 +774,8 @@ proc ctx*(gfx: RGfx): RGfxContext =
   result = RGfxContext(
     fGfx: gfx,
     sColor: gray(255),
-    transform: mat3(vec3(1.0'f32, 1.0, 1.0))
+    sLineWidth: 1,
+    fTransform: mat3(vec3(1.0'f32, 1.0, 1.0))
   )
   result.defaultProgram()
   result.updateProjection()
@@ -873,6 +881,6 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
         lag -= millisPerUpdate
 
       block draw:
-        let `drawStepName` = lag / millisPerUpdate
+        let `drawStepName` = delta / millisPer60fps
         `gfx`.render `drawCtxName`:
           `drawBody`

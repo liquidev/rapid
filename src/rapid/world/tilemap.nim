@@ -41,7 +41,7 @@ proc isInbounds*(wld: RTmWorld, x, y: int): bool =
 proc `oobTile=`*[T](wld: var RTmWorld[T], tile: T) =
   wld.oobTile = tile
 
-proc implTile*[T](wld: var RTmWorld[T],
+proc implTile*[T](wld: RTmWorld[T],
                   initImpl: proc (): T,
                   isSolidImpl: proc (t: T): bool) =
   wld.tile = RTileImpl[T](
@@ -68,7 +68,7 @@ proc `[]`*[T](wld: RTmWorld[T], x, y: int): T =
     else:
       wld.oobTile
 
-proc `[]=`*[T](wld: var RTmWorld[T], x, y: int, tile: T) =
+proc `[]=`*[T](wld: RTmWorld[T], x, y: int, tile: T) =
   ## Sets a tile. If the coordinates are out of bounds, doesn't set anything.
   if wld.isInbounds(x, y):
     let oldTile = wld[x, y]
@@ -78,7 +78,7 @@ proc `[]=`*[T](wld: var RTmWorld[T], x, y: int, tile: T) =
 proc isSolid*(wld: RTmWorld, x, y: int): bool =
   result = wld.tile.isSolidImpl(wld[x, y])
 
-proc init*[T](wld: var RTmWorld[T]) =
+proc init*[T](wld: RTmWorld[T]) =
   assert (not wld.tile.initImpl.isNil),
     "Attempt to initialize unimplemented world"
   wld.tiles = @[]
@@ -112,7 +112,7 @@ iterator areab*[T](wld: RTmWorld[T],
     for x in left..right:
       yield (x, y, wld[x, y])
 
-proc clear*[T](wld: var RTmWorld[T]) =
+proc clear*[T](wld: RTmWorld[T]) =
   ## Clears the world.
   for x, y, t in tiles(wld):
     t = wld.tile.initImpl()
@@ -140,11 +140,21 @@ proc tileAlignedHitbox(wld: RTmWorld,
     int(hb.right / wld.tileWidth.float)
   )
 
-proc update*[T](wld: var RTmWorld[T], step: float) =
+proc collectGarbage(wld: RTmWorld) =
+  var idx = 0
+  while idx < wld.sprites.len:
+    if wld.sprites[idx].delete:
+      wld.del(idx)
+    else:
+      inc(idx)
+
+proc update*[T](wld: RTmWorld[T], step: float) =
   ## Updates the world, simulating physics on its sprites.
   assert (not wld.tile.isSolidImpl.isNil),
     "Cannot update an uninitialized world"
-  for spr in mitems(wld.sprites):
+  wld.collectGarbage()
+  var sprites = wld.sprites
+  for spr in sprites:
     spr.update(step)
     spr.vel += spr.acc
     spr.acc *= 0
@@ -200,6 +210,15 @@ proc update*[T](wld: var RTmWorld[T], step: float) =
 
     spr.pos = p
 
+    # TODO: Very inefficient, use a quad tree for this
+    for b in sprites:
+      if b != spr:
+        let
+          ah = newRAABB(spr.pos.x, spr.pos.y, spr.width, spr.height)
+          bh = newRAABB(b.pos.x, b.pos.y, b.width, b.height)
+        if ah.intersects(bh):
+          spr.collideSprite(b)
+
 proc newRTmWorld*[T](width, height,
                      tileWidth, tileHeight: Natural): RTmWorld[T] =
   ## Creates a new, empty world.
@@ -209,7 +228,7 @@ proc newRTmWorld*[T](width, height,
   )
   result.RWorld.init()
 
-proc load*[T; w, h: static[int]](wld: var RTmWorld[T],
+proc load*[T; w, h: static[int]](wld: RTmWorld[T],
                                  map: array[h, array[w, T]]) =
   ## Loads tiles to a world, from a 2D array of tiles.
   wld.width = w

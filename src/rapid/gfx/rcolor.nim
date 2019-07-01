@@ -8,6 +8,8 @@
 ## This module has some utility color manipulation procs.
 ## **Do not import this directly, it's included by the gfx module.**
 
+import glm
+
 type
   ColorCh* = range[0..255]
   RColor* = tuple
@@ -32,3 +34,11 @@ proc ired*(col: RColor): ColorCh = int(col.red * 255)
 proc igreen*(col: RColor): ColorCh = int(col.green * 255)
 proc iblue*(col: RColor): ColorCh = int(col.blue * 255)
 proc ialpha*(col: RColor): ColorCh = int(col.alpha * 255)
+
+proc mix*(a, b: RColor, t: float): RColor =
+  result = (
+    mix(a.red, b.red, t),
+    mix(a.green, b.green, t),
+    mix(a.blue, b.blue, t),
+    mix(a.alpha, b.alpha, t)
+  )

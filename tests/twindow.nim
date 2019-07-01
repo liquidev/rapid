@@ -29,7 +29,7 @@ type
   Player = ref object of RSprite
     win: RWindow
 
-method draw(plr: var Player, ctx: RGfxContext, step: float) =
+method draw(plr: Player, ctx: RGfxContext, step: float) =
   ctx.begin()
   ctx.color = rgb(0, 128, 255)
   ctx.noTexture()
@@ -39,7 +39,7 @@ method draw(plr: var Player, ctx: RGfxContext, step: float) =
   ctx.color = gray(255)
   ctx.draw()
 
-method update(plr: var Player, step: float) =
+method update(plr: Player, step: float) =
   #echo plr
   const
     v = 0.3
@@ -168,7 +168,7 @@ proc main() =
       ctx.clear(gray(32))
       ctx.clearStencil(255)
 
-      renderTo(mapCanvas):
+      renderTo(ctx, mapCanvas):
         ctx.clear(gray(0, 0))
         map.draw(ctx, step)
 
