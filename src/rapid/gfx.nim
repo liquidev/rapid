@@ -663,6 +663,9 @@ proc lrect*(ctx: RGfxContext, x, y, w, h: float) =
   ## specified dimensions.
   ## This isn't to be used with texturing; for rendering textures, see \
   ## ``rect()``.
+  let
+    w = w - 1
+    h = h - 1
   ctx.line((x - 0.5,     y,         ), (x + w + 0.5, y))
   ctx.line((x + w,       y - 0.5,   ), (x + w,       y + h + 0.5))
   ctx.line((x + w + 0.5, y + h,     ), (x - 0.5,     y + h))
@@ -694,6 +697,9 @@ proc lrrect*(ctx: RGfxContext, x, y, w, h, r: float, points = 8) =
   ## Adds a rounded rectangle outline, at the specified posision, with the \
   ## specified size and corner radius.
   const HPi = PI / 2
+  let
+    w = w - 1
+    h = h - 1
   ctx.line((x + r, y),     (x + w - r,     y))
   ctx.line((x + w, y + r), (x + w,         y + h - r))
   ctx.line((x + r, y + h), (x + w - r + 1, y + h))
