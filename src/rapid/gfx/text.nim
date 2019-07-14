@@ -49,12 +49,10 @@ proc text*(ctx: RGfxContext, font: RFont, x, y: float, text: string) =
     of 0x0d.Rune:
       penX = x * 64
     else:
-      if not font.glyphs.hasKey(r):
-        font.render(r)
-      let glyph = font.glyphs[r]
+      let glyph = font.glyph(r)
       ctx.rect(penX / 64 + glyph.bitmapLeft.float, penY / 64 - glyph.bitmapTop.float,
-              glyph.width.float, glyph.height.float,
-              glyph.rect)
+               glyph.width.float, glyph.height.float,
+               glyph.rect)
       penX += glyph.advanceX.float
   ctx.draw()
   ctx.uniform("rapid_renderText", 0)
