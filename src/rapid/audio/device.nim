@@ -78,6 +78,9 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
 
     framesLeft -= frameCount
 
+proc errorCallback(outstream: ptr SoundIoOutStream, errcode: cint) {.cdecl.} =
+  raise newException(AudioError, $soundio_strerror(errcode))
+
 proc teardownDevice(device: ref RAudioDeviceObj) =
   soundio_outstream_destroy(device.ostream)
   soundio_device_unref(device.device)
@@ -109,6 +112,7 @@ proc newRAudioDevice*(name = "rapid/audio device"): RAudioDevice =
   outstream.name = "rapid/audio"
   outstream.userdata = cast[pointer](result)
   outstream.write_callback = writeCallback
+  outstream.error_callback = errorCallback
   result.ostream = outstream
 
   if (error = soundio_outstream_open(outstream); error != 0):
