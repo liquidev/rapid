@@ -34,7 +34,7 @@ type
 method sample*(osc: ROsc, dest: var seq[float], count: int) =
   dest.setLen(0)
   if osc.playing:
-    let secondsPerSample = 1 / OutputSampleRate
+    let secondsPerSample = 1 / ROutputSampleRate
     case osc.kind
     of oscSine:
       let

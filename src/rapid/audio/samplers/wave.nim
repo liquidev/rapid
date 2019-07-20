@@ -26,7 +26,7 @@ method sample*(wave: RWave, dest: var seq[float], count: int) =
   ## Otherwise, outputs silence.
   dest.setLen(0)
   if wave.playing:
-    let rateRatio = wave.decoder.sampleRate / OutputSampleRate
+    let rateRatio = wave.decoder.sampleRate / ROutputSampleRate
     wave.convBuffer.setLen(0)
     wave.decoder.read(wave.convBuffer, int(ceil(count.float * rateRatio)))
     for n in 0..<count:

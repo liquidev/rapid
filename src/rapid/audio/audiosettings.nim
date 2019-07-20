@@ -6,4 +6,4 @@
 #--
 
 const
-  OutputSampleRate* = 48000
+  ROutputSampleRate* {.intdefine.} = 48000

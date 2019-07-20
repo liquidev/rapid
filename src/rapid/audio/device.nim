@@ -104,7 +104,7 @@ proc newRAudioDevice*(name = "rapid/audio device"): RAudioDevice =
   outstream.format =
     when cpuEndian == littleEndian: SoundIoFormatS16LE
     else: SoundIoFormatS16BE
-  outstream.sample_rate = OutputSampleRate
+  outstream.sample_rate = ROutputSampleRate
   outstream.software_latency = 0.1
   outstream.name = "rapid/audio"
   outstream.userdata = cast[pointer](result)
