@@ -10,7 +10,8 @@
 
 import tables
 
-import glm
+import glm/vec
+import glm/mat
 
 import ../lib/glad/gl
 

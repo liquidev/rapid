@@ -126,10 +126,10 @@ proc begin*(fx: RFxSurface, ctx: RGfxContext,
                            0, 0, fx.a.width.GLint, fx.a.height.GLint,
                            GL_COLOR_BUFFER_BIT,
                            GL_NEAREST)
-    renderTo(ctx, fx.b): fx.ctx.clear(gray(0, 0))
+    ctx.renderTo(fx.b): fx.ctx.clear(gray(0, 0))
   else:
-    renderTo(ctx, fx.a): fx.ctx.clear(gray(0, 0))
-    renderTo(ctx, fx.b): fx.ctx.clear(gray(0, 0))
+    ctx.renderTo(fx.a): fx.ctx.clear(gray(0, 0))
+    ctx.renderTo(fx.b): fx.ctx.clear(gray(0, 0))
 
 proc effect*(fx: RFxSurface, eff: REffect, stencil = false) =
   ## Applies an effect to the contents on the Gfx's effect surface.
@@ -141,9 +141,9 @@ proc effect*(fx: RFxSurface, eff: REffect, stencil = false) =
                            0, 0, fx.a.width.GLint, fx.a.height.GLint,
                            0, 0, fx.b.width.GLint, fx.b.height.GLint,
                            GL_STENCIL_BUFFER_BIT, GL_NEAREST)
-  renderTo(fx.ctx, fx.b):
+  fx.ctx.renderTo(fx.b):
     fx.ctx.clear(gray(0, 0))
-    transform(fx.ctx):
+    fx.ctx.transform():
       fx.ctx.resetTransform()
       fx.ctx.texture = fx.a
       fx.ctx.program = eff.program

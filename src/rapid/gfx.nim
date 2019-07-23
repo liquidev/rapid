@@ -24,7 +24,7 @@ export glm
 export opengl # unfortunate export, but it must be done
 export shaders
 
-export GLint, GLuint
+export GLint, GLuint, GLsizei
 
 include gfx/rcolor
 include gfx/window
@@ -286,6 +286,11 @@ proc updateEbo(gfx: RGfx, data: seq[int32]) =
     0, dataSize,
     data[0].unsafeAddr)
 
+proc updateUniforms*(prog: RProgram, proj: Mat4f, width, height: float) =
+  prog.uniform("rapid_projection", proj)
+  prog.uniform("rapid_width", width)
+  prog.uniform("rapid_height", height)
+
 proc init(gfx: RGfx) =
   # Settings
   glEnable(GL_BLEND)
@@ -317,6 +322,7 @@ proc init(gfx: RGfx) =
   glVertexAttribPointer(
     2, 2, cGL_FLOAT, false, Stride, cast[pointer](6 * sizeof(float32)))
   # Projection
+  currentGlc.viewport = (0.GLint, 0.GLint, gfx.width.GLsizei, gfx.height.GLsizei)
   gfx.projection = ortho(0'f32, gfx.width.float, gfx.height.float, 0, -1, 1)
   # Root canvas
   gfx.fCanvas = RCanvas(fWidth: gfx.fWidth, fHeight: gfx.fHeight, fb: 0)
@@ -346,6 +352,7 @@ proc openGfx*(win: RWindow, fxTexConfig = DefaultTextureConfig): RGfx =
 type
   RGfxContext* = ref object
     fGfx: RGfx
+    fCanvas: RCanvas
     # Shapes
     shape: seq[float32]
     indices: seq[int32]
@@ -414,9 +421,6 @@ uniformProc(Vec4f)
 uniformProc(int)
 uniformProc(Mat4f)
 
-proc updateProjection*(ctx: RGfxContext) =
-  ctx.uniform("rapid_projection", ctx.fGfx.projection)
-
 proc program*(ctx: RGfxContext): RProgram =
   ## Retrieves the currently bound shader program.
   result = ctx.sProgram
@@ -425,9 +429,8 @@ proc `program=`*(ctx: RGfxContext, program: RProgram) =
   ## Binds a shader program for drawing operations.
   glUseProgram(program.id)
   ctx.sProgram = program
-  ctx.updateProjection()
-  ctx.uniform("rapid_width", ctx.fGfx.width.float)
-  ctx.uniform("rapid_height", ctx.fGfx.height.float)
+  program.updateUniforms(ctx.fGfx.projection,
+                         ctx.fCanvas.width, ctx.fCanvas.height)
 
 proc defaultProgram*(ctx: RGfxContext) =
   ## Binds the default shader program.
@@ -772,6 +775,10 @@ proc noStencilTest*(ctx: RGfxContext) =
   currentGlc.stencilFunc = (GL_ALWAYS, 0.GLint, 255.GLuint)
   currentGlc.stencilOp = (GL_KEEP, GL_KEEP, GL_KEEP)
 
+proc updateUniforms(ctx: RGfxContext) =
+  ctx.program.updateUniforms(ctx.fGfx.projection,
+                             ctx.fCanvas.width, ctx.fCanvas.height)
+
 proc ctx*(gfx: RGfx): RGfxContext =
   ## Creates a Gfx context for the specified Gfx.
   ## This should not be used by itself unless you know what you're doing!
@@ -779,12 +786,13 @@ proc ctx*(gfx: RGfx): RGfxContext =
   ## would not work without it.
   result = RGfxContext(
     fGfx: gfx,
+    fCanvas: gfx.canvas,
     sColor: gray(255),
     sLineWidth: 1,
     fTransform: mat3(vec3(1.0'f32, 1.0, 1.0))
   )
   result.defaultProgram()
-  result.updateProjection()
+  result.updateUniforms()
 
 #--
 # Rendering
@@ -792,17 +800,23 @@ proc ctx*(gfx: RGfx): RGfxContext =
 
 template renderTo*(ctx: RGfxContext, canvas: RCanvas, body) =
   withFramebuffer(currentGlc, canvas.fb):
-    let prevProj = ctx.gfx.projection
-    ctx.gfx.projection = ortho(0'f32, canvas.width, canvas.height, 0, -1, 1)
-    ctx.updateProjection()
-    body
-    ctx.gfx.projection = prevProj
-    ctx.updateProjection()
+    let
+      prevProj = ctx.gfx.projection
+      prevCanvas = ctx.fCanvas
+    ctx.fCanvas = canvas
+    currentGlc.withViewport((0.GLint, 0.GLint,
+                             canvas.width.GLsizei, canvas.height.GLsizei)):
+      ctx.fGfx.projection = ortho(0'f32, canvas.width, canvas.height, 0, -1, 1)
+      ctx.updateUniforms()
+      body
+    ctx.fCanvas = prevCanvas
+    ctx.fGfx.projection = prevProj
+    ctx.updateUniforms()
 
-template render*(gfx: RGfx, ctvar, body: untyped): untyped =
+template render*(gfx: RGfx, ctxVar, body: untyped): untyped =
   ## Renders a single frame onto the specified window.
   with(gfx.win):
-    var ctvar {.inject.} = gfx.ctx()
+    var ctxVar {.inject.} = gfx.ctx()
     withFramebuffer(currentGlc, 0):
       glBindVertexArray(gfx.vaoID)
       glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)

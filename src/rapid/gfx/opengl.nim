@@ -20,7 +20,7 @@ type
     fSrcBlend, fDestBlend: GLenum
     fStencilFunc: StencilFunc
     fStencilOp: StencilOp
-    viewport: Viewport
+    fViewport: Viewport
   FbPair* = tuple[read, draw: GLuint]
   BlendFunc* = tuple[src, dest: GLenum]
   StencilFunc* = tuple[fn: GLenum, refer: GLint, mask: GLuint]
@@ -84,10 +84,10 @@ proc stencilOp*(ctx: GLContext): StencilOp =
 
 proc `viewport=`*(ctx: GLContext, vp: Viewport) =
   glViewport(vp.x, vp.y, vp.w, vp.h)
-  ctx.viewport = vp
+  ctx.fViewport = vp
 
 proc viewport*(ctx: GLContext): Viewport =
-  result = ctx.viewport
+  result = ctx.fViewport
 
 template withFor(name, field, T) {.dirty.} =
   template `with name`*(ctx: GLContext, val: T, body) =

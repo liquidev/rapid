@@ -5,8 +5,6 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
-import nimPNG
-
 import images
 import ../gfx/opengl
 import ../lib/glad/gl

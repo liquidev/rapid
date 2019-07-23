@@ -8,7 +8,7 @@
 ## This module has some utility color manipulation procs.
 ## **Do not import this directly, it's included by the gfx module.**
 
-import glm
+import glm/vec
 
 type
   ColorCh* = range[0..255]

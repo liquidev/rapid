@@ -33,7 +33,7 @@ method draw(plr: Player, ctx: RGfxContext, step: float) =
   ctx.begin()
   ctx.color = rgb(0, 128, 255)
   ctx.noTexture()
-  transform(ctx):
+  ctx.transform():
     ctx.translate(plr.pos.x * 4 + 16, plr.pos.y * 4 + 16)
     ctx.rect(-16, -16, 32, 32)
   ctx.color = gray(255)
@@ -75,7 +75,7 @@ proc drawWindow(ctx: RGfxContext, fx: RFxSurface, eff: REffect,
   fx.begin(ctx, copyTarget = true)
 
   ctx.clearStencil(0)
-  stencil(ctx, saReplace, 255):
+  ctx.stencil(saReplace, 255):
     ctx.begin()
     ctx.rrect(x, y, w, h, 8)
     ctx.draw()
