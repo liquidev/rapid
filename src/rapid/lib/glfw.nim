@@ -34,6 +34,7 @@ when defined(windows):
   cCompile(Src/"win32_*.c")
   cCompile(Src/"wgl_context.c")
   cCompile(Src/"egl_context.c")
+  cCompile(Src/"osmesa_context.c")
 elif defined(macosx):
   {.passC: "-D_GLFW_COCOA -D_GLFW_USE_CHDIR -D_GLFW_USE_MENUBAR -D_GLFW_USE_RETINA",
     passL: "-framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo".}
@@ -48,10 +49,12 @@ else:
     {.passC: "-D_GLFW_WAYLAND".}
     cCompile(Src/"wl_*.c")
     cCompile(Src/"egl_context.c")
+    cCompile(Src/"osmesa_context.c")
   elif defined(mir):
     {.passC: "-D_GLFW_MIR".}
     cCompile(Src/"mir_*.c")
     cCompile(Src/"egl_context.c")
+    cCompile(Src/"osmesa_context.c")
   else:
     {.passC: "-D_GLFW_X11".}
     cCompile(Src/"x11_*.c")
