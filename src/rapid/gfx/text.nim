@@ -50,7 +50,8 @@ proc text*(ctx: RGfxContext, font: RFont, x, y: float, text: string) =
       penX = x * 64
     else:
       let glyph = font.glyph(r)
-      ctx.rect(penX / 64 + glyph.bitmapLeft.float, penY / 64 - glyph.bitmapTop.float,
+      ctx.rect(round(penX / 64 + glyph.bitmapLeft.float),
+               round(penY / 64 - glyph.bitmapTop.float),
                glyph.width.float, glyph.height.float,
                glyph.rect)
       penX += glyph.advanceX.float

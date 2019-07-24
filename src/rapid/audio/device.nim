@@ -7,12 +7,12 @@
 
 ## The base audio device, used for outputting audio to your speakers.
 
-import glm
-import math
-
 import ../lib/soundio
 import audiosettings
 import sampler
+
+when not compileOption("threads"):
+  {.error: "rapid/audio must be compiled with --threads:on".}
 
 type
   AudioError* = object of Exception
@@ -22,6 +22,7 @@ type
     ostream: ptr SoundIoOutStream
     buffer: seq[float]
     sampler: RSampler
+    pollThread: Thread[RAudioDevice]
   RAudioDevice* = ref RAudioDeviceObj
 
 proc limit(val: float): float =
@@ -135,34 +136,26 @@ proc attach*(device: RAudioDevice, sampler: RSampler) =
   ## play from multiple samplers at once.
   device.sampler = sampler
 
-proc start*(device: RAudioDevice) =
-  ## Starts playback from the audio device, using the attached sampler to
-  ## generate audio samples.
-  ## After the device is started, either ``poll`` or ``wait`` must be called
-  ## to prevent deadlocks. Check their respective documentation for usage.
+proc rawStart(device: RAudioDevice) =
   var error: cint
   if (error = soundio_outstream_start(device.ostream); error != 0):
     raise newException(AudioError,
       "Unable to start playback: " & $soundio_strerror(error))
 
-proc wait*(device: RAudioDevice) =
-  ## Blocks program execution to allow audio playback. Use this in a while loop
-  ## when you do not use a graphics context.
+proc wait(device: RAudioDevice) =
   runnableExamples:
     while true:
-      # waits until the program is interrupted
       device.wait()
-
   soundio_wait_events(device.sio)
 
-proc poll*(device: RAudioDevice) =
-  ## Flushes the device's events. This should be called every frame of a game
-  ## loop.
-  runnableExamples:
-    win.loop:
-      draw ctx, step:
-        discard
-      update step:
-        device.poll
+proc devicePollThread(device: RAudioDevice) {.thread.} =
+  device.rawStart()
+  while true:
+    device.wait()
 
-  soundio_flush_events(device.sio)
+proc start*(device: RAudioDevice) =
+  ## Starts playback from the audio device, using the attached sampler to
+  ## generate audio samples.
+  ## After the device is started, either ``poll`` or ``wait`` must be called
+  ## to prevent deadlocks. Check their respective documentation for usage.
+  createThread(device.pollThread, devicePollThread, device)

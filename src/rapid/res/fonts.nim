@@ -125,13 +125,13 @@ proc widthOf*(font: RFont, text: string): float =
 proc widthOf*(font: RFont, ch: char): float =
   result = font.widthOf(ch.Rune)
 
-proc lineSpacing*(font: RFont): float = font.lineSpacing
+proc lineSpacing*(font: RFont): float = font.fLineSpacing
 proc `lineSpacing=`*(font: RFont, spacing: float) =
-  font.lineSpacing = spacing
+  font.fLineSpacing = spacing
 
-proc tabWidth*(font: RFont): float = font.tabWidth
+proc tabWidth*(font: RFont): float = font.fTabWidth
 proc `tabWidth=`*(font: RFont, width: float) =
-  font.tabWidth = width
+  font.fTabWidth = width
 
 proc horzAlign*(font: RFont): RTextHAlign = font.fHAlign
 proc `horzAlign=`*(font: RFont, align: RTextHAlign) =

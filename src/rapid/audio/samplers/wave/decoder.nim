@@ -8,11 +8,8 @@
 ## Audio file decoder interface.
 
 import os
-import streams
 
 import ../../../lib/oggvorbis
-import ../../audiosettings
-import ../../samplerutils
 
 type
   AudioDecodeError* = object of Exception

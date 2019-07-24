@@ -9,8 +9,6 @@
 ## They are semi low-level, to avoid audio slowdowns and underruns.
 ## This is a base implementation which outputs silence.
 
-import macros
-
 import samplerutils
 
 type

@@ -12,7 +12,6 @@ import math
 
 import wave/decoder
 import ../audiosettings
-import ../samplerutils
 import ../sampler
 
 type

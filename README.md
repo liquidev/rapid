@@ -215,6 +215,10 @@ rapid provides a natural API for audio playback. It revolves around the idea of
 connecting different samplers together to produce sound, while maintaining
 easy-to-understand code without global state.
 
+To use rapid/audio, compile your program with ``--threads:on``. You can easily
+add this to nim.cfg or config.nims to save yourself the hassle of passing the
+argument each time you want to compile your program.
+
 ```nim
 import os
 
@@ -244,15 +248,10 @@ dev.start()
 music.play()
 
 # To prevent the program from closing immediately, we use a while true loop.
-# The same can be done using a game loop.
 while true:
   # Play our jump sample every second
   jump.play()
   sleep(1000)
-  # Poll for any events, such as the program quitting.
-  # This must be called in a loop, eg. a game loop, to stop the audio playback
-  # thread when we're done.
-  device.poll()
 
 ```
 
