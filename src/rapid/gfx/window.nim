@@ -40,7 +40,7 @@ proc initGlfw(): InitErrorKind =
     return ieGlfwInitFailed
   addQuitProc() do:
     glfw.terminate()
-  discard glfw.setErrorCallback do (errCode: int32, msg: cstring):
+  discard glfw.setErrorCallback do (errCode: int32, msg: cstring) {.cdecl.}:
     var err = newException(GLFWError, $msg)
     err.code = int errCode
     raise err
@@ -193,22 +193,22 @@ proc glfwCallbacks(win: var RWindow) =
     let win = cast[RWindow](glfw.getWindowUserPointer(w))
     for cb in win.callbacks.name: body
   discard glfw.setCharModsCallback(win.handle,
-    proc (w: glfw.Window, uchar: cuint, mods: int32) =
+    proc (w: glfw.Window, uchar: cuint, mods: int32) {.cdecl.} =
       run(onChar): cb(win, Rune(uchar), mods))
   discard glfw.setCursorEnterCallback(win.handle,
-    proc (w: glfw.Window, entered: int32) =
+    proc (w: glfw.Window, entered: int32) {.cdecl.} =
       if entered == 1:
         run(onCursorEnter, cb(win))
       else:
         run(onCursorLeave, cb(win)))
   discard glfw.setCursorPosCallback(win.handle,
-    proc (w: glfw.Window, x, y: cdouble) =
+    proc (w: glfw.Window, x, y: cdouble) {.cdecl.} =
       run(onCursorMove, cb(win, x, y)))
   discard glfw.setDropCallback(win.handle,
-    proc (w: glfw.Window, n: int32, files: cstringArray) =
+    proc (w: glfw.Window, n: int32, files: cstringArray) {.cdecl.} =
       run(onFilesDropped, cb(win, cstringArrayToSeq(files, n))))
   discard glfw.setKeyCallback(win.handle,
-    proc (w: glfw.Window, key, scan, action, mods: int32) =
+    proc (w: glfw.Window, key, scan, action, mods: int32) {.cdecl.} =
       case glfw.KeyAction(action)
       of glfw.kaDown:
         run(onKeyPress, cb(win, glfw.Key(key), int scan, mods))
@@ -217,7 +217,7 @@ proc glfwCallbacks(win: var RWindow) =
       of glfw.kaRepeat:
         run(onKeyRepeat, cb(win, glfw.Key(key), int scan, mods)))
   discard glfw.setMouseButtonCallback(win.handle,
-    proc (w: glfw.Window, button, action, mods: int32) =
+    proc (w: glfw.Window, button, action, mods: int32) {.cdecl.} =
       case glfw.KeyAction(action)
       of glfw.kaDown:
         run(onMousePress, cb(win, glfw.MouseButton(button), mods))
@@ -225,15 +225,15 @@ proc glfwCallbacks(win: var RWindow) =
         run(onMouseRelease, cb(win, glfw.MouseButton(button), mods))
       else: discard)
   discard glfw.setScrollCallback(win.handle,
-    proc (w: glfw.Window, x, y: cdouble) =
+    proc (w: glfw.Window, x, y: cdouble) {.cdecl.} =
       run(onScroll, cb(win, x, y)))
   discard glfw.setWindowCloseCallback(win.handle,
-    proc (w: glfw.Window) =
+    proc (w: glfw.Window) {.cdecl.} =
       var close = true
       run(onClose): close = close and cb(win)
       glfw.setWindowShouldClose(w, int32 close))
   discard glfw.setWindowSizeCallback(win.handle,
-    proc (w: glfw.Window, width, height: int32) =
+    proc (w: glfw.Window, width, height: int32) {.cdecl.} =
       run(onResize, cb(win, width, height)))
 
 converter toInt32(hint: glfw.Hint): int32 =

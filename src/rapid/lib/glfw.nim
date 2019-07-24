@@ -341,24 +341,24 @@ type
 type
   OpenGlProc* = proc () {.cdecl.}
   Vkproc* = proc () {.cdecl.}
-  Errorfun* = proc (a2: int32; a3: cstring) {.closure.}
-  Windowposfun* = proc (a2: Window; a3: int32; a4: int32) {.closure.}
-  Windowsizefun* = proc (a2: Window; a3: int32; a4: int32) {.closure.}
-  Windowclosefun* = proc (a2: Window) {.closure.}
-  Windowrefreshfun* = proc (a2: Window) {.closure.}
-  Windowfocusfun* = proc (a2: Window; a3: int32) {.closure.}
-  Windowiconifyfun* = proc (a2: Window; a3: int32) {.closure.}
-  Framebuffersizefun* = proc (a2: Window; a3: int32; a4: int32) {.closure.}
-  Mousebuttonfun* = proc (a2: Window; a3: int32; a4: int32; a5: int32) {.closure.}
-  Cursorposfun* = proc (a2: Window; a3: cdouble; a4: cdouble) {.closure.}
-  Cursorenterfun* = proc (a2: Window; a3: int32) {.closure.}
-  Scrollfun* = proc (a2: Window; a3: cdouble; a4: cdouble) {.closure.}
-  Keyfun* = proc (a2: Window; a3: int32; a4: int32; a5: int32; a6: int32) {.closure.}
-  Charfun* = proc (a2: Window; a3: cuint) {.closure.}
-  Charmodsfun* = proc (a2: Window; a3: cuint; a4: int32) {.closure.}
-  Dropfun* = proc (a2: Window; a3: int32; a4: cstringArray) {.closure.}
-  Monitorfun* = proc (a2: Monitor; a3: int32) {.closure.}
-  Joystickfun* = proc (a2: int32; a3: int32) {.closure.}
+  Errorfun* = proc (a2: int32; a3: cstring) {.cdecl.}
+  Windowposfun* = proc (a2: Window; a3: int32; a4: int32) {.cdecl.}
+  Windowsizefun* = proc (a2: Window; a3: int32; a4: int32) {.cdecl.}
+  Windowclosefun* = proc (a2: Window) {.cdecl.}
+  Windowrefreshfun* = proc (a2: Window) {.cdecl.}
+  Windowfocusfun* = proc (a2: Window; a3: int32) {.cdecl.}
+  Windowiconifyfun* = proc (a2: Window; a3: int32) {.cdecl.}
+  Framebuffersizefun* = proc (a2: Window; a3: int32; a4: int32) {.cdecl.}
+  Mousebuttonfun* = proc (a2: Window; a3: int32; a4: int32; a5: int32) {.cdecl.}
+  Cursorposfun* = proc (a2: Window; a3: cdouble; a4: cdouble) {.cdecl.}
+  Cursorenterfun* = proc (a2: Window; a3: int32) {.cdecl.}
+  Scrollfun* = proc (a2: Window; a3: cdouble; a4: cdouble) {.cdecl.}
+  Keyfun* = proc (a2: Window; a3: int32; a4: int32; a5: int32; a6: int32) {.cdecl.}
+  Charfun* = proc (a2: Window; a3: cuint) {.cdecl.}
+  Charmodsfun* = proc (a2: Window; a3: cuint; a4: int32) {.cdecl.}
+  Dropfun* = proc (a2: Window; a3: int32; a4: cstringArray) {.cdecl.}
+  Monitorfun* = proc (a2: Monitor; a3: int32) {.cdecl.}
+  Joystickfun* = proc (a2: int32; a3: int32) {.cdecl.}
 
 import macros
 from strutils import toUpperAscii
