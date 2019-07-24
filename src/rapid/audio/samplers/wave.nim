@@ -43,6 +43,7 @@ proc initRWave*(wave: RWave, filename: string) =
   wave.initRSampler()
   wave.decoder = newRAudioDecoder(filename)
   wave.playing = false
+  wave.convBuffer = newSeq[float](4096)
 
 proc newRWave*(filename: string): RWave =
   ## Creates a new wave file sampler.
