@@ -190,6 +190,8 @@ type
     vboSize, eboSize: int
     # Projection
     projection: Mat4f
+    # Rendering
+    fVsync: bool
 
 proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
   ## Creates a new ``RProgram`` from the specified shaders.
@@ -255,6 +257,10 @@ proc width*(gfx: RGfx): float = gfx.fWidth.float
 proc height*(gfx: RGfx): float = gfx.fHeight.float
 
 proc canvas*(gfx: RGfx): RCanvas = gfx.fCanvas
+
+proc vsync*(gfx: RGfx): bool = gfx.fVsync
+proc `vsync=`*(gfx: RGfx, enabled: bool) =
+  gfx.fVsync = enabled
 
 proc reallocVbo(gfx: RGfx) =
   glBufferData(GL_ARRAY_BUFFER,
@@ -341,7 +347,8 @@ proc openGfx*(win: RWindow, fxTexConfig = DefaultTextureConfig): RGfx =
   result = RGfx(
     win: win,
     fWidth: win.width,
-    fHeight: win.height
+    fHeight: win.height,
+    fVsync: true
   )
   result.init()
 
@@ -877,7 +884,7 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
   if drawBody.isNil: error("Missing draw event", body)
   if updateBody.isNil: error("Missing update event", body)
   result = quote do:
-    glfw.swapInterval(1)
+    glfw.swapInterval(int32(`gfx`.vsync))
 
     let millisPerUpdate = calcMillisPerFrame()
     const millisPer60fps = 1 / 60
