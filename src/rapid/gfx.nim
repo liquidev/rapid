@@ -884,7 +884,7 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
       initCtxName = st[1]
       initBody = st[2]
     else:
-      error("Invalid loop event! Must be 'draw' or 'update'", st)
+      error("Invalid loop event! Must be 'init', 'draw' or 'update'", st)
   if initBody.isNil: error("Missing init event", body)
   if drawBody.isNil: error("Missing draw event", body)
   if updateBody.isNil: error("Missing update event", body)
