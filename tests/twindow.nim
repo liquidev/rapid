@@ -164,6 +164,8 @@ proc main() =
     ctx.lineWidth = 1
 
   gfx.loop:
+    init ctx:
+      discard ctx
     draw ctx, step:
       ctx.clear(gray(32))
       ctx.clearStencil(255)

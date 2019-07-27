@@ -863,8 +863,8 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
   # What this macro does can technically be done using a proc, but for some
   # reason doing so causes a segmentation fault under Windows.
   var
-    drawBody, updateBody: NimNode
-    drawCtxName, drawStepName, updateStepName: NimNode
+    initBody, drawBody, updateBody: NimNode
+    initCtxName, drawCtxName, drawStepName, updateStepName: NimNode
   body.expectKind(nnkStmtList)
   for st in body:
     st.expectKind(nnkCommand)
@@ -879,12 +879,23 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
       st[2].expectKind(nnkStmtList)
       updateStepName = st[1]
       updateBody = st[2]
+    elif st[0].eqIdent("init"):
+      st[2].expectKind(nnkStmtList)
+      initCtxName = st[1]
+      initBody = st[2]
     else:
       error("Invalid loop event! Must be 'draw' or 'update'", st)
+  if initBody.isNil: error("Missing init event", body)
   if drawBody.isNil: error("Missing draw event", body)
   if updateBody.isNil: error("Missing update event", body)
   result = quote do:
     glfw.swapInterval(int32(`gfx`.vsync))
+
+    block init:
+      # Render 2 frames to fill both buffers
+      for frame in 1..2:
+        `gfx`.render(`initCtxName`):
+          `initBody`
 
     let millisPerUpdate = calcMillisPerFrame()
     const millisPer60fps = 1 / 60
@@ -909,5 +920,5 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
 
       block draw:
         let `drawStepName` = delta / millisPer60fps
-        `gfx`.render `drawCtxName`:
+        `gfx`.render(`drawCtxName`):
           `drawBody`
