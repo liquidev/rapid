@@ -863,8 +863,10 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
   # What this macro does can technically be done using a proc, but for some
   # reason doing so causes a segmentation fault under Windows.
   var
-    initBody, drawBody, updateBody: NimNode
-    initCtxName, drawCtxName, drawStepName, updateStepName: NimNode
+    drawBody, updateBody: NimNode
+    drawCtxName, drawStepName, updateStepName: NimNode
+    initBody = newNimNode(nnkStmtList)
+    initCtxName = ident"ctx"
   body.expectKind(nnkStmtList)
   for st in body:
     st.expectKind(nnkCommand)
@@ -885,7 +887,6 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
       initBody = st[2]
     else:
       error("Invalid loop event! Must be 'init', 'draw' or 'update'", st)
-  if initBody.isNil: error("Missing init event", body)
   if drawBody.isNil: error("Missing draw event", body)
   if updateBody.isNil: error("Missing update event", body)
   result = quote do:
