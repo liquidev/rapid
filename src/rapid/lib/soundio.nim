@@ -65,8 +65,10 @@ elif defined(macosx):
   # I don't have a way of testing this, contributions welcome
   discard
 else:
-  const pass = "-lpthread -lasound -lpulse -ljack"
-  {.passL: pass.}
+  {.passL: "-lpthread " &
+    (if ALSAAvailable: "-lasound " else: "") &
+    (if PulseAudioAvailable: "-lpulse " else: "") &
+    (if JACKAvailable: "-ljack" else: "").}
 
 cImport(Incl/"soundio.h")
 
