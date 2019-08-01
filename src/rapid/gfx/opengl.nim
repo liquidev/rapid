@@ -11,7 +11,7 @@ import ../lib/glad/gl
 from ../lib/glfw import nil
 
 type
-  GLError* = object of Exception
+  GLError* = object of Defect
   GLContext* = ref object
     ## An object used for storing OpenGL state.
     window*: glfw.Window

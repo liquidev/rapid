@@ -15,7 +15,7 @@ when not compileOption("threads"):
   {.error: "rapid/audio must be compiled with --threads:on".}
 
 type
-  AudioError* = object of Exception
+  AudioError* = object of CatchableError
   RAudioDeviceObj = object
     sio: ptr SoundIo
     device: ptr SoundIoDevice
@@ -142,20 +142,13 @@ proc rawStart(device: RAudioDevice) =
     raise newException(AudioError,
       "Unable to start playback: " & $soundio_strerror(error))
 
-proc wait(device: RAudioDevice) =
-  runnableExamples:
-    while true:
-      device.wait()
-  soundio_wait_events(device.sio)
-
 proc devicePollThread(device: RAudioDevice) {.thread.} =
   device.rawStart()
   while true:
-    device.wait()
+    soundio_flush_events(device.sio)
 
 proc start*(device: RAudioDevice) =
   ## Starts playback from the audio device, using the attached sampler to
   ## generate audio samples.
-  ## After the device is started, either ``poll`` or ``wait`` must be called
-  ## to prevent deadlocks. Check their respective documentation for usage.
+  ## This creates a new thread in which the device is polled for any events.
   createThread(device.pollThread, devicePollThread, device)

@@ -12,7 +12,7 @@ import os
 import ../../../lib/oggvorbis
 
 type
-  AudioDecodeError* = object of Exception
+  AudioDecodeError* = object of CatchableError
   RAudioDecoderKind* = enum
     adkVorbis
   RAudioDecoderMode* = enum
@@ -31,7 +31,9 @@ type
       sample: seq[int16]
       samplePos: int
     of admStream:
-      discard
+      readBuffer: array[4096, int16]
+      readPos: int
+      remapBuffer: array[8, int16]
 
     case kind*: RAudioDecoderKind
     of adkVorbis:
@@ -100,6 +102,43 @@ proc preload(decoder: RAudioDecoder) =
     decoder.samplePos = 0
     decoder.preloadVorbis()
 
+proc fillBufferVorbis(decoder: RAudioDecoder) =
+  var
+    bitstream: cint
+    totalDecoded = 0
+    byteReadBuffer = cast[ptr UncheckedArray[uint8]](addr decoder.readBuffer)
+  while totalDecoded < sizeof(decoder.readBuffer):
+    let decoded = ov_read(addr decoder.vorbisFile,
+                          cast[cstring](
+                            byteReadBuffer[totalDecoded].unsafeAddr),
+                          cint(sizeof(decoder.readBuffer) - totalDecoded),
+                          cint(cpuEndian == bigEndian), 2, 1,
+                          addr bitstream)
+    if decoded in [OV_HOLE, OV_EBADLINK, OV_EINVAL]:
+      raise newException(AudioDecodeError,
+        "The Vorbis file is invalid or corrupted")
+    totalDecoded += decoded
+  decoder.readPos = 0
+
+proc streamVorbis(decoder: RAudioDecoder, dest: var seq[float], count: int) =
+  for i in 0..<count:
+    for ch in 0..<decoder.channels:
+      if decoder.readPos > decoder.readBuffer.high:
+        decoder.fillBufferVorbis()
+      decoder.remapBuffer[ch] = decoder.readBuffer[decoder.readPos]
+      inc(decoder.readPos)
+    let
+      left16 = decoder.remapBuffer[ChannelRemapTable[decoder.channels][0]]
+      right16 = decoder.remapBuffer[ChannelRemapTable[decoder.channels][1]]
+    dest.add([
+      left16 / high(int16),
+      right16 / high(int16)
+    ])
+
+proc stream(decoder: RAudioDecoder, dest: var seq[float], count: int) =
+  case decoder.kind
+  of adkVorbis: decoder.streamVorbis(dest, count)
+
 proc closeVorbis(decoder: RAudioDecoder) =
   discard ov_clear(addr decoder.vorbisFile)
 
@@ -115,7 +154,7 @@ proc newRAudioDecoder*(filename: string, mode = admSample): RAudioDecoder =
   let (_, _, ext) = filename.splitFile()
   case ext
   of ".ogg":
-    result = RAudioDecoder(kind: adkVorbis)
+    result = RAudioDecoder(kind: adkVorbis, mode: mode)
     if result.file.open(filename):
       if ov_open_callbacks(result.file, addr result.vorbisFile, nil, 0,
                            OggCallbacks) < 0:
@@ -133,7 +172,8 @@ proc newRAudioDecoder*(filename: string, mode = admSample): RAudioDecoder =
   if mode == admSample:
     result.preload()
   else:
-    discard # TODO: Sample streaming
+    case result.kind
+    of adkVorbis: result.fillBufferVorbis()
 
 proc seekSampleVorbis(decoder: RAudioDecoder, sample: int) =
   let result = ov_pcm_seek(addr decoder.vorbisFile, sample.ogg_int64_t)
@@ -177,4 +217,4 @@ proc read*(decoder: RAudioDecoder, dest: var seq[float], count: int) =
     if decoder.samplePos * 2 > decoder.sample.len:
       decoder.atEnd = true
   of admStream:
-    discard # TODO: Implement streaming samples from disk
+    decoder.stream(dest, count)

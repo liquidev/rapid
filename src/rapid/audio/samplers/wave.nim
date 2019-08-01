@@ -13,12 +13,17 @@ import math
 import wave/decoder
 import ../audiosettings
 import ../sampler
+import ../samplerutils
+import ../../math/interpolation
+
+export RAudioDecoderMode
 
 type
   RWave* = ref object of RSampler
     decoder: RAudioDecoder
     convBuffer: seq[float]
-    playing: bool
+    playing, loop: bool
+    interpolation: InterpFunc
 
 method sample*(wave: RWave, dest: var seq[float], count: int) =
   ## Reads ``count`` samples of the wave file into ``dest``, if it's playing.
@@ -31,24 +36,28 @@ method sample*(wave: RWave, dest: var seq[float], count: int) =
     for n in 0..<count:
       let
         i = n.float * rateRatio
-        l = wave.convBuffer[int(i * 2)]
-        r = wave.convBuffer[int(i * 2 + 1)]
+        (l, r) = interpChannels(wave.convBuffer, i, wave.interpolation)
+        # l = wave.convBuffer[int(i * 2)]
+        # r = wave.convBuffer[int(i * 2 + 1)]
       dest.add([l, r])
   else:
     for n in 0..<count:
       dest.add([0.0, 0.0])
 
-proc initRWave*(wave: RWave, filename: string) =
+proc initRWave*(wave: RWave, filename: string, decodeMode = admSample,
+                interpolation = linear) =
   ## Initializes a wave file sampler.
   wave.initRSampler()
-  wave.decoder = newRAudioDecoder(filename)
+  wave.decoder = newRAudioDecoder(filename, decodeMode)
   wave.playing = false
   wave.convBuffer = newSeq[float](4096)
+  wave.interpolation = interpolation
 
-proc newRWave*(filename: string): RWave =
+proc newRWave*(filename: string, decodeMode = admSample,
+               interpolation = hermite): RWave =
   ## Creates a new wave file sampler.
   new(result)
-  result.initRWave(filename)
+  result.initRWave(filename, decodeMode, interpolation)
 
 proc play*(wave: RWave) =
   ## Plays the wave file.
@@ -69,3 +78,7 @@ proc stop*(wave: RWave) =
 
 proc finished*(wave: RWave): bool =
   result = wave.decoder.atEnd
+
+proc loop*(wave: RWave): bool = wave.loop
+proc `loop=`*(wave: RWave, enabled: bool) =
+  wave.loop = enabled

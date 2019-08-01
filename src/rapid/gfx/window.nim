@@ -32,7 +32,7 @@ type
     ieOK = "Init successful"
     ieGlfwInitFailed = "Failed to initialize GLFW"
     ieGladLoadFailed = "Failed to load OpenGL procs"
-  GLFWError* = object of Exception
+  GLFWError* = object of Defect
     code: int
 
 proc initGlfw(): InitErrorKind =

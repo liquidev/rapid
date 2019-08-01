@@ -42,7 +42,7 @@ type
     fLineSpacing, fTabWidth: float
     fHAlign: RTextHAlign
     fVAlign: RTextVAlign
-  FreetypeError* = object of Exception
+  FreetypeError* = object of CatchableError
 
 var freetypeLib*: FT_Library
 

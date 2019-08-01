@@ -180,32 +180,6 @@ proc main() =
       ctx.draw()
       ctx.noTexture
       ctx.drawWindow(fx, eff, 32, 32, 128, 128)
-      # ctx.clearStencil(255)
-      # fx.begin(ctx, copyTarget = true)
-      # stencil(ctx, saInvert, 0):
-      #   ctx.begin()
-      #   let
-      #     a = rand(128..256)
-      #     b = rand(128..256)
-      #   ctx.rect(rand(0..<gfx.width.int - a).float,
-      #            rand(0..<gfx.height.int - b).float,
-      #            a.float, b.float)
-      #   ctx.draw()
-      # fx.effect(eff, stencil = true)
-      # fx.finish()
-
-      # ctx.text(rubik, gfx.width / 2, 0, "effect testing")
-
-      # ctx.begin()
-      # ctx.color = gray(0, 128)
-      # ctx.rrect(32, 32, 128, 128, 32)
-      # ctx.draw()
-
-      # ctx.lineSmooth = true
-      # ctx.begin()
-      # ctx.color = gray(255)
-      # ctx.lrrect(32, 32, 128, 128, 32)
-      # ctx.draw(prLineShape)
     update step:
       map.update(step)
 

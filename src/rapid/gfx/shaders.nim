@@ -20,7 +20,7 @@ type
   RShaderKind* = enum
     shVertex
     shFragment
-  ShaderError* = object of Exception
+  ShaderError* = object of Defect
 
 proc newRShader*(kind: RShaderKind, source: string): RShader =
   ## Creates a new vertex or fragment shader, as specified by ``kind``, and
@@ -46,7 +46,7 @@ type
   RProgram* = ref object
     id*: GLuint
     uniformLocations: Table[string, GLint]
-  ProgramError* = object of Exception
+  ProgramError* = object of Defect
 
 proc newRProgram*(): RProgram =
   ## Creates a new ``RProgram``.
