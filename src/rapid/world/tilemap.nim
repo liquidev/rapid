@@ -15,9 +15,10 @@ import ../gfx
 export worldbase
 
 type
-  RTileImpl*[T] = object
+  RTileImpl*[T] = tuple
     initImpl: proc (): T
     isSolidImpl: proc (tile: T): bool
+    hitboxImpl: proc (x, y: float, tile: T): RAABounds {.closure.}
   RTmWorld*[T] = ref object of RWorld
     width*, height*: Natural
 
@@ -43,11 +44,13 @@ proc `oobTile=`*[T](wld: var RTmWorld[T], tile: T) =
 
 proc implTile*[T](wld: RTmWorld[T],
                   initImpl: proc (): T,
-                  isSolidImpl: proc (t: T): bool) =
-  wld.tile = RTileImpl[T](
+                  isSolidImpl: proc (t: T): bool,
+                  hitboxImpl: proc (x, y: float, t: T): RAABounds) =
+  wld.tile = (
     initImpl: initImpl,
-    isSolidImpl: isSolidImpl
-  )
+    isSolidImpl: isSolidImpl,
+    hitboxImpl: hitboxImpl
+  ).RTileImpl[:T]
 
 proc getX(wld: RTmWorld, x: int): int =
   result =
@@ -170,8 +173,7 @@ proc update*[T](wld: RTmWorld[T], step: float) =
 
     for x, y, t in areab(wld, st.top, st.left, st.bottom, st.right): # X
       if wld.isSolid(x, y):
-        let t = newRAABB(x.float * wld.tileWidth, y.float * wld.tileWidth,
-                         wld.tileWidth, wld.tileHeight)
+        let t = wld.tile.hitboxImpl(x.float, y.float, t)
         if spr.vel.x > 0.001 and not wld.isSolid(x - 1, y):
           let w = newRAABB(t.left, t.top + 1,
                            spr.vel.x * 1.5, t.height - 2)
@@ -193,8 +195,7 @@ proc update*[T](wld: RTmWorld[T], step: float) =
 
     for x, y, t in areab(wld, st.top, st.left, st.bottom, st.right): # Y
       if wld.isSolid(x, y):
-        let t = newRAABB(x.float * wld.tileWidth, y.float * wld.tileWidth,
-                         wld.tileWidth, wld.tileHeight)
+        let t = wld.tile.hitboxImpl(x.float, y.float, t)
         if spr.vel.y > 0.001 and not wld.isSolid(x, y - 1):
           let w = newRAABB(t.left + 1, t.top,
                            t.width - 2, spr.vel.y * 1.5)
