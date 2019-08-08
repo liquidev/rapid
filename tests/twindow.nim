@@ -6,7 +6,7 @@ import times
 import rapid/res/[textures, fonts]
 import rapid/gfx, rapid/gfx/[fxsurface, texatlas, text]
 import rapid/lib/glad/gl
-import rapid/world/[sprite, tilemap]
+import rapid/world/[aabb, sprite, tilemap]
 
 type
   Tile = object
@@ -20,6 +20,9 @@ proc initTile*(): Tile =
 
 proc isSolid*(t: Tile): bool =
   result = t.solid
+
+proc hitbox(x, y: float, t: Tile): RAABounds =
+  result = newRAABB(x * 8, y * 8, 8, 8)
 
 proc tt(x, y: int): Tile = Tile(tileX: x, tileY: y, solid: false)
 proc at(): Tile = tt(0, 0)
@@ -115,7 +118,7 @@ proc main() =
 
   let atl = newRAtlas(tileset, 8, 8, 1)
 
-  map.implTile(initImpl = initTile, isSolidImpl = isSolid)
+  map.implTile(initImpl = initTile, isSolidImpl = isSolid, hitboxImpl = hitbox)
   map.init()
   map.load(Map)
 
@@ -178,8 +181,8 @@ proc main() =
       ctx.texture = mapCanvas
       ctx.rect(0, 0, gfx.width.float, gfx.height.float)
       ctx.draw()
-      ctx.noTexture
-      ctx.drawWindow(fx, eff, 32, 32, 128, 128)
+      ctx.noTexture()
+      # ctx.drawWindow(fx, eff, 32, 32, 128, 128)
     update step:
       map.update(step)
 
