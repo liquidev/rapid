@@ -55,14 +55,8 @@ To install rapid, use the following command:
 $ nimble install rapid
 ```
 
-Extra prerequisites:
-
- - git
 
 ### Windows
-
-*Not tested. If you're willing to test rapid on Windows, please verify that all
-the tests run correctly and report this here.*
 
 rapid should work fine on Windows out of the box, no outside dependencies.
 
