@@ -22,7 +22,7 @@ const
 static:
   assert cshort.sizeof == int16.sizeof and cint.sizeof == int32.sizeof,
     "Not binary-compatible with GLFW. Please report this."
-  gitPull("https://github.com/glfw/glfw", BaseDir, "include/*\nsrc/*\n",
+  gitPull("https://github.com/glfw/glfw.git", BaseDir, "include/*\nsrc/*\n",
           checkout = "#latest")
 
 cIncludeDir(Incl)

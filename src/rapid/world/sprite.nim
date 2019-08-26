@@ -10,9 +10,6 @@ import glm
 import ../gfx
 
 type
-  RSpriteImpl* = tuple
-    draw: proc (ctx: RGfxContext, spr: var RSprite, step: float) {.nimcall.}
-    update: proc (spr: var RSprite, step: float) {.nimcall.}
   RSprite* = ref object of RootObj
     width*, height*: float
     pos*, vel*, acc*: Vec2[float]

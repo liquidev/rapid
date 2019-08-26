@@ -5,8 +5,6 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
-import math
-
 import aabb
 import sprite
 import worldbase
@@ -153,8 +151,7 @@ proc collectGarbage(wld: RTmWorld) =
 
 proc update*[T](wld: RTmWorld[T], step: float) =
   ## Updates the world, simulating physics on its sprites.
-  assert (not wld.tile.isSolidImpl.isNil),
-    "Cannot update an uninitialized world"
+  assert wld.tile.isSolidImpl != nil, "Cannot update an uninitialized world"
   wld.collectGarbage()
   var sprites = wld.sprites
   for spr in sprites:

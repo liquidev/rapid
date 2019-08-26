@@ -373,7 +373,7 @@ type
     sLineWidth: float
     sLineSmooth: bool
     # Transformations
-    fTransform: Mat3f
+    fTransform: Mat3[float]
   RVertex* = tuple
     x, y: float
     color: RColor
@@ -443,37 +443,37 @@ proc defaultProgram*(ctx: RGfxContext) =
   ## Binds the default shader program.
   ctx.`program=`(ctx.fGfx.defaultProgram)
 
-proc `transform=`*(ctx: RGfxContext, transform: Mat3f) =
+proc `transform=`*(ctx: RGfxContext, transform: Mat3[float]) =
   ctx.fTransform = transform
-proc transform*(ctx: RGfxContext): Mat3f = ctx.fTransform
+proc transform*(ctx: RGfxContext): Mat3[float] = ctx.fTransform
 
 proc translate*(ctx: RGfxContext, x, y: float) =
   ## Translates the transform matrix.
-  ctx.transform = ctx.transform * mat3f(
-    vec3f(1.0, 0.0, 0.0),
-    vec3f(0.0, 1.0, 0.0),
-    vec3f(x, y, 1.0)
+  ctx.transform = ctx.transform * mat3(
+    vec3(1.0, 0.0, 0.0),
+    vec3(0.0, 1.0, 0.0),
+    vec3(x, y, 1.0)
   )
 
 proc scale*(ctx: RGfxContext, x, y: float) =
   ## Scales the transform matrix.
-  ctx.transform = ctx.transform * mat3f(
-    vec3f(x, 0.0, 0.0),
-    vec3f(0.0, y, 0.0),
-    vec3f(0.0, 0.0, 1.0)
+  ctx.transform = ctx.transform * mat3(
+    vec3(x, 0.0, 0.0),
+    vec3(0.0, y, 0.0),
+    vec3(0.0, 0.0, 1.0)
   )
 
 proc rotate*(ctx: RGfxContext, angle: float) =
   ## Rotates the transform matrix.
-  ctx.transform = ctx.transform * mat3f(
-    vec3f(cos(angle), sin(angle), 0.0),
-    vec3f(-sin(angle), cos(angle), 0.0),
-    vec3f(0.0, 0.0, 1.0)
+  ctx.transform = ctx.transform * mat3(
+    vec3(cos(angle), sin(angle), 0.0),
+    vec3(-sin(angle), cos(angle), 0.0),
+    vec3(0.0, 0.0, 1.0)
   )
 
 proc resetTransform*(ctx: RGfxContext) =
   ## Resets the transform matrix.
-  ctx.transform = mat3f(1.0)
+  ctx.transform = mat3(1.0)
 
 template transform*(ctx: RGfxContext, body: untyped): untyped =
   ## Isolates the current transform matrix, returning to the previous one \
@@ -544,10 +544,10 @@ proc vertex*(ctx: RGfxContext,
              vert: RVertex): RVertexIndex {.discardable.} =
   ## Adds a vertex to the shape.
   result = RVertexIndex(ctx.vertexCount)
-  let p = ctx.transform * vec3f(vert.x, vert.y, 1.0)
+  let p = ctx.transform * vec3(vert.x, vert.y, 1.0)
   ctx.shape.add([
     # Position
-    p.x, p.y,
+    p.x.float32, p.y.float32,
     # Color
     vert.color.red, vert.color.green, vert.color.blue,
     vert.color.alpha,
@@ -676,10 +676,10 @@ proc lrect*(ctx: RGfxContext, x, y, w, h: float) =
   let
     w = w - 1
     h = h - 1
-  ctx.line((x - 0.5,     y,         ), (x + w + 0.5, y))
-  ctx.line((x + w,       y - 0.5,   ), (x + w,       y + h + 0.5))
-  ctx.line((x + w + 0.5, y + h,     ), (x - 0.5,     y + h))
-  ctx.line((x,           y + h + 0.5), (x,           y - 0.5))
+  ctx.line((x,     y),     (x + w, y))
+  ctx.line((x + w, y),     (x + w, y + h))
+  ctx.line((x + w, y + h), (x,     y + h))
+  ctx.line((x,     y + h), (x,     y))
 
 proc lcircle*(ctx: RGfxContext, x, y, r: float, points = 32) =
   ## Adds a circle outline, with the specified center and radius. An amount of \
@@ -796,7 +796,7 @@ proc ctx*(gfx: RGfx): RGfxContext =
     fCanvas: gfx.canvas,
     sColor: gray(255),
     sLineWidth: 1,
-    fTransform: mat3(vec3(1.0'f32, 1.0, 1.0))
+    fTransform: mat3(vec3(1.0, 1.0, 1.0))
   )
   result.defaultProgram()
   result.updateUniforms()
@@ -824,13 +824,13 @@ template render*(gfx: RGfx, ctxVar, body: untyped): untyped =
   ## Renders a single frame onto the specified window.
   with(gfx.win):
     var ctxVar {.inject.} = gfx.ctx()
+    glfw.swapBuffers(gfx.win.handle)
+    glfw.pollEvents()
     withFramebuffer(currentGlc, 0):
       glBindVertexArray(gfx.vaoID)
       glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gfx.eboID)
       body
-    glfw.swapBuffers(gfx.win.handle)
-    glfw.pollEvents()
 
 proc calcMillisPerFrame(): float =
   let
