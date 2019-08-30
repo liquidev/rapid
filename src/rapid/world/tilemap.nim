@@ -38,12 +38,16 @@ proc isInbounds*(wld: RTmWorld, x, y: int): bool =
     (wld.wrapY or y >= 0 and y < wld.height)
 
 proc `oobTile=`*[T](wld: var RTmWorld[T], tile: T) =
+  ## Set an out of bounds tile. This tile is used as a placeholder for
+  ## collision detection out of bounds.
   wld.oobTile = tile
 
 proc implTile*[T](wld: RTmWorld[T],
                   initImpl: proc (): T,
                   isSolidImpl: proc (t: T): bool,
                   hitboxImpl: proc (x, y: float, t: T): RAABounds) =
+  ## Set implementation for all tile-related procedures. This must be called
+  ## with non-nil values for the world to properly function.
   wld.tile = (
     initImpl: initImpl,
     isSolidImpl: isSolidImpl,
@@ -77,11 +81,15 @@ proc `[]=`*[T](wld: RTmWorld[T], x, y: int, tile: T) =
     if not wld.onModify.isNil: wld.onModify(x, y, oldTile, tile)
 
 proc isSolid*(wld: RTmWorld, x, y: int): bool =
+  ## Returns whether a tile at the specified coordinates is a solid tile, using
+  ## the specified ``isSolid`` implementation.
   result = wld.tile.isSolidImpl(wld[x, y])
 
 proc init*[T](wld: RTmWorld[T]) =
+  ## Initialize a world. This *must* be called before doing anything with the
+  ## world.
   assert (not wld.tile.initImpl.isNil),
-    "Attempt to initialize unimplemented world"
+    "Cannot initialize a world with unimplemented tile procs"
   wld.tiles = @[]
   for y in 0..<wld.height:
     var row: seq[T] = @[]
@@ -99,8 +107,8 @@ iterator tiles*[T](wld: RTmWorld[T]): tuple[x, y: int, tile: T] =
 iterator area*[T](wld: RTmWorld[T],
                   x, y, w, h: int): tuple[x, y: int, tile: T] =
   ## Loops through an area of world tiles.
-  ## Note that the coordinates *can* be out of bounds, in that case the
-  ## ``oobTile`` is yielded (because the ``[]`` operator is used).
+  ## Note that the coordinates *can* be out of bounds, in that case the same
+  ## rules apply as when using the ``[]`` operator.
   for y in y..<y + h:
     for x in x..<x + w:
       yield (x, y, wld[x, y])
@@ -128,8 +136,9 @@ proc wldPos*(wld: RTmWorld, x, y: int): tuple[x, y: float] =
 
 proc draw*[T](wld: RTmWorld[T], ctx: RGfxContext, step: float) =
   ## Draws the world onto the specified Gfx context.
-  ## Drawing is implementation dependent, and largely specific to the world's
-  ## tile type. That's why it doesn't have a default implementation.
+  ## Drawing is largely dependent on the game you're creating, so it doesn't
+  ## have a default implementation. ``drawImpl=`` must be used to set an
+  ## implementation for how to draw the world.
   wld.drawImpl(ctx, wld, step)
 
 proc tileAlignedHitbox(wld: RTmWorld,
@@ -208,7 +217,7 @@ proc update*[T](wld: RTmWorld[T], step: float) =
 
     spr.pos = p
 
-    # TODO: Very inefficient, use a quad tree for this
+    # TODO: Very inefficient, use a quad tree or grid for this
     for b in sprites:
       if b != spr:
         let
@@ -229,6 +238,8 @@ proc newRTmWorld*[T](width, height,
 proc load*[T; w, h: static[int]](wld: RTmWorld[T],
                                  map: array[h, array[w, T]]) =
   ## Loads tiles to a world, from a 2D array of tiles.
+  ## This should be used only for testing purposes, as embedding the whole map
+  ## in source code isn't really viable for full-blown games.
   wld.width = w
   wld.height = h
   for x, y, t in tiles(wld):

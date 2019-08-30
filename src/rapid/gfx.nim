@@ -5,7 +5,7 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
-## This module handles drawing basic graphics. Other modules from the gfx \
+## This module handles drawing basic graphics. Other modules from the gfx
 ## directory provide more advanced drawing, like texture atlases and text.
 
 import macros
@@ -114,14 +114,25 @@ type
     texConf: RTextureConfig
     cOnResize: seq[RCanvasResizeFn]
 
-proc id*(canvas: RCanvas): GLuint = canvas.fb
+proc id*(canvas: RCanvas): GLuint =
+  ## Retrieve a unique ID of the canvas. This ID is also a handle to the
+  ## underlying OpenGL framebuffer.
+  canvas.fb
 
-proc width*(canvas: RCanvas): float = canvas.fWidth.float
-proc height*(canvas: RCanvas): float = canvas.fHeight.float
+proc width*(canvas: RCanvas): float =
+  ## Get the width of the canvas.
+  canvas.fWidth.float
+proc height*(canvas: RCanvas): float =
+  ## Get the height of the canvas.
+  canvas.fHeight.float
 
-proc window*(canvas: RCanvas): RWindow = canvas.fWindow
+proc window*(canvas: RCanvas): RWindow =
+  ## Get the window bound to the canvas. For canvases that are not window-bound,
+  ## this value is nil.
+  canvas.fWindow
 
 proc onResize*(canvas: RCanvas, callback: RCanvasResizeFn) =
+  ## Add a callback to be called when the canvas is resized.
   canvas.cOnResize.add(callback)
 
 proc updateFb(canvas: RCanvas) =
@@ -146,6 +157,7 @@ proc updateFb(canvas: RCanvas) =
     glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
 
 proc resize*(canvas: RCanvas, width, height: float) =
+  ## Resize the canvas.
   canvas.fWidth = width.int
   canvas.fHeight = height.int
   canvas.updateFb()
@@ -253,13 +265,25 @@ proc newRProgram*(gfx: RGfx, vertexSrc, fragmentSrc: string): RProgram =
   glDeleteShader(fsh.GLuint)
   result.uniform("rapid_texture", 0)
 
-proc width*(gfx: RGfx): float = gfx.fWidth.float
-proc height*(gfx: RGfx): float = gfx.fHeight.float
+proc width*(gfx: RGfx): float =
+  ## Get the width of a Gfx.
+  gfx.fWidth.float
+proc height*(gfx: RGfx): float =
+  ## Get the height of a Gfx.
+  gfx.fHeight.float
 
-proc canvas*(gfx: RGfx): RCanvas = gfx.fCanvas
+proc canvas*(gfx: RGfx): RCanvas =
+  ## Get a special gfx-bound canvas.
+  ## This canvas does not have a proper framebuffer bound to it; the canvas's
+  ## ID is 0 pointing to the window's framebuffer.
+  gfx.fCanvas
 
-proc vsync*(gfx: RGfx): bool = gfx.fVsync
+proc vsync*(gfx: RGfx): bool =
+  ## Get whether VSync is enabled for the Gfx's window.
+  gfx.fVsync
 proc `vsync=`*(gfx: RGfx, enabled: bool) =
+  ## Set whether VSync should be enabled for the Gfx's window. This must be done
+  ## outside of the draw loop.
   gfx.fVsync = enabled
 
 proc reallocVbo(gfx: RGfx) =
@@ -292,7 +316,7 @@ proc updateEbo(gfx: RGfx, data: seq[int32]) =
     0, dataSize,
     data[0].unsafeAddr)
 
-proc updateUniforms*(prog: RProgram, proj: Mat4f, width, height: float) =
+proc updateUniforms(prog: RProgram, proj: Mat4f, width, height: float) =
   prog.uniform("rapid_projection", proj)
   prog.uniform("rapid_width", width)
   prog.uniform("rapid_height", height)
@@ -406,7 +430,9 @@ type
     scEq
     scNotEq
 
-proc gfx*(ctx: RGfxContext): RGfx = ctx.fGfx
+proc gfx*(ctx: RGfxContext): RGfx =
+  ## Get the context's parent Gfx.
+  ctx.fGfx
 
 converter toRVertex*(vert: RPointVertex): RVertex =
   (vert.x, vert.y, gray(255), 0.0, 0.0)
@@ -444,8 +470,11 @@ proc defaultProgram*(ctx: RGfxContext) =
   ctx.`program=`(ctx.fGfx.defaultProgram)
 
 proc `transform=`*(ctx: RGfxContext, transform: Mat3[float]) =
+  ## Set the affine transform to be used for drawing.
   ctx.fTransform = transform
-proc transform*(ctx: RGfxContext): Mat3[float] = ctx.fTransform
+proc transform*(ctx: RGfxContext): Mat3[float] =
+  ## Get the affine transform used for drawing.
+  ctx.fTransform
 
 proc translate*(ctx: RGfxContext, x, y: float) =
   ## Translates the transform matrix.
@@ -476,7 +505,7 @@ proc resetTransform*(ctx: RGfxContext) =
   ctx.transform = mat3(1.0)
 
 template transform*(ctx: RGfxContext, body: untyped): untyped =
-  ## Isolates the current transform matrix, returning to the previous one \
+  ## Isolates the current transform matrix, returning to the previous one
   ## after the block.
   let prevTransform = ctx.transform
   body
@@ -488,7 +517,7 @@ proc clear*(ctx: RGfxContext, col: RColor) =
   glClear(GL_COLOR_BUFFER_BIT)
 
 proc `color=`*(ctx: RGfxContext, col: RColor) =
-  ## Sets a 'default' vertex color. This vertex color is used when no explicit \
+  ## Sets a 'default' vertex color. This vertex color is used when no explicit
   ## color is specified in the vertex.
   ctx.sColor = col
 
@@ -651,6 +680,7 @@ proc line*[T: SomeVertex](ctx: RGfxContext, a, b: T) =
     ctx.index(ctx.vertex(b))
 
 proc ltri*[T: SomeVertex](ctx: RGfxContext, a, b, c: T) =
+  ## Adds a triangle outline, together with its indices.
   lineAux:
     let
       i = ctx.vertex(a)
@@ -741,6 +771,7 @@ proc draw*(ctx: RGfxContext, primitive = prTriShape) =
                    else:          GL_TRIANGLES, 0, GLsizei ctx.vertexCount)
 
 proc clearStencil*(ctx: RGfxContext, value = 255) =
+  ## Clear the stencil buffer.
   glClearStencil(value.GLint)
   glClear(GL_STENCIL_BUFFER_BIT)
 
@@ -764,8 +795,11 @@ template stencil*(ctx: RGfxContext, action: RStencilAction, value: int,
 
 proc `stencilTest=`*(ctx: RGfxContext,
                      test: tuple[condition: RStencilCondition, value: int]) =
-  ## Sets the stencil test. For each fragment, if the test succeeds, the
-  ## fragment is drawn. Otherwise, it's discarded.
+  ## Sets the stencil test.
+  ## The stencil test is used to restrict the rendering of fragments to only a
+  ## specified shape, as specified by the stencil buffer's contents.
+  ## For each fragment, if the stencil buffer's value meets the specified
+  ## condition, the fragment is drawn. Otherwise it's discarded.
   ## This should not be used inside of ``stencil()``.
   currentGlc.stencilFunc = (
     (case test.condition
@@ -789,7 +823,7 @@ proc updateUniforms(ctx: RGfxContext) =
 proc ctx*(gfx: RGfx): RGfxContext =
   ## Creates a Gfx context for the specified Gfx.
   ## This should not be used by itself unless you know what you're doing!
-  ## Use ``render`` and ``loop`` instead. This proc is exported because they \
+  ## Use ``render`` and ``loop`` instead. This proc is exported because they
   ## would not work without it.
   result = RGfxContext(
     fGfx: gfx,
@@ -806,6 +840,8 @@ proc ctx*(gfx: RGfx): RGfxContext =
 #--
 
 template renderTo*(ctx: RGfxContext, canvas: RCanvas, body) =
+  ## Sets the target of rendering operations to the specified canvas, for the
+  ## duration of the block.
   withFramebuffer(currentGlc, canvas.fb):
     let
       prevProj = ctx.gfx.projection

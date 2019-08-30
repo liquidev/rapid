@@ -27,7 +27,7 @@ method sample*(sampler: RSampler, dest: var seq[float], count: int) {.base.} =
   ##
   ## No system calls (like heap allocation) must be made in a ``sample``
   ## implementation. System calls are slow and will result in a buffer
-  ## underflow due to the lack of samples being supplied on time, which will
+  ## underflow due to the lack of samples being supplied in time, which will
   ## result in a segmentation fault.
   ## Every ``sample`` implementation *must* be sure that when the proc returns
   ## the length of ``dest`` is equal to ``count * 2``. If that isn't the case,

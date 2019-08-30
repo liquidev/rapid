@@ -190,7 +190,8 @@ proc seekSampleVorbis(decoder: RAudioDecoder, sample: int) =
       else: "An unknown error occured while seeking")
 
 proc seekSample*(decoder: RAudioDecoder, sample: int) =
-  ## Seeks to the specified PCM sample.
+  ## Seeks to the specified PCM sample. In order to seek to a position in
+  ## seconds, use ``decoder.seekSample(seconds * decoder.sampleRate)``.
   case decoder.mode
   of admSample:
     decoder.samplePos = sample
@@ -206,6 +207,7 @@ proc sampleAt(decoder: RAudioDecoder, i: int): int16 =
     else: 0
 
 proc read*(decoder: RAudioDecoder, dest: var seq[float], count: int) =
+  ## Decode audio to the specified buffer.
   case decoder.mode
   of admSample:
     for i in decoder.samplePos..<decoder.samplePos + count:

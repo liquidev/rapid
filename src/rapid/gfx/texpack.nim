@@ -7,14 +7,9 @@
 
 ## This module implements a simple texture packer.
 
-# TODO: This can be optimized further. (Details)
-# Instead of starting from scratch every time a new texture is to be added,
-# strore the position in the texture packer. Also, when a line is reset,
-# check all hitboxes and travel instantly to the line with the lowest free Y.
-
 import algorithm
 
-import glm
+import glm/vec
 
 import ../gfx/opengl
 import ../lib/glad/gl
@@ -54,7 +49,7 @@ proc pack(tp: RTexturePacker, image: RImage): RTextureRect =
       while x <= tp.texture.width - image.width:
         block placeTex:
           for area in tp.occupied:
-            if area.has(vec2f(x.float, y.float)):
+            if area.has(vec2(x.float, y.float)):
               x = int area.x + area.width
               break placeTex
           if tp.areaFree(x, y, image.width, image.height):
@@ -73,10 +68,14 @@ proc pack(tp: RTexturePacker, image: RImage): RTextureRect =
     tp.y = y
 
 proc place*(tp: RTexturePacker, image: RImage): RTextureRect =
+  ## Place an image onto the texture packer's target.
   currentGlc.withTex2D(tp.texture.id):
     result = tp.pack(image)
 
 proc place*(tp: RTexturePacker, images: openarray[RImage]): seq[RTextureRect] =
+  ## Place an array of images onto the texture packer's target. This should be
+  ## preferred over the single-image version, as this binds the texture only one
+  ## time, thus saving performance.
   currentGlc.withTex2D(tp.texture.id):
     let sorted = images.sorted(proc (a, b: RImage): int =
                                  cmp(a.width * a.height, b.width * b.height),
@@ -87,10 +86,12 @@ proc place*(tp: RTexturePacker, images: openarray[RImage]): seq[RTextureRect] =
 proc newRTexturePacker*(width, height: Natural,
                         conf = DefaultTextureConfig,
                         fmt = fmtRGBA8): RTexturePacker =
+  ## Creates a new texture packer.
   result = RTexturePacker(
     texture: newRTexture(width, height, nil, conf, fmt),
     fmt: fmt
   )
 
-proc unload*(tp: var RTexturePacker) =
+proc unload*(tp: RTexturePacker) =
+  ## Unloads the texture packer's texture, rendering the packer unusable.
   tp.texture.unload()

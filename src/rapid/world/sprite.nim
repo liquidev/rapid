@@ -5,7 +5,7 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
-import glm
+import glm/vec
 
 import ../gfx
 
@@ -30,9 +30,11 @@ method collideSprite*(a, b: RSprite) {.base.} =
   discard
 
 proc force*(spr: RSprite, force: Vec2[float]) =
+  ## Add ``force`` to the sprite's acceleration.
   spr.acc += force
 
 proc newRSprite*(width, height: float): RSprite =
+  ## Create a new sprite of the specified size.
   result = RSprite(
     width: width, height: height
   )

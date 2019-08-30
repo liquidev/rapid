@@ -71,6 +71,7 @@ proc newAuxCanvas(fx: RFxSurface, conf = DefaultTextureConfig): RCanvas =
   result = canvas
 
 proc newRFxSurface*(target: RCanvas, conf = DefaultTextureConfig): RFxSurface =
+  ## Creates a new effect surface.
   result = RFxSurface(target: target)
   result.auxA = result.newAuxCanvas(conf)
   result.auxB = result.newAuxCanvas(conf)
@@ -115,6 +116,7 @@ paramProc(Mat4f)
 
 proc begin*(fx: RFxSurface, ctx: RGfxContext,
             copyTarget = false) =
+  ## Begins drawing to an effect surface.
   doAssert fx.ctx.isNil,
     "Cannot begin() an effect surface twice. Call finish() first"
   fx.ctx = ctx
@@ -132,7 +134,7 @@ proc begin*(fx: RFxSurface, ctx: RGfxContext,
     ctx.renderTo(fx.b): fx.ctx.clear(gray(0, 0))
 
 proc effect*(fx: RFxSurface, eff: REffect, stencil = false) =
-  ## Applies an effect to the contents on the Gfx's effect surface.
+  ## Applies an effect to the contents on the effect surface.
   let
     prevProgram = fx.ctx.program
     prevTexture = fx.ctx.texture
@@ -157,6 +159,10 @@ proc effect*(fx: RFxSurface, eff: REffect, stencil = false) =
 
 proc finish*(fx: RFxSurface,
              replaceTarget = false) =
+  ## Finishes drawing to the effect surface, and draws the image drawn onto it
+  ## to the target canvas. If ``replaceTarget`` is true, the pixels will be
+  ## copied directly without any blending. This may save performance in some
+  ## cases.
   let prevTexture = fx.ctx.texture
   if replaceTarget:
     glBlitNamedFramebuffer(fx.a.id, fx.target.id,

@@ -16,7 +16,7 @@ import ../gfx
 import ../res/fonts
 
 proc text*(ctx: RGfxContext, font: RFont, x, y: float, text: string) =
-  ## Renders a string of text using the specified font, at the specified \
+  ## Renders a string of text using the specified font, at the specified
   ## position. The text must be UTF-8-encoded.
   let
     runes = text.toRunes()

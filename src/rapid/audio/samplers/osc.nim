@@ -23,8 +23,9 @@ type
     freq*: float
     case kind*: ROscKind
     of oscSine:
-      sineRadians*: float
+      sineRadians: float
     of oscPulse:
+      # TODO: Pulse oscillator
       pulseWidth*: float
     else: discard
 
@@ -32,6 +33,7 @@ type
   ROsc* = ref ROscObj
 
 method sample*(osc: ROsc, dest: var seq[float], count: int) =
+  ##
   dest.setLen(0)
   if osc.playing:
     let secondsPerSample = 1 / ROutputSampleRate
@@ -49,6 +51,7 @@ method sample*(osc: ROsc, dest: var seq[float], count: int) =
     dest.fill(count * 2, 0.0)
 
 proc initROsc*(osc: ROsc, kind: ROscKind) =
+  ## Initialize an oscillator with the specified kind.
   osc[] = ROscObj(kind: kind) # avoid case transitions
   osc.initRSampler()
   osc.playing = false
@@ -57,15 +60,19 @@ proc initROsc*(osc: ROsc, kind: ROscKind) =
     osc.pulseWidth = 0.5
 
 proc newROsc*(kind: ROscKind): ROsc =
+  ## Create a new oscillator of the specified kind.
   new(result)
   result.initROsc(kind)
 
 proc play*(osc: ROsc) =
+  ## Play the oscillator's tone.
   osc.playing = true
 
 proc play*(osc: ROsc, freq: float) =
+  ## Play the oscillator's tone at the given frequency.
   osc.freq = freq
   osc.playing = true
 
 proc stop*(osc: ROsc) =
+  ## Stop playback.
   osc.playing = false

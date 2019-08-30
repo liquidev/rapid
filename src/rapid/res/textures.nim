@@ -84,7 +84,7 @@ proc newRTexture*(image: RImage, conf = DefaultTextureConfig): RTexture =
   result = newRTexture(image.width, image.height, image.caddr, conf)
 
 proc loadRTexture*(filename: string, conf = DefaultTextureConfig): RTexture =
-  ## Loads an image from a file and creates a texture from it.
+  ## Loads an RGBA image from a PNG file and creates a texture from it.
   let img = loadRImage(filename)
   result = newRTexture(img, conf)
 

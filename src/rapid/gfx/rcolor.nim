@@ -5,7 +5,9 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
-## This module has some utility color manipulation procs.
+## This module implements a basic OpenGL color class. This differs from Nim's
+## ``colors`` module, because colors are stored as 4 floats instead of a single
+## integer.
 ## **Do not import this directly, it's included by the gfx module.**
 
 import glm/vec

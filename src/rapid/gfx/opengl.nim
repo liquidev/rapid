@@ -27,8 +27,7 @@ type
   StencilOp* = tuple[fail, zfail, zpass: GLenum]
   Viewport* = tuple[x, y: GLint, w, h: GLsizei]
 
-# I know global variables are bad, but the current OpenGL context is global to
-# the current process.
+# TODO: Merge global state into a state object
 var currentGlc*: GLContext
 
 proc makeCurrent*(ctx: GLContext) =
