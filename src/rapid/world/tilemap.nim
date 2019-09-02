@@ -56,12 +56,12 @@ proc implTile*[T](wld: RTmWorld[T],
 
 proc getX(wld: RTmWorld, x: int): int =
   result =
-    if wld.wrapX: floorMod(x, wld.width).int
+    if wld.wrapX: floorMod(x.float, wld.width.float).int
     else: x
 
 proc getY(wld: RTmWorld, y: int): int =
   result =
-    if wld.wrapY: floorMod(y, wld.height).int
+    if wld.wrapY: floorMod(y.float, wld.height.float).int
     else: y
 
 proc `[]`*[T](wld: RTmWorld[T], x, y: int): T =

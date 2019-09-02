@@ -396,6 +396,7 @@ type
     sTexture: RTexture
     sLineWidth: float
     sLineSmooth: bool
+    sAntialiasing: bool
     # Transformations
     fTransform: Mat3[float]
   RVertex* = tuple
@@ -556,12 +557,28 @@ proc `lineWidth=`*(ctx: RGfxContext, width: float) =
   ## Sets the line width.
   ctx.sLineWidth = width
   glLineWidth(width)
+proc lineWidth*(ctx: RGfxContext): float =
+  ## Gets the line width.
+  ctx.sLineWidth
 
 proc `lineSmooth=`*(ctx: RGfxContext, enable: bool) =
-  ## Sets if lines should be anti-aliased.
+  ## Sets if lines should be antialiased.
   ctx.sLineSmooth = enable
   if enable: glEnable(GL_LINE_SMOOTH)
   else: glDisable(GL_LINE_SMOOTH)
+proc lineSmooth*(ctx: RGfxContext): bool =
+  ## Gets the line antialiasing state.
+  ctx.sLineSmooth
+
+proc `antialiasing=`*(ctx: RGfxContext, enable: bool) =
+  ## Sets if antialiasing should be enabled. The window must be constructed with
+  ## ``antialiasLevel`` for this to work.
+  ctx.sAntialiasing = enable
+  if enable: glEnable(GL_MULTISAMPLE)
+  else: glDisable(GL_MULTISAMPLE)
+proc antialiasing*(ctx: RGfxContext): bool =
+  ## Gets whether antialiasing is enabled.
+  ctx.sAntialiasing
 
 proc begin*(ctx: RGfxContext) =
   ## Begins a new shape.

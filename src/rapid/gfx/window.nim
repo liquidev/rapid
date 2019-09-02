@@ -102,6 +102,7 @@ type
     width, height: Natural
     title: string
     resizable, visible, decorated, focused, floating, maximized: bool
+    antialiasLevel: int
   #--
   # Events
   #--
@@ -180,6 +181,11 @@ builderBool(floating):
 builderBool(maximized):
   ## Defines if the built window will be maximized.
 
+proc antialiasLevel*(wopt; level: int): WindowOptions =
+  ## Builds the window with the specified antialiasing level.
+  result = wopt
+  result.antialiasLevel = level
+
 converter toModsSet(mods: int32): RModKeys =
   result = {}
   if (mods and glfw.mkShift.int) > 0: result = result + { glfw.mkShift }
@@ -255,6 +261,8 @@ proc open*(wopt): RWindow =
   glfw.windowHint(glfw.hAlphaBits, 8)
   glfw.windowHint(glfw.hDepthBits, 24)
   glfw.windowHint(glfw.hStencilBits, 8)
+  if wopt.antialiasLevel != 0:
+    glfw.windowHint(glfw.hSamples, wopt.antialiasLevel.int32)
 
   glfw.windowHint(glfw.hResizable, wopt.resizable.int32)
   glfw.windowHint(glfw.hVisible, false.int32)
