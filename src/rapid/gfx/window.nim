@@ -107,15 +107,15 @@ type
   # Events
   #--
   RModKeys* = set[glfw.ModifierKey]
-  RCharProc* = proc (win: RWindow, rune: Rune, mods: RModKeys)
-  RCursorEnterProc* = proc (win: RWindow)
-  RCursorMoveProc* = proc (win: RWindow, x, y: float)
-  RFilesDroppedProc* = proc (win: RWindow, filenames: seq[string])
-  RKeyProc* = proc (win: RWindow, key: glfw.Key, scancode: int, mods: RModKeys)
-  RMouseProc* = proc (win: RWindow, button: glfw.MouseButton, mods: RModKeys)
-  RScrollProc* = proc (win: RWindow, x, y: float)
-  RCloseProc* = proc (win: RWindow): bool
-  RResizeProc* = proc (win: RWindow, width, height: Natural)
+  RCharProc* = proc (rune: Rune, mods: RModKeys)
+  RCursorEnterProc* = proc ()
+  RCursorMoveProc* = proc (x, y: float)
+  RFilesDroppedProc* = proc (filenames: seq[string])
+  RKeyProc* = proc (key: glfw.Key, scancode: int, mods: RModKeys)
+  RMouseProc* = proc (button: glfw.MouseButton, mods: RModKeys)
+  RScrollProc* = proc (x, y: float)
+  RCloseProc* = proc (): bool
+  RResizeProc* = proc (width, height: Natural)
   WindowCallbacks = object
     onChar: seq[RCharProc]
     onCursorEnter, onCursorLeave: seq[RCursorEnterProc]
@@ -200,47 +200,47 @@ proc glfwCallbacks(win: var RWindow) =
     for cb in win.callbacks.name: body
   discard glfw.setCharModsCallback(win.handle,
     proc (w: glfw.Window, uchar: cuint, mods: int32) {.cdecl.} =
-      run(onChar): cb(win, Rune(uchar), mods))
+      run(onChar): cb(Rune(uchar), mods))
   discard glfw.setCursorEnterCallback(win.handle,
     proc (w: glfw.Window, entered: int32) {.cdecl.} =
       if entered == 1:
-        run(onCursorEnter, cb(win))
+        run(onCursorEnter, cb())
       else:
-        run(onCursorLeave, cb(win)))
+        run(onCursorLeave, cb()))
   discard glfw.setCursorPosCallback(win.handle,
     proc (w: glfw.Window, x, y: cdouble) {.cdecl.} =
-      run(onCursorMove, cb(win, x, y)))
+      run(onCursorMove, cb(x, y)))
   discard glfw.setDropCallback(win.handle,
     proc (w: glfw.Window, n: int32, files: cstringArray) {.cdecl.} =
-      run(onFilesDropped, cb(win, cstringArrayToSeq(files, n))))
+      run(onFilesDropped, cb(cstringArrayToSeq(files, n))))
   discard glfw.setKeyCallback(win.handle,
     proc (w: glfw.Window, key, scan, action, mods: int32) {.cdecl.} =
       case glfw.KeyAction(action)
       of glfw.kaDown:
-        run(onKeyPress, cb(win, glfw.Key(key), int scan, mods))
+        run(onKeyPress, cb(glfw.Key(key), int scan, mods))
       of glfw.kaUp:
-        run(onKeyRelease, cb(win, glfw.Key(key), int scan, mods))
+        run(onKeyRelease, cb(glfw.Key(key), int scan, mods))
       of glfw.kaRepeat:
-        run(onKeyRepeat, cb(win, glfw.Key(key), int scan, mods)))
+        run(onKeyRepeat, cb(glfw.Key(key), int scan, mods)))
   discard glfw.setMouseButtonCallback(win.handle,
     proc (w: glfw.Window, button, action, mods: int32) {.cdecl.} =
       case glfw.KeyAction(action)
       of glfw.kaDown:
-        run(onMousePress, cb(win, glfw.MouseButton(button), mods))
+        run(onMousePress, cb(glfw.MouseButton(button), mods))
       of glfw.kaUp:
-        run(onMouseRelease, cb(win, glfw.MouseButton(button), mods))
+        run(onMouseRelease, cb(glfw.MouseButton(button), mods))
       else: discard)
   discard glfw.setScrollCallback(win.handle,
     proc (w: glfw.Window, x, y: cdouble) {.cdecl.} =
-      run(onScroll, cb(win, x, y)))
+      run(onScroll, cb(x, y)))
   discard glfw.setWindowCloseCallback(win.handle,
     proc (w: glfw.Window) {.cdecl.} =
       var close = true
-      run(onClose): close = close and cb(win)
+      run(onClose): close = close and cb()
       glfw.setWindowShouldClose(w, int32 close))
   discard glfw.setWindowSizeCallback(win.handle,
     proc (w: glfw.Window, width, height: int32) {.cdecl.} =
-      run(onResize, cb(win, width, height)))
+      run(onResize, cb(width, height)))
 
 converter toInt32(hint: glfw.Hint): int32 =
   int32 hint
