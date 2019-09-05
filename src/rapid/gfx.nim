@@ -177,7 +177,7 @@ proc newRCanvas*(width, height: float, conf = DefaultTextureConfig): RCanvas =
 
 proc init(canvas: RCanvas, window: RWindow, conf: RTextureConfig) =
   canvas.init(window.width, window.height, conf)
-  window.onResize do (win: RWindow, width, height: Natural):
+  window.onResize do (width, height: Natural):
     canvas.resize(width.float, height.float)
 
 proc newRCanvas*(window: RWindow, conf = DefaultTextureConfig): RCanvas =
@@ -357,7 +357,7 @@ proc init(gfx: RGfx) =
   # Root canvas
   gfx.fCanvas = RCanvas(fWidth: gfx.fWidth, fHeight: gfx.fHeight, fb: 0)
   # Resizing
-  gfx.win.onResize do (win: RWindow, width, height: Natural):
+  gfx.win.onResize do (width, height: Natural):
     currentGlc.viewport = (0.GLint, 0.GLint, width.GLsizei, height.GLsizei)
     gfx.fWidth = width
     gfx.fHeight = height
