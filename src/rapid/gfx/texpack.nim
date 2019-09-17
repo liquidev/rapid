@@ -75,7 +75,8 @@ proc place*(tp: RTexturePacker, image: RImage): RTextureRect =
 proc place*(tp: RTexturePacker, images: openarray[RImage]): seq[RTextureRect] =
   ## Place an array of images onto the texture packer's target. This should be
   ## preferred over the single-image version, as this binds the texture only one
-  ## time, thus saving performance.
+  ## time, thus saving performance. It is also more efficient, since it sorts
+  ## the images by area.
   currentGlc.withTex2D(tp.texture.id):
     let sorted = images.sorted(proc (a, b: RImage): int =
                                  cmp(a.width * a.height, b.width * b.height),

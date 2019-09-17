@@ -55,13 +55,11 @@ proc newRProgram*(): RProgram =
     uniformLocations: initTable[string, GLint]()
   )
 
-proc attach*(program: var RProgram, shader: RShader) =
+proc attach*(program: RProgram, shader: RShader) =
   ## Attaches a shader to a program.
-  ## The ``RProgram`` is not a ``var RProgram``, because without it being \
-  ## ``var`` we can easily chain calls together.
   glAttachShader(program.id, GLuint(shader))
 
-proc link*(program: var RProgram) =
+proc link*(program: RProgram) =
   ## Links the program. This does not destroy attached shaders!
   glLinkProgram(program.id)
   # Error checking
