@@ -136,6 +136,11 @@ proc widthOf*(font: RFont, text: string): float =
   for r in runes(text):
     result += font.widthOf(r)
 
+proc widthOf*(font: RFont, text: seq[Rune]): float =
+  ## Calculate the width of a Unicode string.
+  for r in text:
+    result += font.widthOf(r)
+
 proc widthOf*(font: RFont, ch: char): float =
   ## Get the width of an ASCII character.
   result = font.widthOf(ch.Rune)
