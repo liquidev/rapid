@@ -34,7 +34,7 @@ proc drawChar(ctx: RGfxContext, font: RFont,
              glyph.width.float, glyph.height.float, glyph.rect)
     penX += glyph.advanceX.float
 
-proc penX(font: RFont, x: float, text: string): float =
+proc penX[T](font: RFont, x: float, text: T): float =
   result = floor(
     case font.horzAlign
     of taLeft: x
@@ -42,7 +42,7 @@ proc penX(font: RFont, x: float, text: string): float =
     of taRight: x - font.widthOf(text)
   ) * 64
 
-proc penY(font: RFont, y: float, text: string): float =
+proc penY(font: RFont, y: float): float =
   result = floor(
     case font.vertAlign
     of taTop: y + font.height.float
@@ -56,11 +56,27 @@ proc text*(ctx: RGfxContext, font: RFont, x, y: float, text: string) =
   let previousTex = ctx.texture
   var
     penX = font.penX(x, text)
-    penY = font.penY(y, text)
+    penY = font.penY(y)
   ctx.uniform("rapid_renderText", 1)
   ctx.texture = font.packer.texture
   ctx.begin()
   for r in text.runes:
+    ctx.drawChar(font, x, y, penX, penY, r)
+  ctx.draw()
+  ctx.uniform("rapid_renderText", 0)
+  ctx.texture = previousTex
+
+proc text*(ctx: RGfxContext, font: RFont, x, y: float, text: seq[Rune]) =
+  ## Renders a string of text using the specified font, at the specified
+  ## position. The text must be UTF-8-encoded.
+  let previousTex = ctx.texture
+  var
+    penX = font.penX(x, text)
+    penY = font.penY(y)
+  ctx.uniform("rapid_renderText", 1)
+  ctx.texture = font.packer.texture
+  ctx.begin()
+  for r in text:
     ctx.drawChar(font, x, y, penX, penY, r)
   ctx.draw()
   ctx.uniform("rapid_renderText", 0)
