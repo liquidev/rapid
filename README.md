@@ -55,6 +55,18 @@ To install rapid, use the following command:
 $ nimble install rapid
 ```
 
+#### Why doesn't rapid have a release?
+
+rapid is an engine I develop along with my games, and so, it is constantly
+evolving. It's difficult to mark major milestones in the engine's development,
+since every single feature is important.
+
+I plan to release version 0.1.0 whenever compiling on Windows works properly.
+Currently, it's broken since rapid/audio's dependency—soundio—does not want to
+compile under MinGW. I hope to resolve this problem as soon as I can, since it's
+very annoying not being able to release games for the most popular platform
+out there.
+
 
 ### Windows
 
