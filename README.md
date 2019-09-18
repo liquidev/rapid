@@ -72,6 +72,10 @@ out there.
 
 rapid should work fine on Windows out of the box, no outside dependencies.
 
+Well, except for rapid/audio. The backend library I'm using (soundio)
+**does not want to compile under MinGW**. If anyone has a fix, please open a
+pull request.
+
 ### Linux
 
 On Linux, the development headers for the following libraries must be installed:
