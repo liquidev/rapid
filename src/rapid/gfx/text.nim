@@ -48,9 +48,9 @@ var freetypeLib*: FT_Library
 proc handle*(font: RFont): FT_Face = font.fHandle
 proc packer*(font: RFont): RTexturePacker = font.fPacker
 
-proc newRFont*(file: string, height: Natural, width = 0.Natural,
-               textureConfig = DefaultTextureConfig,
-               texWidth = 512.Natural, texHeight = 512.Natural): RFont =
+proc loadRFont*(file: string, height: Natural, width = 0.Natural,
+                textureConfig = DefaultTextureConfig,
+                texWidth = 512.Natural, texHeight = 512.Natural): RFont =
   ## Create a new font loaded from the specified file, with the specified
   ## dimensions, texture configuration, and atlas size.
   ## The atlas size should be tweaked when lots of Unicode characters are used,
