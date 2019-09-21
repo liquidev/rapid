@@ -7,8 +7,6 @@
 
 ## This module provides texture atlas utilities.
 
-import tables
-
 import ../res/textures
 
 type
