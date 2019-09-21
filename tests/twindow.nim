@@ -3,7 +3,7 @@ import glm
 import random
 import times
 
-import rapid/res/[textures, fonts]
+import rapid/res/textures
 import rapid/gfx, rapid/gfx/[fxsurface, texatlas, text]
 import rapid/lib/glad/gl
 import rapid/world/[aabb, sprite, tilemap]
@@ -58,7 +58,7 @@ proc newPlayer(win: var RWindow, x, y: float): Player =
   result = Player(win: win, width: 8, height: 8)
 
   let plr = result
-  win.onKeyPress do (win: RWindow, key: Key, scancode: int, mods: RModKeys):
+  win.onKeyPress do (key: Key, scancode: int, mods: RModKeys):
     if key == keyUp:
       plr.force(vec2(0.0, -3.0))
 
@@ -137,13 +137,13 @@ proc main() =
     x, y = 0.0
     pressed = false
 
-  win.onCursorMove do (win: RWindow, cx, cy: float):
+  win.onCursorMove do (cx, cy: float):
     x = cx
     y = cy
 
-  win.onMousePress do (win: RWindow, btn: MouseButton, mods: RModKeys):
+  win.onMousePress do (btn: MouseButton, mods: RModKeys):
     pressed = true
-  win.onMouseRelease do (win: RWindow, btn: MouseButton, mods: RModKeys):
+  win.onMouseRelease do (btn: MouseButton, mods: RModKeys):
     pressed = false
 
   let eff = fx.newREffect("""
@@ -158,8 +158,6 @@ proc main() =
       return avg;
     }
   """)
-
-  rubik.horzAlign = taCenter
 
   render(gfx, ctx):
     ctx.clearStencil(255)
@@ -183,6 +181,17 @@ proc main() =
       ctx.draw()
       ctx.noTexture()
       # ctx.drawWindow(fx, eff, 32, 32, 128, 128)
+
+      ctx.begin()
+      ctx.color = rgb(255, 0, 0)
+      ctx.lrect(0, 0, 256, 256)
+      ctx.color = gray(255)
+      ctx.draw(prLineShape)
+      for horz in taLeft..taRight:
+        for vert in taTop..taBottom:
+          ctx.text(font = rubik, x = 0, y = 0, w = 256, h = 256,
+                   text = ($horz)[2..^1] & ' ' & ($vert)[2..^1],
+                   hAlign = horz, vAlign = vert)
     update step:
       map.update(step)
 
