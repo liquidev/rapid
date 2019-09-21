@@ -3,7 +3,7 @@ import glm
 import random
 import times
 
-import rapid/res/[textures, fonts]
+import rapid/res/textures
 import rapid/gfx, rapid/gfx/[fxsurface, texatlas, text]
 import rapid/lib/glad/gl
 import rapid/world/[aabb, sprite, tilemap]
@@ -58,7 +58,7 @@ proc newPlayer(win: var RWindow, x, y: float): Player =
   result = Player(win: win, width: 8, height: 8)
 
   let plr = result
-  win.onKeyPress do (win: RWindow, key: Key, scancode: int, mods: RModKeys):
+  win.onKeyPress do (key: Key, scancode: int, mods: RModKeys):
     if key == keyUp:
       plr.force(vec2(0.0, -3.0))
 
@@ -110,7 +110,7 @@ proc main() =
       minFilter: fltNearest, magFilter: fltNearest,
       wrapH: wrapRepeat, wrapV: wrapRepeat)
     tileset = loadRTexture("sampleData/tileset.png", tc)
-    rubik = newRFont("sampleData/Rubik-Regular.ttf", 14, 14, tc)
+    rubik = loadRFont("sampleData/Rubik-Regular.ttf", 16, tc)
     gfx = win.openGfx()
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
     mapCanvas = newRCanvas(win)
@@ -137,13 +137,13 @@ proc main() =
     x, y = 0.0
     pressed = false
 
-  win.onCursorMove do (win: RWindow, cx, cy: float):
+  win.onCursorMove do (cx, cy: float):
     x = cx
     y = cy
 
-  win.onMousePress do (win: RWindow, btn: MouseButton, mods: RModKeys):
+  win.onMousePress do (btn: MouseButton, mods: RModKeys):
     pressed = true
-  win.onMouseRelease do (win: RWindow, btn: MouseButton, mods: RModKeys):
+  win.onMouseRelease do (btn: MouseButton, mods: RModKeys):
     pressed = false
 
   let eff = fx.newREffect("""
@@ -158,8 +158,6 @@ proc main() =
       return avg;
     }
   """)
-
-  rubik.horzAlign = taCenter
 
   render(gfx, ctx):
     ctx.clearStencil(255)
@@ -182,6 +180,8 @@ proc main() =
       ctx.rect(0, 0, gfx.width.float, gfx.height.float)
       ctx.draw()
       ctx.noTexture()
+
+      ctx.text(rubik, 32, 32, "12345 testowanie dźwięku")
       # ctx.drawWindow(fx, eff, 32, 32, 128, 128)
     update step:
       map.update(step)
