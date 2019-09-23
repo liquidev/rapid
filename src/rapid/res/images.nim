@@ -40,8 +40,15 @@ proc loadRImage*(path: string): RImage =
   let png = loadPNG32(path)
   result = newRImage(png.width, png.height, png.data)
 
+proc readRImagePng*(png: string): RImage =
+  ## Reads a PNG image from memory. This is most useful when used in conjunction
+  ## with ``slurp``/``staticRead``, and allows for embedding resources in the
+  ## executable itself.
+  let png = decodePNG32(png)
+  result = newRImage(png.width, png.height, png.data)
+
 proc caddr*(img: RImage): ptr char =
-  ## Get a pointer to the raw image data.
+  ## Get a pointer to raw image data.
   result = img.data[0].unsafeAddr
 
 proc subimg*(img: RImage, x, y, w, h: int): RImage =
