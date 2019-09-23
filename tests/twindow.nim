@@ -110,7 +110,7 @@ proc main() =
       minFilter: fltNearest, magFilter: fltNearest,
       wrapH: wrapRepeat, wrapV: wrapRepeat)
     tileset = loadRTexture("sampleData/tileset.png", tc)
-    rubik = newRFont("sampleData/Rubik-Regular.ttf", 14, 14, tc)
+    rubik = loadRFont("sampleData/Rubik-Regular.ttf", 14, 0, tc)
     gfx = win.openGfx()
     map = newRTmWorld[Tile](Map[0].len, Map.len, 8, 8)
     mapCanvas = newRCanvas(win)
