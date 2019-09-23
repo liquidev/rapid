@@ -885,11 +885,10 @@ template render*(gfx: RGfx, ctxVar, body: untyped): untyped =
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gfx.eboID)
       body
 
-proc calcMillisPerFrame(): float =
-  let
-    mon = glfw.getPrimaryMonitor()
-    mode = glfw.getVideoMode(mon)
-  result = 1 / mode.refreshRate
+const RFramerateDen* {.intdefine.} = 1 ## \
+  ## The framerate denominator. This can be used in conjunction with VSync to
+  ## simulate a lower framerate, using the formula
+  ## ``refreshRate / RFramerateDen``.
 
 macro loop*(gfx: RGfx, body: untyped): untyped =
   ## Runs a game loop on the specified window. ``draw`` and ``update`` events \
@@ -944,7 +943,7 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
   if drawBody.isNil: error("Missing draw event", body)
   if updateBody.isNil: error("Missing update event", body)
   result = quote do:
-    glfw.swapInterval(int32(`gfx`.vsync))
+    glfw.swapInterval(int32(`gfx`.vsync) * RFramerateDen)
 
     block init:
       # Render 2 frames to fill both buffers
@@ -952,28 +951,19 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
         `gfx`.render(`initCtxName`):
           `initBody`
 
-    let millisPerUpdate = calcMillisPerFrame()
-    const millisPer60fps = 1 / 60
-      # 60 fps is an arbitrary number, but gives a more natural time step to
-      # work with in update functions, because this is the typical monitor
-      # refresh rate
     var
       previous = time()
-      lag = 0.0
     while glfw.windowShouldClose(`gfx`.win.handle) == 0:
       let
         current = time()
         delta = current - previous
       previous = current
-      lag += delta
 
-      while lag >= millisPerUpdate:
-        block update:
-          let `updateStepName` = delta / millisPer60fps
-          `updateBody`
-        lag -= millisPerUpdate
+      block update:
+        let `updateStepName` = delta * 60
+        `updateBody`
 
       block draw:
-        let `drawStepName` = delta / millisPer60fps
+        let `drawStepName` = delta * 60
         `gfx`.render(`drawCtxName`):
           `drawBody`
