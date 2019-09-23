@@ -58,8 +58,7 @@ else:
 
 # pass linker args
 when defined(windows):
-  # XXX: link WASAPI
-  discard
+  {.passL: "-lole32".}
 elif defined(macosx):
   # XXX: link CoreAudio, probably using '-framework CoreAudio'
   # I don't have a way of testing this, contributions welcome
@@ -69,15 +68,6 @@ else:
     (if ALSAAvailable: "-lasound " else: "") &
     (if PulseAudioAvailable: "-lpulse " else: "") &
     (if JACKAvailable: "-ljack" else: "").}
-
-cImport(Incl/"soundio.h")
-
-cCompile(Src/"soundio.c")
-cCompile(Src/"util.c")
-cCompile(Src/"os.c")
-cCompile(Src/"dummy.c")
-cCompile(Src/"channel_layout.c")
-cCompile(Src/"ring_buffer.c")
 
 static:
   var backends = ""
@@ -114,6 +104,15 @@ static:
     .replace("@LIBSOUNDIO_VERSION@", "2.0.0")
     .replace("$backends", backends)
   writeFile(Src/"config.h", configH)
+
+cImport(Incl/"soundio.h")
+
+cCompile(Src/"soundio.c")
+cCompile(Src/"util.c")
+cCompile(Src/"os.c")
+cCompile(Src/"dummy.c")
+cCompile(Src/"channel_layout.c")
+cCompile(Src/"ring_buffer.c")
 
 when WASAPIAvailable: cCompile(Src/"wasapi.c")
 when CoreAudioAvailable: cCompile(Src/"coreaudio.c")
