@@ -165,12 +165,12 @@ proc update*[T](wld: RTmWorld[T], step: float) =
   var sprites = wld.sprites
   for spr in sprites:
     spr.update(step)
-    spr.vel += spr.acc
+    spr.vel += spr.acc * step
     spr.acc *= 0
 
     var p = spr.pos.xy
 
-    p.x += spr.vel.x * step
+    p.x += spr.vel.x
     if wld.wrapX: p.x = floorMod(p.x, wld.width.float * wld.tileWidth)
 
     var
@@ -193,7 +193,7 @@ proc update*[T](wld: RTmWorld[T], step: float) =
             spr.vel.x *= -spr.friction
             p.x = t.right
 
-    p.y += spr.vel.y * step
+    p.y += spr.vel.y
     if wld.wrapY: p.y = floorMod(p.y, wld.height.float * wld.tileWidth)
 
     s = newRAABB(p.x, p.y, spr.width, spr.height)
