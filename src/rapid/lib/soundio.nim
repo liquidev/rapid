@@ -107,6 +107,8 @@ static:
 
 cImport(Incl/"soundio.h")
 
+cDefine("SOUNDIO_STATIC_LIBRARY")
+
 cCompile(Src/"soundio.c")
 cCompile(Src/"util.c")
 cCompile(Src/"os.c")
