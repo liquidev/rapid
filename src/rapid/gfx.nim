@@ -892,8 +892,9 @@ proc calcMillisPerFrame(): float =
   result = 1 / mode.refreshRate
 
 macro loop*(gfx: RGfx, body: untyped): untyped =
-  ## Runs a game loop on the specified window. A ``draw`` and ``update`` event \
-  ## must be provided (see example).
+  ## Runs a game loop on the specified window. ``draw`` and ``update`` events \
+  ## must be provided (see example). There's also an optional ``init`` event,
+  ## which only gets the context.
   ## The game loop is responsible for running the game at a constant speed, \
   ## independent of the hardware the game's running on.
   runnableExamples:
@@ -957,11 +958,11 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
       # work with in update functions, because this is the typical monitor
       # refresh rate
     var
-      previous = float(time())
+      previous = time()
       lag = 0.0
     while glfw.windowShouldClose(`gfx`.win.handle) == 0:
       let
-        current = float(time())
+        current = time()
         delta = current - previous
       previous = current
       lag += delta
