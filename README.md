@@ -35,7 +35,7 @@ prototyping. Made for convenience while coding, not striking performance.
        - [ ] Tri
        - [ ] Saw
        - [ ] Wave
-     - [ ] Mixer
+     - [x] Mixer
      - Effects
      - DSP
  - Resource loading
