@@ -10,6 +10,7 @@
 import os
 
 import ../../../lib/oggvorbis
+import ../../samplebuffer
 
 type
   AudioDecodeError* = object of CatchableError
@@ -120,7 +121,7 @@ proc fillBufferVorbis(decoder: RAudioDecoder) =
     totalDecoded += decoded
   decoder.readPos = 0
 
-proc streamVorbis(decoder: RAudioDecoder, dest: var seq[float], count: int) =
+proc streamVorbis(decoder: RAudioDecoder, dest: var SampleBuffer, count: int) =
   for i in 0..<count:
     for ch in 0..<decoder.channels:
       if decoder.readPos > decoder.readBuffer.high:
@@ -135,7 +136,7 @@ proc streamVorbis(decoder: RAudioDecoder, dest: var seq[float], count: int) =
       right16 / high(int16)
     ])
 
-proc stream(decoder: RAudioDecoder, dest: var seq[float], count: int) =
+proc stream(decoder: RAudioDecoder, dest: var SampleBuffer, count: int) =
   case decoder.kind
   of adkVorbis: decoder.streamVorbis(dest, count)
 
@@ -206,7 +207,7 @@ proc sampleAt(decoder: RAudioDecoder, i: int): int16 =
     if i in 0..<decoder.sample.len: decoder.sample[i]
     else: 0
 
-proc read*(decoder: RAudioDecoder, dest: var seq[float], count: int) =
+proc read*(decoder: RAudioDecoder, dest: var SampleBuffer, count: int) =
   ## Decode audio to the specified buffer.
   case decoder.mode
   of admSample:

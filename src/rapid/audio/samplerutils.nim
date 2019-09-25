@@ -10,13 +10,9 @@
 import math
 
 import ../math/interpolation
+import samplebuffer
 
-proc fill*[T](s: var seq[T], amt: int, val: T) =
-  ## Fill the given sequence with ``amt`` of ``val``.
-  for n in 0..<amt:
-    s.add(val)
-
-func interpChannels*(audio: openarray[float], t: float,
+func interpChannels*(audio: SampleBuffer, t: float,
                      fn: InterpFunc): tuple[l, r: float] =
   ## Interpolate interleaved audio channels.
   ## **Note:** This is currently broken and will result in poor audio quality

@@ -21,22 +21,20 @@ export RAudioDecoderMode
 type
   RWave* = ref object of RSampler
     decoder: RAudioDecoder
-    convBuffer: seq[float]
     playing, loop: bool
     interpolation: InterpFunc
 
-method sample*(wave: RWave, dest: var seq[float], count: int) =
+method sample*(wave: RWave, dest: var SampleBuffer, count: int) =
   ## Reads ``count`` samples of the wave file into ``dest``, if it's playing.
   ## Otherwise, outputs silence.
-  dest.setLen(0)
   if wave.playing:
+    var convBuffer: SampleBuffer
     let rateRatio = wave.decoder.sampleRate / ROutputSampleRate
-    wave.convBuffer.setLen(0)
-    wave.decoder.read(wave.convBuffer, int(ceil(count.float * rateRatio)))
+    wave.decoder.read(convBuffer, int(ceil(count.float * rateRatio)))
     for n in 0..<count:
       let
         i = n.float * rateRatio
-        (l, r) = interpChannels(wave.convBuffer, i, wave.interpolation)
+        (l, r) = interpChannels(convBuffer, i, wave.interpolation)
         # l = wave.convBuffer[int(i * 2)]
         # r = wave.convBuffer[int(i * 2 + 1)]
       dest.add([l, r])
@@ -50,7 +48,6 @@ proc initRWave*(wave: RWave, filename: string, decodeMode = admSample,
   wave.initRSampler()
   wave.decoder = newRAudioDecoder(filename, decodeMode)
   wave.playing = false
-  wave.convBuffer = newSeq[float](4096)
   wave.interpolation = interpolation
 
 proc newRWave*(filename: string, decodeMode = admSample,

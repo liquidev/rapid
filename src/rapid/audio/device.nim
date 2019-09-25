@@ -20,7 +20,6 @@ type
     sio: ptr SoundIo
     device: ptr SoundIoDevice
     ostream: ptr SoundIoOutStream
-    buffer: seq[float]
     sampler: RSampler
     pollThread: Thread[RAudioDevice]
   RAudioDevice* = ref RAudioDeviceObj
@@ -49,13 +48,14 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
     if frameCount == 0:
       break
 
-    device.sampler.sample(device.buffer, frameCount)
+    var buffer: SampleBuffer
+    device.sampler.sample(buffer, frameCount)
     if layout.channel_count == 1: # mono
       for s in 0..<frameCount:
         let
           left = s * 2
           right = left + 1
-          downmixed = (device.buffer[left] + device.buffer[right]) / 2
+          downmixed = (buffer[left] + buffer[right]) / 2
           s16 = int16(downmixed.limit() * high(int16).float)
         var
           pt = cast[ptr int16](areas[0].`ptr`[areas[0].step * s].unsafeAddr)
@@ -65,8 +65,8 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
         let
           left = s * 2
           right = left + 1
-          ls16 = int16(device.buffer[left].limit() * high(int16).float)
-          rs16 = int16(device.buffer[right].limit() * high(int16).float)
+          ls16 = int16(buffer[left].limit() * high(int16).float)
+          rs16 = int16(buffer[right].limit() * high(int16).float)
         var
           lpt = cast[ptr int16](areas[0].`ptr`[areas[0].step * s].unsafeAddr)
           rpt = cast[ptr int16](areas[1].`ptr`[areas[1].step * s].unsafeAddr)
@@ -124,8 +124,6 @@ proc newRAudioDevice*(name = "rapid/audio device"): RAudioDevice =
     raise newException(AudioError,
       "Could not set channel layout: " &
       $soundio_strerror(outstream.layout_error))
-
-  result.buffer = @[]
 
 proc attach*(device: RAudioDevice, sampler: RSampler) =
   ## Attaches a sampler to the device. This must be done before starting audio

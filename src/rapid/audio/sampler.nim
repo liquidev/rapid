@@ -9,12 +9,14 @@
 ## They are semi low-level, to avoid audio slowdowns and underruns.
 ## This is a base implementation which outputs silence.
 
-import samplerutils
+import samplebuffer
+
+export samplebuffer
 
 type
   RSampler* = ref object of RootObj
 
-method sample*(sampler: RSampler, dest: var seq[float], count: int) {.base.} =
+method sample*(sampler: RSampler, dest: var SampleBuffer, count: int) {.base.} =
   ## Write samples to the destination.
   ## This base implementation writes zeros (producing silence).
   ## Every implementation must write samples to 2 channels interleaved, like:
@@ -33,8 +35,7 @@ method sample*(sampler: RSampler, dest: var seq[float], count: int) {.base.} =
   ## the length of ``dest`` is equal to ``count * 2``. If that isn't the case,
   ## that means there's a sample leak somewhere and a segfault will occur due to
   ## a buffer underflow.
-  dest.setLen(0)
-  dest.fill(count * 2, 0.0)
+  dest.add(0.0, count * 2)
 
 proc initRSampler*(sampler: RSampler) =
   ## Initialize a silent sampler.

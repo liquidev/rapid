@@ -7,27 +7,27 @@
 
 ## A basic mixer with track support.
 
+import ../audiosettings
 import ../sampler
 import ../samplerutils
 
 type
   RMixer* = ref object of RSampler
     tracks*: seq[RTrack]
-    buffer: seq[float]
   RTrack* = ref object
     sampler: RSampler
     pVolume: float
     pMute: bool
 
-method sample*(mixer: RMixer, dest: var seq[float], count: int) =
+method sample*(mixer: RMixer, dest: var SampleBuffer, count: int) =
   ## Mix all tracks together and write the resulting samples into ``dest``.
-  dest.setLen(0)
-  dest.fill(count * 2, 0.0)
+  var
+    buffer: SampleBuffer
   for t in mixer.tracks:
     if not t.pMute:
-      t.sampler.sample(mixer.buffer, count)
-      for i, s in mixer.buffer:
-        dest[i] += s * t.pVolume
+      t.sampler.sample(buffer, count)
+      for i in 0..<buffer.len:
+        dest[i] = dest[i] + buffer[i]
 
 proc initRMixer*(mixer: RMixer) =
   ## Initializes a mixer.

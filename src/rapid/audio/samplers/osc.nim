@@ -11,7 +11,6 @@ import math
 
 import ../audiosettings
 import ../sampler
-import ../samplerutils
 
 type
   ROscKind* = enum
@@ -32,9 +31,8 @@ type
     playing: bool
   ROsc* = ref ROscObj
 
-method sample*(osc: ROsc, dest: var seq[float], count: int) =
+method sample*(osc: ROsc, dest: var SampleBuffer, count: int) =
   ##
-  dest.setLen(0)
   if osc.playing:
     let secondsPerSample = 1 / ROutputSampleRate
     case osc.kind
@@ -48,7 +46,7 @@ method sample*(osc: ROsc, dest: var seq[float], count: int) =
         osc.sineRadians += radiansPerSample
     else: discard
   else:
-    dest.fill(count * 2, 0.0)
+    dest.add(0.0, count * 2)
 
 proc initROsc*(osc: ROsc, kind: ROscKind) =
   ## Initialize an oscillator with the specified kind.
