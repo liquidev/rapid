@@ -28,9 +28,6 @@ type
 proc limit(val: float): float =
   result = clamp(val, -1.0, 1.0)
 
-proc printf(formatstr: cstring) {.importc: "printf", varargs,
-header: "<stdio.h>".}
-
 proc writeCallback(outstream: ptr SoundIoOutStream,
                    frameCountMin: cint, frameCountMax: cint) {.cdecl.} =
   var error: cint
