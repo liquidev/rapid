@@ -34,9 +34,9 @@ method sample*(wave: RWave, dest: var SampleBuffer, count: int) =
     for n in 0..<count:
       let
         i = n.float * rateRatio
-        (l, r) = interpChannels(convBuffer, i, wave.interpolation)
-        # l = wave.convBuffer[int(i * 2)]
-        # r = wave.convBuffer[int(i * 2 + 1)]
+        # (l, r) = interpChannels(convBuffer, i, wave.interpolation)
+        l = convBuffer[int(i * 2)]
+        r = convBuffer[int(i * 2 + 1)]
       dest.add([l, r])
   else:
     for n in 0..<count:

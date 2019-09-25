@@ -22,10 +22,14 @@ type
     ostream: ptr SoundIoOutStream
     sampler: RSampler
     pollThread: Thread[RAudioDevice]
+    gcSetup: bool
   RAudioDevice* = ref RAudioDeviceObj
 
 proc limit(val: float): float =
   result = clamp(val, -1.0, 1.0)
+
+proc printf(formatstr: cstring) {.importc: "printf", varargs,
+header: "<stdio.h>".}
 
 proc writeCallback(outstream: ptr SoundIoOutStream,
                    frameCountMin: cint, frameCountMax: cint) {.cdecl.} =
@@ -35,6 +39,9 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
   var
     areas: ptr UncheckedArray[SoundIoChannelArea]
     device = cast[RAudioDevice](outstream.userdata)
+
+  if not device.gcSetup:
+    setupForeignThreadGc()
 
   var framesLeft = frameCountMax
   while framesLeft > 0:
