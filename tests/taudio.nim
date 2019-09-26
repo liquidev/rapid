@@ -1,9 +1,7 @@
 import os
-import terminal
 
-import rapid/audio/samplers/[wave, mixer, osc]
+import rapid/audio/samplers/osc
 import rapid/audio/device
-import rapid/gfx
 
 var
   dev = newRAudioDevice()
