@@ -23,6 +23,7 @@ type
     sampler: RSampler
     pollThread: Thread[RAudioDevice]
     gcSetup: bool
+    fUnderruns: int
   RAudioDevice* = ref RAudioDeviceObj
 
 proc limit(val: float): float =
@@ -85,8 +86,12 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
 
     framesLeft -= frameCount
 
+proc underflowCallback(outstream: ptr SoundIoOutStream) {.cdecl.} =
+  inc(cast[RAudioDevice](outstream.userdata).fUnderruns)
+
 proc errorCallback(outstream: ptr SoundIoOutStream, errcode: cint) {.cdecl.} =
-  raise newException(AudioError, $soundio_strerror(errcode))
+  if errcode.SoundIoError != SoundIoErrorUnderflow:
+    raise newException(AudioError, $soundio_strerror(errcode))
 
 proc teardownDevice(device: ref RAudioDeviceObj) =
   soundio_outstream_destroy(device.ostream)
@@ -120,6 +125,7 @@ proc newRAudioDevice*(name = "rapid/audio device",
   outstream.name = "rapid/audio"
   outstream.userdata = cast[pointer](result)
   outstream.write_callback = writeCallback
+  outstream.underflow_callback = underflowCallback
   outstream.error_callback = errorCallback
   result.ostream = outstream
 
@@ -157,3 +163,7 @@ proc start*(device: RAudioDevice) =
   ## generate audio samples.
   ## This creates a new thread in which the device is polled for any events.
   createThread(device.pollThread, devicePollThread, device)
+
+proc underruns*(device: RAudioDevice): int =
+  ## Returns the amount of underruns that happened since ``start()`` was called.
+  device.fUnderruns
