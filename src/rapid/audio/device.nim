@@ -42,7 +42,7 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
 
   var framesLeft = frameCountMax
   while framesLeft > 0:
-    var frameCount = framesLeft
+    var frameCount = min(framesLeft, RAudioBatchSize)
 
     if (error = soundio_outstream_begin_write(outstream,
           cast[ptr ptr SoundIoChannelArea](addr areas), addr frameCount);

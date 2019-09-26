@@ -6,13 +6,13 @@
 #--
 
 ## A ``seq`` living on the stack. Keep in mind that its capacity is limited
-## and determined by ``RSampleBufferSize``.
+## and determined by ``RAudioBatchSize``.
 
 import audiosettings
 
 type
   SampleBuffer* = object
-    fData: array[RSampleBufferSize, float]
+    fData: array[RAudioBatchSize * 2, float]
     fLen: int
 
 proc len*(sb: SampleBuffer): int =
@@ -26,7 +26,7 @@ proc `[]`*(sb: SampleBuffer, i: int): float =
   ## This also prevents overflows; if ``i`` is out of bounds, the value
   ## retrieved will be 0.
   result =
-    if i in 0..<RSampleBufferSize: sb.fData[i]
+    if i in 0..<RAudioBatchSize: sb.fData[i]
     else: 0
 
 
@@ -35,7 +35,7 @@ proc `[]=`*(sb: var SampleBuffer, i: int, val: float) =
   ## buffer's length, so it's possible to set elements beyoud ``sb.len - 1``.
   ## This also prevents overflows; if ``i`` is out of bounds, the value
   ## retrieved will be 0.
-  if i in 0..<RSampleBufferSize:
+  if i in 0..<RAudioBatchSize:
     sb.fData[i] = val
 
 proc add*(sb: var SampleBuffer, x: float, n = 1) =

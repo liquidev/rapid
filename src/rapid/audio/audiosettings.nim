@@ -7,4 +7,4 @@
 
 const
   ROutputSampleRate* {.intdefine.} = 48000
-  RSampleBufferSize* {.intdefine.} = 32768
+  RAudioBatchSize* {.intdefine.} = 256
