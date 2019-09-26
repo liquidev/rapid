@@ -12,9 +12,6 @@ import os
 import ../../../lib/oggvorbis
 import ../../samplebuffer
 
-proc printf(formatstr: cstring) {.importc: "printf", varargs,
-                                  header: "<stdio.h>".}
-
 type
   AudioDecodeError* = object of CatchableError
   RAudioDecoderKind* = enum

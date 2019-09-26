@@ -40,7 +40,9 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
   if not device.gcSetup:
     setupForeignThreadGc()
 
-  var framesLeft = frameCountMax
+  var
+    framesLeft = frameCountMax
+    buffer: SampleBuffer
   while framesLeft > 0:
     var frameCount = min(framesLeft, RAudioBatchSize)
 
@@ -52,7 +54,7 @@ proc writeCallback(outstream: ptr SoundIoOutStream,
     if frameCount == 0:
       break
 
-    var buffer: SampleBuffer
+    buffer.reset()
     device.sampler.sample(buffer, frameCount)
     if layout.channel_count == 1: # mono
       for s in 0..<frameCount:
