@@ -93,7 +93,8 @@ proc teardownDevice(device: ref RAudioDeviceObj) =
   soundio_device_unref(device.device)
   soundio_destroy(device.sio)
 
-proc newRAudioDevice*(name = "rapid/audio device"): RAudioDevice =
+proc newRAudioDevice*(name = "rapid/audio device",
+                      latency = 0.1): RAudioDevice =
   ## Creates a new audio device, with the specified name.
   var error: cint
   new(result, teardownDevice)
@@ -115,7 +116,7 @@ proc newRAudioDevice*(name = "rapid/audio device"): RAudioDevice =
     when cpuEndian == littleEndian: SoundIoFormatS16LE
     else: SoundIoFormatS16BE
   outstream.sample_rate = ROutputSampleRate
-  outstream.software_latency = 0.1
+  outstream.software_latency = latency
   outstream.name = "rapid/audio"
   outstream.userdata = cast[pointer](result)
   outstream.write_callback = writeCallback
