@@ -72,41 +72,59 @@ out there.
 
 rapid should work fine on Windows out of the box, no outside dependencies.
 
-Well, except for rapid/audio. The backend library I'm using (soundio)
-**does not want to compile under MinGW**. If anyone has a fix, please open a
-pull request.
-
 ### Linux
 
 On Linux, the development headers for the following libraries must be installed:
 
- - GL
- - X11
- - Xrandr
- - Xxf86vm
- - Xi
- - Xcursor
- - Xinerama
+- for `rapid/gfx`:
+  - GL
+  - X11
+  - Xrandr
+  - Xxf86vm
+  - Xi
+  - Xcursor
+  - Xinerama
+- for `rapid/audio`*:
+  - ALSA
+  - PulseAudio
+  - Jack
+
+\* Each dependency is optional, but highly recommended to increase distro
+compatibility.
+
+If a dependency of `rapid/audio` is not present, a warning will be displayed and
+the respective backend will be unavailable. **To hear anything, you need at**
+**least one backend available.**
 
 #### Debian and Ubuntu
-```
+```sh
+# rapid/gfx
 sudo apt install \
   libgl-dev libx11-dev libxrandr-dev libxxf86vm-dev libxi-dev libxcursor-dev \
   libxinerama-dev
+# rapid/audio
+# TODO: rapid/audio deps on ubuntu
 ```
 
 #### Fedora
-```
+```sh
+# rapid/gfx
 sudo dnf install \
   mesa-libGL-devel libX11-devel libXrandr-devel libXxf86vm-devel \
   libXinerama-devel libXi-devel libXcursor-devel
+# rapid/audio
+sudo dnf install \
+  alsa-lib-devel pulseaudio-libs-devel jack-audio-connection-kit-devel
 ```
 
 #### openSUSE
-```
+```sh
+# rapid/gfx
 sudo zypper in \
   Mesa-libGL-devel libX11-devel libXrandr-devel libXxf86vm-devel \
   libXinerama-devel libXi-devel libXcursor-devel
+# rapid/audio
+# TODO: rapid/audio deps on suse
 ```
 
 ## Examples

@@ -18,3 +18,4 @@ dev.start()
 while true:
   coin1.play()
   coin2.play()
+  sleep(1000)

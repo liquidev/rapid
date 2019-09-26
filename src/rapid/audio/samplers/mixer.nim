@@ -7,9 +7,7 @@
 
 ## A basic mixer with track support.
 
-import ../audiosettings
 import ../sampler
-import ../samplerutils
 
 type
   RMixer* = ref object of RSampler

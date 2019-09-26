@@ -13,7 +13,6 @@ import math
 import wave/decoder
 import ../audiosettings
 import ../sampler
-import ../samplerutils
 import ../../math/interpolation
 
 export RAudioDecoderMode

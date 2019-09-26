@@ -64,6 +64,18 @@ elif defined(macosx):
   # I don't have a way of testing this, contributions welcome
   discard
 else:
+  when not ALSAAvailable:
+    {.warning:
+      "ALSA development headers not found. " &
+      "This audio backend will be disabled".}
+  when not PulseAudioAvailable:
+    {.warning:
+      "PulseAudio development headers not found. " &
+      "This audio backend will be disabled".}
+  when not JACKAvailable:
+    {.warning:
+      "JACK development headers not found. " &
+      "This audio backend will be disabled".}
   {.passL: "-lpthread " &
     (if ALSAAvailable: "-lasound " else: "") &
     (if PulseAudioAvailable: "-lpulse " else: "") &
