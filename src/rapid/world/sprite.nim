@@ -19,7 +19,9 @@ type
 method draw*(spr: RSprite, ctx: RGfxContext, step: float) {.base.} =
   ## The base draw implementation. It just draws a rectangle at the sprite's \
   ## position, with the sprite's dimensions.
+  ctx.begin()
   ctx.rect(spr.pos.x, spr.pos.y, spr.width, spr.height)
+  ctx.draw()
 
 method update*(spr: RSprite, step: float) {.base.} =
   ## The base update implementation. It doesn't do anything.
