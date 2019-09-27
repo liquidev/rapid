@@ -892,7 +892,9 @@ const
     ## ``refreshRate / RFramerateDen``.
   RUpdateFreq* {.intdefine.} = 60 ## \
     ## This is the update frequency to be used in your game loop. This specifies
-    ## how many times a second the update block should execute.
+    ## how many times a second the update block should execute. This is also
+    ## used to specify the scaling applied to ``update`` and ``draw``'s ``step``
+    ## variables.
 
   SecPerUpdate = 1 / RUpdateFreq
 
@@ -969,11 +971,11 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
 
       block update:
         while lag >= SecPerUpdate:
-          let `updateStepName` = delta * 60
+          let `updateStepName` = delta * RUpdateFreq
           `updateBody`
           lag -= SecPerUpdate
 
       block draw:
-        let `drawStepName` = delta * 60
+        let `drawStepName` = delta * RUpdateFreq
         `gfx`.render(`drawCtxName`):
           `drawBody`
