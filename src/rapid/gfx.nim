@@ -885,10 +885,16 @@ template render*(gfx: RGfx, ctxVar, body: untyped): untyped =
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gfx.eboID)
       body
 
-const RFramerateDen* {.intdefine.} = 1 ## \
-  ## The framerate denominator. This can be used in conjunction with VSync to
-  ## simulate a lower framerate, using the formula
-  ## ``refreshRate / RFramerateDen``.
+const
+  RFramerateDen* {.intdefine.} = 1 ## \
+    ## The framerate denominator. This can be used in conjunction with VSync to
+    ## simulate a lower framerate, using the formula
+    ## ``refreshRate / RFramerateDen``.
+  RUpdateFreq* {.intdefine.} = 60 ## \
+    ## This is the update frequency to be used in your game loop. This specifies
+    ## how many times a second the update block should execute.
+
+  SecPerUpdate = 1 / RUpdateFreq
 
 macro loop*(gfx: RGfx, body: untyped): untyped =
   ## Runs a game loop on the specified window. ``draw`` and ``update`` events \
@@ -953,15 +959,19 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
 
     var
       previous = time()
+      lag = 0.0
     while glfw.windowShouldClose(`gfx`.win.handle) == 0:
       let
         current = time()
         delta = current - previous
       previous = current
+      lag += delta
 
       block update:
-        let `updateStepName` = delta * 60
-        `updateBody`
+        while lag >= SecPerUpdate:
+          let `updateStepName` = delta * 60
+          `updateBody`
+          lag -= SecPerUpdate
 
       block draw:
         let `drawStepName` = delta * 60

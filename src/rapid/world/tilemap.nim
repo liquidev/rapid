@@ -165,7 +165,7 @@ proc update*[T](wld: RTmWorld[T], step: float) =
   var sprites = wld.sprites
   for spr in sprites:
     spr.update(step)
-    spr.vel += spr.acc * step
+    spr.vel += spr.acc
     spr.acc *= 0
 
     var p = spr.pos.xy
