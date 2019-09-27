@@ -5,10 +5,14 @@ import rapid/audio/device
 
 var
   dev = newRAudioDevice()
-  sine = newROsc(oscSine)
-dev.attach(sine)
+  oscl = newROsc(oscSine)
+dev.attach(oscl)
 dev.start()
 
-sine.play(freq = 440)
+oscl.play(freq = 440)
 
-sleep(4000)
+sleep(1000)
+
+oscl.stop()
+
+sleep(1000)
