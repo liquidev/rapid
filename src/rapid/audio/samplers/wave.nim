@@ -75,6 +75,8 @@ proc seek*(wave: RWave, time: float) =
   ## Seeks playback to a specified time (in seconds).
   wave.decoder.seekSample(int(time * wave.decoder.sampleRate.float))
 
+proc playing*(wave: RWave): bool = wave.playing
+
 proc stop*(wave: RWave) =
   ## Stops playback and rewinds to the beginning of the wave.
   wave.pause()
