@@ -13,19 +13,21 @@ type
   RMixer* = ref object of RSampler
     tracks*: seq[RTrack]
   RTrack* = ref object
+    buffer: SampleBuffer
     sampler: RSampler
     pVolume: float
     pMute: bool
 
 method sample*(mixer: RMixer, dest: var SampleBuffer, count: int) =
   ## Mix all tracks together and write the resulting samples into ``dest``.
-  var
-    buffer: SampleBuffer
-  for t in mixer.tracks:
+  for i in 0..<count * 2:
+    dest[i] = 0
+  for t in mixer.tracks.mitems:
     if not t.pMute:
-      t.sampler.sample(buffer, count)
-      for i in 0..<buffer.len:
-        dest[i] = dest[i] + buffer[i]
+      t.buffer.reset()
+      t.sampler.sample(t.buffer, count)
+      for i in 0..<count * 2:
+        dest[i] = dest[i] + t.buffer[i] * t.pVolume
 
 proc initRMixer*(mixer: RMixer) =
   ## Initializes a mixer.

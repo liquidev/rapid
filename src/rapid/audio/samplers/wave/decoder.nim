@@ -24,7 +24,7 @@ type
 
     channels*: int
     sampleRate*: int
-    atEnd*: bool
+    fAtEnd: bool
 
     case mode*: RAudioDecoderMode
     of admSample:
@@ -65,6 +65,12 @@ const
     [0, 2], [0, 2], [0, 2], [0, 2]
   ]
 
+proc atEnd*(decoder: RAudioDecoder): bool =
+  result = decoder.fAtEnd
+
+proc `atEnd=`(decoder: RAudioDecoder, atEnd: bool) =
+  decoder.fAtEnd = atEnd
+
 proc preloadVorbis(decoder: RAudioDecoder) =
   var
     readBuffer: array[4096, uint8]
@@ -104,6 +110,7 @@ proc preload(decoder: RAudioDecoder) =
     decoder.preloadVorbis()
 
 proc fillBufferVorbis(decoder: RAudioDecoder) =
+  echo "PRELOADING"
   var
     bitstream: cint
     totalDecoded = 0
@@ -118,6 +125,12 @@ proc fillBufferVorbis(decoder: RAudioDecoder) =
     if decoded in [OV_HOLE, OV_EBADLINK, OV_EINVAL]:
       raise newException(AudioDecodeError,
         "The Vorbis file is invalid or corrupted")
+    elif decoded == 0:
+      decoder.atEnd = true
+      let bufSize = sizeof(decoder.readBuffer)
+      for i in bufSize - totalDecoded..<bufSize:
+        byteReadBuffer[i] = 0
+      break
     totalDecoded += decoded
   decoder.readPos = 0
 
