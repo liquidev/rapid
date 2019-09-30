@@ -650,7 +650,7 @@ proc circle*(ctx: RGfxContext, x, y, r: float, points = 32) =
   ## specifying them for a circle (convert to cartesian, or use polar?)
   let center = ctx.vertex((x, y))
   var rim: seq[RVertexIndex]
-  for i in 0..<points:
+  for i in 0..points:
     let angle = i / (points - 1) * (2 * PI)
     rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
   for n, i in rim:
@@ -733,7 +733,7 @@ proc lcircle*(ctx: RGfxContext, x, y, r: float, points = 32) =
   ## points can be specified to create an equilateral polygon.
   lineAux:
     var rim: seq[RVertexIndex]
-    for i in 0..<points:
+    for i in 0..points:
       let angle = i / (points - 1) * (2 * PI)
       rim.add(ctx.vertex((x + cos(angle) * r, y + sin(angle) * r)))
     for n, i in rim:
