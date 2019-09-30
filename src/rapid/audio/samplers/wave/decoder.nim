@@ -110,7 +110,6 @@ proc preload(decoder: RAudioDecoder) =
     decoder.preloadVorbis()
 
 proc fillBufferVorbis(decoder: RAudioDecoder) =
-  echo "PRELOADING"
   var
     bitstream: cint
     totalDecoded = 0
