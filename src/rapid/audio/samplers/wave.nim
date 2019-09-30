@@ -23,6 +23,12 @@ type
     playing, loop: bool
     interpolation: InterpFunc
 
+proc printf(formatstr: cstring) {.importc: "printf", varargs,
+header: "<stdio.h>".}
+
+proc finished*(wave: RWave): bool =
+  result = wave.decoder.atEnd
+
 method sample*(wave: RWave, dest: var SampleBuffer, count: int) =
   ## Reads ``count`` samples of the wave file into ``dest``, if it's playing.
   ## Otherwise, outputs silence.
@@ -30,6 +36,8 @@ method sample*(wave: RWave, dest: var SampleBuffer, count: int) =
     var convBuffer: SampleBuffer
     let rateRatio = wave.decoder.sampleRate / ROutputSampleRate
     wave.decoder.read(convBuffer, int(ceil(count.float * rateRatio)))
+    if wave.loop and wave.finished:
+      wave.decoder.seekSample(0)
     for n in 0..<count:
       let
         i = n.float * rateRatio
@@ -71,9 +79,6 @@ proc stop*(wave: RWave) =
   ## Stops playback and rewinds to the beginning of the wave.
   wave.pause()
   wave.seek(0)
-
-proc finished*(wave: RWave): bool =
-  result = wave.decoder.atEnd
 
 proc loop*(wave: RWave): bool = wave.loop
 proc `loop=`*(wave: RWave, enabled: bool) =
