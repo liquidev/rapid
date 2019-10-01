@@ -156,7 +156,7 @@ proc rawStart(device: RAudioDevice) =
 proc devicePollThread(device: RAudioDevice) {.thread.} =
   device.rawStart()
   while true:
-    soundio_flush_events(device.sio)
+    soundio_wait_events(device.sio)
 
 proc start*(device: RAudioDevice) =
   ## Starts playback from the audio device, using the attached sampler to
