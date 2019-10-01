@@ -97,7 +97,8 @@ sudo apt install \
   libgl-dev libx11-dev libxrandr-dev libxxf86vm-dev libxi-dev libxcursor-dev \
   libxinerama-dev
 # rapid/audio
-# TODO: rapid/audio deps on ubuntu
+sudo apt install \
+  libasound2-dev libpulse-dev libjack-dev
 ```
 
 #### Fedora
