@@ -76,7 +76,7 @@ method sample*(osc: ROsc, dest: var SampleBuffer, count: int) =
     case osc.kind
     of oscSine:
       sinePrep
-      while osc.sineRadians mod PI > 0.05:
+      while osc.sineRadians mod PI notin -0.05..0.05:
         sineLoop
     of oscPulse: discard
     dest.add(0.0, count * 2 - dest.len)
