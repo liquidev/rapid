@@ -141,16 +141,18 @@ proc updateFb(canvas: RCanvas) =
     canvas.target.unload()
   if canvas.rb != 0:
     glDeleteRenderbuffers(1, addr canvas.rb)
-  glCreateFramebuffers(1, addr canvas.fb)
+  glGenFramebuffers(1, addr canvas.fb)
   canvas.target = newRTexture(canvas.fWidth, canvas.fHeight, nil,
                               canvas.texConf)
-  glNamedFramebufferTexture(canvas.fb, GL_COLOR_ATTACHMENT0,
-                            canvas.target.id, 0)
-  glCreateRenderbuffers(1, addr canvas.rb)
-  glNamedRenderbufferStorage(canvas.rb, GL_DEPTH24_STENCIL8,
-                             canvas.width.GLsizei, canvas.height.GLsizei)
-  glNamedFramebufferRenderbuffer(canvas.fb, GL_DEPTH_STENCIL_ATTACHMENT,
-                                 GL_RENDERBUFFER, canvas.rb)
+  currentGlc.withFramebuffer(canvas.fb):
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                              canvas.target.id, 0)
+    glGenRenderbuffers(1, addr canvas.rb)
+    currentGlc.withRenderbuffer(canvas.rb):
+      glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8,
+                            canvas.width.GLsizei, canvas.height.GLsizei)
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                                GL_RENDERBUFFER, canvas.rb)
   withFramebuffer(currentGlc, canvas.fb):
     glClearColor(0.0, 0.0, 0.0, 0.0)
     glClearStencil(255)
