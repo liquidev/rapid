@@ -52,9 +52,17 @@ else:
     {.error: "pkg-config is required to build rapid/lib/soundio".}
   else:
     const
-      JACKAvailable = gorgeEx("pkg-config jack").exitCode == 0
-      PulseAudioAvailable = gorgeEx("pkg-config libpulse").exitCode == 0
-      ALSAAvailable = gorgeEx("pkg-config alsa").exitCode == 0
+      JACKAvailable =
+        not defined(RNoJACK) and gorgeEx("pkg-config jack").exitCode == 0
+      PulseAudioAvailable =
+        not defined(RNoPulse) and gorgeEx("pkg-config libpulse").exitCode == 0
+      ALSAAvailable =
+        not defined(RNoALSA) and gorgeEx("pkg-config alsa").exitCode == 0
+    static:
+      echo "--- rapid/audio - linux config ---"
+      echo "jack: ", JACKAvailable
+      echo "pulse: ", PulseAudioAvailable
+      echo "alsa: ", ALSAAvailable
 
 # pass linker args
 when defined(windows):
@@ -83,11 +91,11 @@ else:
 
 static:
   var backends = ""
-  if WASAPIAvailable: backends.add("#define SOUNDIO_HAVE_WASAPI\n")
-  if CoreAudioAvailable: backends.add("#define SOUNDIO_HAVE_COREAUDIO\n")
-  if JACKAvailable: backends.add("#define SOUNDIO_HAVE_JACK\n")
-  if PulseAudioAvailable: backends.add("#define SOUNDIO_HAVE_PULSEAUDIO\n")
-  if ALSAAvailable: backends.add("#define SOUNDIO_HAVE_ALSA\n")
+  when WASAPIAvailable: backends.add("#define SOUNDIO_HAVE_WASAPI\n")
+  when CoreAudioAvailable: backends.add("#define SOUNDIO_HAVE_COREAUDIO\n")
+  when JACKAvailable: backends.add("#define SOUNDIO_HAVE_JACK\n")
+  when PulseAudioAvailable: backends.add("#define SOUNDIO_HAVE_PULSEAUDIO\n")
+  when ALSAAvailable: backends.add("#define SOUNDIO_HAVE_ALSA\n")
   let configH = """
     /*
     * Copyright (c) 2015 Andrew Kelley
@@ -116,6 +124,8 @@ static:
     .replace("@LIBSOUNDIO_VERSION@", "2.0.0")
     .replace("$backends", backends)
   writeFile(Src/"config.h", configH)
+  when defined(RCompileDebug):
+    echo configH
 
 cImport(Incl/"soundio.h")
 
