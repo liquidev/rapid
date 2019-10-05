@@ -53,6 +53,11 @@ proc color*(fmt: RTexturePixelFormat): GLenum =
   of fmtRGBA8: GL_RGBA
   of fmtRed8: GL_RED
 
+proc pixelSize*(fmt: RTexturePixelFormat): int =
+  case fmt
+  of fmtRGBA8: 4
+  of fmtRed8: 1
+
 const
   DefaultTextureConfig* = (
     minFilter: fltLinear, magFilter: fltLinear,
@@ -61,15 +66,22 @@ const
 
 proc newRTexture*(width, height: int, data: pointer,
                   conf = DefaultTextureConfig,
-                  format = fmtRGBA8): RTexture =
+                  format = fmtRGBA8, clear = true): RTexture =
   ## Creates a new texture from the specified data.
+  ## If ``clear`` is true and ``data`` is nil, the texture will be cleared with
+  ## zeros.
   result = RTexture(width: width, height: height)
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
   glGenTextures(1, addr result.id)
   currentGlc.withTex2D(result.id):
+    let d =
+      if clear and data == nil: alloc0(width * height * format.pixelSize)
+      else: data
     glTexImage2D(GL_TEXTURE_2D, 0, format.internal.GLint,
                  width.GLsizei, height.GLsizei, 0,
-                 format.color, GL_UNSIGNED_BYTE, data)
+                 format.color, GL_UNSIGNED_BYTE, d)
+    if data == nil:
+      dealloc(d)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
                     conf.minFilter.GLenum.GLint)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
