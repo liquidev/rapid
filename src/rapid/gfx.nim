@@ -138,7 +138,6 @@ proc onResize*(canvas: RCanvas, callback: RCanvasResizeFn) =
 proc updateFb(canvas: RCanvas) =
   if canvas.fb != 0:
     glDeleteFramebuffers(1, addr canvas.fb)
-    canvas.target.unload()
   if canvas.rb != 0:
     glDeleteRenderbuffers(1, addr canvas.rb)
   glGenFramebuffers(1, addr canvas.fb)

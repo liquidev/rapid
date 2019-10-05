@@ -168,7 +168,6 @@ proc unload*(font: var RFont) =
   ## Unloads a font. The font cannot be used afterwards.
   let err = FT_Done_Face(font.handle)
   doAssert not err.bool, "Could not unload font face"
-  font.packer.unload()
 
 proc drawChar(ctx: RGfxContext, font: RFont,
               x, y: float, penX, penY: var float, r: Rune) =

@@ -92,7 +92,3 @@ proc newRTexturePacker*(width, height: Natural,
     texture: newRTexture(width, height, nil, conf, fmt),
     fmt: fmt
   )
-
-proc unload*(tp: RTexturePacker) =
-  ## Unloads the texture packer's texture, rendering the packer unusable.
-  tp.texture.unload()
