@@ -64,10 +64,16 @@ const
     wrapH: wrapRepeat, wrapV: wrapRepeat
   ).RTextureConfig # for type safety
 
+proc unload(tex: RTexture) =
+  ## Unloads a texture. The texture cannot be used afterwards.
+  glDeleteTextures(1, addr tex.id)
+
 proc newRTexture*(width, height: int, data: pointer,
                   conf = DefaultTextureConfig, format = fmtRGBA8): RTexture =
   ## Creates a new texture from the specified data.
-  result = RTexture(width: width, height: height)
+  new(result, unload)
+  result.width = width
+  result.height = height
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
   glGenTextures(1, addr result.id)
   currentGlc.withTex2D(result.id):
@@ -120,7 +126,3 @@ proc `wrapV=`*(tex: RTexture, wrap: RTextureWrap) =
   ## Sets the vertical wrapping of the texture.
   currentGlc.withTex2D(tex.id):
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap.GLenum.GLint)
-
-proc unload*(tex: RTexture) =
-  ## Unloads a texture. The texture cannot be used afterwards.
-  glDeleteTextures(1, addr tex.id)
