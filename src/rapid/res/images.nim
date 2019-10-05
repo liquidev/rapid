@@ -14,6 +14,8 @@ type
     width*, height*: int
     data*: string
 
+proc area*(img: RImage): int = img.width * img.height
+
 proc newRImage*(width, height: int, data: string, colorChannels = 4): RImage =
   ## Create a new image, with the specified size, data, and amount of color
   ## channels. The resulting image will be flipped in the Y axis, so it can be
