@@ -108,6 +108,6 @@ proc `wrapV=`*(tex: RTexture, wrap: RTextureWrap) =
   currentGlc.withTex2D(tex.id):
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap.GLenum.GLint)
 
-proc unload*(tex: var RTexture) =
+proc unload*(tex: RTexture) =
   ## Unloads a texture. The texture cannot be used afterwards.
   glDeleteTextures(1, addr tex.id)
