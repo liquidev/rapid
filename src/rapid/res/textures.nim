@@ -65,23 +65,15 @@ const
   ).RTextureConfig # for type safety
 
 proc newRTexture*(width, height: int, data: pointer,
-                  conf = DefaultTextureConfig,
-                  format = fmtRGBA8, clear = true): RTexture =
+                  conf = DefaultTextureConfig, format = fmtRGBA8): RTexture =
   ## Creates a new texture from the specified data.
-  ## If ``clear`` is true and ``data`` is nil, the texture will be cleared with
-  ## zeros.
   result = RTexture(width: width, height: height)
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
   glGenTextures(1, addr result.id)
   currentGlc.withTex2D(result.id):
-    let d =
-      if clear and data == nil: alloc0(width * height * format.pixelSize)
-      else: data
     glTexImage2D(GL_TEXTURE_2D, 0, format.internal.GLint,
                  width.GLsizei, height.GLsizei, 0,
-                 format.color, GL_UNSIGNED_BYTE, d)
-    if data == nil:
-      dealloc(d)
+                 format.color, GL_UNSIGNED_BYTE, data)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
                     conf.minFilter.GLenum.GLint)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
@@ -90,6 +82,15 @@ proc newRTexture*(width, height: int, data: pointer,
                     conf.wrapH.GLenum.GLint)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
                     conf.wrapV.GLenum.GLint)
+
+proc newRTexture*(width, height: int, conf = DefaultTextureConfig,
+                  format = fmtRGBA8): RTexture =
+  ## Creates a new texture. Unlike calling ``newRTexture`` with nil as the
+  ## data pointer, this zeroes the texture out, making it perfect for use with
+  ## any additional processing like texture packing.
+  let zeroData = alloc0(width * height * format.pixelSize)
+  result = newRTexture(width, height, zeroData, conf, format)
+  dealloc(zeroData)
 
 proc newRTexture*(image: RImage, conf = DefaultTextureConfig): RTexture =
   ## Creates a texture from an RImage.
