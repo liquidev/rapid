@@ -47,6 +47,13 @@ proc rawPlace(tp: RTexturePacker, x, y, w, h: int, data: pointer) =
   glTexSubImage2D(GL_TEXTURE_2D, 0, x.GLint, GLint(tp.texture.height - y - h),
                   w.GLsizei, h.GLsizei, tp.fmt.color, GL_UNSIGNED_BYTE, data)
 
+proc getRect(tp: RTexturePacker, x, y, w, h: int): RTextureRect =
+  let
+    hp = 1 / tp.texture.width / tp.texture.width.float / 2
+    vp = 1 / tp.texture.height / tp.texture.height.float / 2
+  result = (x / tp.texture.width + hp, y / tp.texture.height + vp,
+            w / tp.texture.width - hp * 2, h / tp.texture.height - vp * 2)
+
 proc packEfficient(tp: RTexturePacker, image: RImage): RTextureRect =
   var
     x = tp.x
@@ -61,12 +68,7 @@ proc packEfficient(tp: RTexturePacker, image: RImage): RTextureRect =
         if tp.areaFree(x, y, image.width, image.height):
           tp.rawPlace(x, y, image.width, image.height, image.caddr)
           tp.occupyArea(x, y, image.width, image.height)
-          let
-            hp = 1 / tp.texture.width / tp.texture.width.float / 2
-            vp = 1 / tp.texture.height / tp.texture.height.float / 2
-          return (x / tp.texture.width + hp, y / tp.texture.height + vp,
-                  image.width / tp.texture.width - hp * 2,
-                  image.height / tp.texture.height - vp * 2)
+          return tp.getRect(x, y, image.width, image.height)
         inc(x)
     x = 0
     inc(y)
@@ -78,6 +80,7 @@ proc packFast(tp: RTexturePacker, image: RImage): RTextureRect =
     tp.x = 0
     tp.y = tp.lineMaxY
   tp.rawPlace(tp.x, tp.y, image.width, image.height, image.caddr)
+  result = tp.getRect(tp.x, tp.y, image.width, image.height)
   tp.x += image.width
   if tp.lineMaxY < tp.y + image.height:
     tp.lineMaxY = tp.y + image.height
