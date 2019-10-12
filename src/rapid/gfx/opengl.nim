@@ -17,6 +17,7 @@ type
     window*: glfw.Window
     fTex2D: GLuint
     fFramebuffers: FbPair
+    fRenderbuffer: GLuint
     fSrcBlend, fDestBlend: GLenum
     fStencilFunc: StencilFunc
     fStencilOp: StencilOp
@@ -59,6 +60,13 @@ proc `framebuffer=`*(ctx: GLContext, fb: GLuint) =
   glBindFramebuffer(GL_FRAMEBUFFER, fb)
   ctx.fFramebuffers = (fb, fb)
 
+proc renderbuffer*(ctx: GLContext): GLuint =
+  result = ctx.fRenderbuffer
+
+proc `renderbuffer=`*(ctx: GLContext, rb: GLuint) =
+  glBindRenderbuffer(GL_RENDERBUFFER, rb)
+  ctx.fRenderbuffer = rb
+
 proc blendFunc*(ctx: GLContext): BlendFunc =
   result = (ctx.fSrcBlend, ctx.fDestBlend)
 
@@ -97,6 +105,7 @@ template withFor(name, field, T) {.dirty.} =
 
 withFor(Tex2D, tex2D, GLuint)
 withFor(Framebuffers, framebuffers, FbPair)
+withFor(Renderbuffer, renderbuffer, GLuint)
 withFor(StencilFunc, stencilFunc, StencilFunc)
 withFor(StencilOp, stencilOp, StencilOp)
 withFor(Viewport, viewport, Viewport)

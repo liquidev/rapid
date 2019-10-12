@@ -123,11 +123,11 @@ proc begin*(fx: RFxSurface, ctx: RGfxContext,
   fx.prevFbs = currentGlc.framebuffers
   currentGlc.framebuffer = fx.a.id
   if copyTarget:
-    glBlitNamedFramebuffer(fx.target.id, fx.a.id,
-                           0, 0, fx.target.width.GLint, fx.target.height.GLint,
-                           0, 0, fx.a.width.GLint, fx.a.height.GLint,
-                           GL_COLOR_BUFFER_BIT,
-                           GL_NEAREST)
+    currentGlc.withFramebuffers((fx.target.id, fx.a.id)):
+      glBlitFramebuffer(0, 0, fx.target.width.GLint, fx.target.height.GLint,
+                        0, 0, fx.a.width.GLint, fx.a.height.GLint,
+                        GL_COLOR_BUFFER_BIT,
+                        GL_NEAREST)
     ctx.renderTo(fx.b): fx.ctx.clear(gray(0, 0))
   else:
     ctx.renderTo(fx.a): fx.ctx.clear(gray(0, 0))
@@ -139,10 +139,10 @@ proc effect*(fx: RFxSurface, eff: REffect, stencil = false) =
     prevProgram = fx.ctx.program
     prevTexture = fx.ctx.texture
   if stencil:
-    glBlitNamedFramebuffer(fx.a.id, fx.b.id,
-                           0, 0, fx.a.width.GLint, fx.a.height.GLint,
-                           0, 0, fx.b.width.GLint, fx.b.height.GLint,
-                           GL_STENCIL_BUFFER_BIT, GL_NEAREST)
+    currentGlc.withFramebuffers((fx.a.id, fx.b.id)):
+      glBlitFramebuffer(0, 0, fx.a.width.GLint, fx.a.height.GLint,
+                        0, 0, fx.b.width.GLint, fx.b.height.GLint,
+                        GL_STENCIL_BUFFER_BIT, GL_NEAREST)
   fx.ctx.renderTo(fx.b):
     fx.ctx.clear(gray(0, 0))
     fx.ctx.transform():
@@ -165,11 +165,11 @@ proc finish*(fx: RFxSurface,
   ## cases.
   let prevTexture = fx.ctx.texture
   if replaceTarget:
-    glBlitNamedFramebuffer(fx.a.id, fx.target.id,
-                           0, 0, fx.a.width.GLint, fx.a.height.GLint,
-                           0, 0, fx.target.width.GLint, fx.target.height.GLint,
-                           GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT,
-                           GL_NEAREST)
+    currentGlc.withFramebuffers((fx.a.id, fx.target.id)):
+      glBlitFramebuffer(0, 0, fx.a.width.GLint, fx.a.height.GLint,
+                        0, 0, fx.target.width.GLint, fx.target.height.GLint,
+                        GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT,
+                        GL_NEAREST)
   else:
     renderTo(fx.ctx, fx.target):
       transform(fx.ctx):

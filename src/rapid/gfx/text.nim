@@ -62,7 +62,8 @@ proc loadRFont*(file: string, height: Natural, width = 0.Natural,
   result = RFont(
     fTexConf: textureConfig,
     fGlyphs: newTable[RGlyphId, RGlyph](),
-    fPacker: newRTexturePacker(texWidth, texHeight, textureConfig, fmtRed8),
+    fPacker: newRTexturePacker(texWidth, texHeight, textureConfig, fmtRed8,
+                               tpmFast),
     fWidth: width,
     fHeight: height,
     fLineSpacing: 1.3,
@@ -168,7 +169,6 @@ proc unload*(font: var RFont) =
   ## Unloads a font. The font cannot be used afterwards.
   let err = FT_Done_Face(font.handle)
   doAssert not err.bool, "Could not unload font face"
-  font.packer.unload()
 
 proc drawChar(ctx: RGfxContext, font: RFont,
               x, y: float, penX, penY: var float, r: Rune) =

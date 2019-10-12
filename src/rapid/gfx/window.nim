@@ -7,6 +7,8 @@
 
 ## This module has everything related to windows.
 ## **Do not import this directly, it's included by the gfx module.**
+##
+## You can use ``-d:RGlDebugOutput`` to enable OpenGL debug output.
 
 import times
 import unicode
@@ -75,7 +77,7 @@ proc initGl(win: glfw.Window): InitErrorKind =
   glfw.makeContextCurrent(win)
   if not gladLoadGL(glfw.getProcAddress):
     return ieGladLoadFailed
-  when defined(glDebugOutput):
+  when defined(RGlDebugOutput):
     if GLAD_GL_KHR_debug:
       glEnable(GL_DEBUG_OUTPUT)
       glDebugMessageCallback(onGlDebug, nil)
@@ -85,9 +87,6 @@ proc initGl(win: glfw.Window): InitErrorKind =
     error("ARB_separate_shader_objects is not available. ",
           "Please update your graphics drivers")
     quit(QuitFailure)
-  if not GLAD_GL_ARB_direct_state_access:
-    error("ARB_direct_state_access is not available. ",
-          "Please update your graphics drivers")
   return ieOK
 
 #--
