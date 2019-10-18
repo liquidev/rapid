@@ -13,40 +13,20 @@
 import times
 import unicode
 
-import ../debug
 import ../lib/glad/gl
-from ../lib/glfw import nil
+import ../lib/sdl
+import ../debug
+import ../shutdown
+import window/window_enums
 import opengl
 
-export glfw.Key
-export glfw.KeyAction
-export glfw.ModifierKey
-export glfw.MouseButton
+export window_enums
 export times.cpuTime
 export unicode.Rune
 
 #--
-# OpenGL Initialization
+# Initialization
 #--
-
-type
-  InitErrorKind = enum
-    ieOK = "Init successful"
-    ieGlfwInitFailed = "Failed to initialize GLFW"
-    ieGladLoadFailed = "Failed to load OpenGL procs"
-  GLFWError* = object of Defect
-    code: int
-
-proc initGlfw(): InitErrorKind =
-  if glfw.init() == 0:
-    return ieGlfwInitFailed
-  addQuitProc() do:
-    glfw.terminate()
-  discard glfw.setErrorCallback do (errCode: int32, msg: cstring) {.cdecl.}:
-    var err = newException(GLFWError, $msg)
-    err.code = int errCode
-    raise err
-  return ieOK
 
 proc onGlDebug(source, kind: GLenum, id: GLuint, severity: GLenum,
                length: GLsizei, msgPtr: ptr GLchar,
@@ -73,10 +53,8 @@ proc onGlDebug(source, kind: GLenum, id: GLuint, severity: GLenum,
   when defined(glDebugBacktrace):
     writeStackTrace()
 
-proc initGl(win: glfw.Window): InitErrorKind =
-  glfw.makeContextCurrent(win)
-  if not gladLoadGL(glfw.getProcAddress):
-    return ieGladLoadFailed
+proc initGl(win: sdl.Window) =
+  doAssert gladLoadGL(sdl.GL_GetProcAddress), "OpenGL could not be loaded"
   when defined(RGlDebugOutput):
     if GLAD_GL_KHR_debug:
       glEnable(GL_DEBUG_OUTPUT)
@@ -105,13 +83,13 @@ type
   #--
   # Events
   #--
-  RModKeys* = set[glfw.ModifierKey]
+  RModKeys* = set[RModKey]
   RCharProc* = proc (rune: Rune, mods: RModKeys)
   RCursorEnterProc* = proc ()
   RCursorMoveProc* = proc (x, y: float)
   RFilesDroppedProc* = proc (filenames: seq[string])
-  RKeyProc* = proc (key: glfw.Key, scancode: int, mods: RModKeys)
-  RMouseProc* = proc (button: glfw.MouseButton, mods: RModKeys)
+  RKeyProc* = proc (key: RKeycode, scancode: RScancode, mods: RModKeys)
+  RMouseProc* = proc (button: RMouseButton, mods: RModKeys)
   RScrollProc* = proc (x, y: float)
   RCloseProc* = proc (): bool
   RResizeProc* = proc (width, height: Natural)
@@ -129,9 +107,8 @@ type
   # Windows
   #--
   RWindowObj = object
-    handle*: glfw.Window
+    handle: ptr sdl.Window
     callbacks: WindowCallbacks
-    context*: GLContext
   RWindow* = ref RWindowObj
 
 using
@@ -140,9 +117,8 @@ using
 proc initRWindow*(): WindowOptions =
   ## Initializes a new ``RWindow``.
   once:
-    let status = initGlfw()
-    if status != ieOK:
-      raise newException(GLFWError, $status)
+    if sdl.initSubSystem(0x20 #[SDL_INIT_VIDEO]#) != 0:
+      raise newException(SDLError, $sdl.getError())
   result = WindowOptions(
     width: 800, height: 600,
     title: "rapid",
@@ -187,67 +163,21 @@ proc antialiasLevel*(wopt; level: int): WindowOptions =
 
 converter toModsSet(mods: int32): RModKeys =
   result = {}
-  if (mods and glfw.mkShift.int) > 0: result = result + { glfw.mkShift }
-  if (mods and glfw.mkAlt.int) > 0: result = result + { glfw.mkAlt }
-  if (mods and glfw.mkCtrl.int) > 0: result = result + { glfw.mkCtrl }
-  if (mods and glfw.mkSuper.int) > 0: result = result + { glfw.mkSuper }
-
-proc glfwCallbacks(win: var RWindow) =
-  win.callbacks = WindowCallbacks()
-  template run(name, body: untyped): untyped {.dirty.} =
-    let win = cast[RWindow](glfw.getWindowUserPointer(w))
-    for cb in win.callbacks.name: body
-  discard glfw.setCharModsCallback(win.handle,
-    proc (w: glfw.Window, uchar: cuint, mods: int32) {.cdecl.} =
-      run(onChar): cb(Rune(uchar), mods))
-  discard glfw.setCursorEnterCallback(win.handle,
-    proc (w: glfw.Window, entered: int32) {.cdecl.} =
-      if entered == 1:
-        run(onCursorEnter, cb())
-      else:
-        run(onCursorLeave, cb()))
-  discard glfw.setCursorPosCallback(win.handle,
-    proc (w: glfw.Window, x, y: cdouble) {.cdecl.} =
-      run(onCursorMove, cb(x, y)))
-  discard glfw.setDropCallback(win.handle,
-    proc (w: glfw.Window, n: int32, files: cstringArray) {.cdecl.} =
-      run(onFilesDropped, cb(cstringArrayToSeq(files, n))))
-  discard glfw.setKeyCallback(win.handle,
-    proc (w: glfw.Window, key, scan, action, mods: int32) {.cdecl.} =
-      case glfw.KeyAction(action)
-      of glfw.kaDown:
-        run(onKeyPress, cb(glfw.Key(key), int scan, mods))
-      of glfw.kaUp:
-        run(onKeyRelease, cb(glfw.Key(key), int scan, mods))
-      of glfw.kaRepeat:
-        run(onKeyRepeat, cb(glfw.Key(key), int scan, mods)))
-  discard glfw.setMouseButtonCallback(win.handle,
-    proc (w: glfw.Window, button, action, mods: int32) {.cdecl.} =
-      case glfw.KeyAction(action)
-      of glfw.kaDown:
-        run(onMousePress, cb(glfw.MouseButton(button), mods))
-      of glfw.kaUp:
-        run(onMouseRelease, cb(glfw.MouseButton(button), mods))
-      else: discard)
-  discard glfw.setScrollCallback(win.handle,
-    proc (w: glfw.Window, x, y: cdouble) {.cdecl.} =
-      run(onScroll, cb(x, y)))
-  discard glfw.setWindowCloseCallback(win.handle,
-    proc (w: glfw.Window) {.cdecl.} =
-      var close = true
-      run(onClose): close = close and cb()
-      glfw.setWindowShouldClose(w, int32 close))
-  discard glfw.setWindowSizeCallback(win.handle,
-    proc (w: glfw.Window, width, height: int32) {.cdecl.} =
-      run(onResize, cb(width, height)))
-
-converter toInt32(hint: glfw.Hint): int32 =
-  int32 hint
+  const
+    Shifts = KMOD_LSHIFT or KMOD_RSHIFT
+    Ctrls = KMOD_LCTRL or KMOD_RCTRL
+    Alts = KMOD_LALT or KMOD_RALT
+    Guis = KMOD_LGUI or KMOD_RGUI
+  if (mods and Shifts) > 0: result.incl(rmkShift)
+  if (mods and Ctrls) > 0: result.incl(rmkCtrl)
+  if (mods and Alts) > 0: result.incl(rmkAlt)
+  if (mods and Guis) > 0: result.incl(rmkGui)
+  if (mods and KMOD_NUM) > 0: result.incl(rmkNumLock)
+  if (mods and KMOD_CAPS) > 0: result.incl(rmkCapsLock)
+  if (mods and KMOD_MODE) > 0: result.incl(rmkMode)
 
 proc open*(wopt): RWindow =
   ## Builds a window using the specified options and opens it.
-  ## The window will always have an OpenGL 3.3 (or newer) context.
-  ## rapid only ever makes use of 3.3 procs, however.
   result = RWindow()
 
   let
@@ -274,14 +204,10 @@ proc open*(wopt): RWindow =
   glfw.windowHint(glfw.hContextVersionMinor, 3)
   glfw.windowHint(glfw.hOpenglProfile, glfw.opCoreProfile.int32)
   glfw.windowHint(glfw.hOpenglDebugContext, 1)
-  result.handle = glfw.createWindow(
-    wopt.width.int32, wopt.height.int32,
-    wopt.title,
-    nil, nil
-  )
-  result.context = GLContext(
-    window: result.handle
-  )
+  const
+    PosCentered = 0x2FFF0000.cint
+  result.handle = createWindow(wopt.title, PosCentered, PosCentered,
+                               wopt.width.cint, wopt.height.cint, 0)
   if currentGlc.isNil:
     result.context.makeCurrent()
 

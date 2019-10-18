@@ -8,13 +8,13 @@
 ## Common OpenGL things.
 
 import ../lib/glad/gl
-from ../lib/glfw import nil
+import ../lib/sdl
 
 type
   GLError* = object of Defect
   GLContext* = ref object
     ## An object used for storing OpenGL state.
-    window*: glfw.Window
+    window*: ptr sdl.Window
     fTex2D: GLuint
     fFramebuffers: FbPair
     fRenderbuffer: GLuint
