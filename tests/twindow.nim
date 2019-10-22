@@ -8,6 +8,8 @@ import rapid/gfx, rapid/gfx/[fxsurface, texatlas, text]
 import rapid/lib/glad/gl
 import rapid/world/[aabb, sprite, tilemap]
 
+import rapid/lib/sdl2
+
 type
   Tile = object
     tileX, tileY: int

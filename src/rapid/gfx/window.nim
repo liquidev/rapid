@@ -13,11 +13,14 @@
 import times
 import unicode
 
+import glm
+
 import ../lib/glad/gl
-import ../lib/sdl
+import ../lib/sdl/[sdl_init, sdl_error, sdl_keyboard, sdl_video]
 import ../debug
 import ../shutdown
 import window/window_enums
+import window/window_lowlevel
 import opengl
 
 export window_enums
@@ -53,8 +56,8 @@ proc onGlDebug(source, kind: GLenum, id: GLuint, severity: GLenum,
   when defined(glDebugBacktrace):
     writeStackTrace()
 
-proc initGl(win: sdl.Window) =
-  doAssert gladLoadGL(sdl.GL_GetProcAddress), "OpenGL could not be loaded"
+proc initGl(win: ptr Window) =
+  doAssert gladLoadGL(GL_GetProcAddress), "OpenGL could not be loaded"
   when defined(RGlDebugOutput):
     if GLAD_GL_KHR_debug:
       glEnable(GL_DEBUG_OUTPUT)
@@ -72,17 +75,14 @@ proc initGl(win: sdl.Window) =
 #--
 
 type
-  #--
   # Building
-  #--
   WindowOptions = object
     width, height: Natural
     title: string
-    resizable, visible, decorated, focused, floating, maximized: bool
+    fullscreen: bool
+    resizable, visible, decorated, maximized, minimized: bool
     antialiasLevel: int
-  #--
   # Events
-  #--
   RModKeys* = set[RModKey]
   RCharProc* = proc (rune: Rune, mods: RModKeys)
   RCursorEnterProc* = proc ()
@@ -103,12 +103,12 @@ type
     onScroll: seq[RScrollProc]
     onClose: seq[RCloseProc]
     onResize: seq[RResizeProc]
-  #--
   # Windows
-  #--
   RWindowObj = object
-    handle: ptr sdl.Window
+    handle: ptr Window
     callbacks: WindowCallbacks
+    fClose: bool
+    keyState: ptr UncheckedArray[uint8]
   RWindow* = ref RWindowObj
 
 using
@@ -117,14 +117,13 @@ using
 proc initRWindow*(): WindowOptions =
   ## Initializes a new ``RWindow``.
   once:
-    if sdl.initSubSystem(0x20 #[SDL_INIT_VIDEO]#) != 0:
-      raise newException(SDLError, $sdl.getError())
+    sdlTry initSubSystem(0x20 #[SDL_INIT_VIDEO]#)
   result = WindowOptions(
     width: 800, height: 600,
     title: "rapid",
     resizable: true, visible: true,
-    decorated: true, focused: true,
-    floating: false, maximized: false
+    decorated: true, maximized: false,
+    fullscreen: false
   )
 
 proc size*(wopt; width, height: int): WindowOptions =
@@ -143,16 +142,19 @@ template builderBool(param: untyped, doc: untyped): untyped {.dirty.} =
     doc
     result = wopt
     result.param = param
+builderBool(fullscreen):
+  ## Defines if the built window will be fullscreen.
+  ## This creates a window in 'borderless fullscreen', meaning that the video
+  ## mode of your monitor is not changed. The window simply fills your entire
+  ## desktop.
 builderBool(resizable):
   ## Defines if the built window will be resizable.
 builderBool(visible):
   ## Defines if the built window will be visible.
 builderBool(decorated):
   ## Defines if the built window will be decorated.
-builderBool(focused):
-  ## Defines if the built window will be focused.
-builderBool(floating):
-  ## Defines if the built window will float (stay on top of other windows).
+builderBool(minimized):
+  ## Defines if the built window will be minimized.
 builderBool(maximized):
   ## Defines if the built window will be maximized.
 
@@ -178,118 +180,108 @@ converter toModsSet(mods: int32): RModKeys =
 
 proc open*(wopt): RWindow =
   ## Builds a window using the specified options and opens it.
-  result = RWindow()
+  new(result) do (win: RWindow):
+    destroyWindow(win.handle)
 
-  let
-    mon = glfw.getPrimaryMonitor()
-    mode = glfw.getVideoMode(mon)
+  let mode = primaryDisplay()
 
-  glfw.windowHint(glfw.hRedBits, mode.redBits)
-  glfw.windowHint(glfw.hGreenBits, mode.greenBits)
-  glfw.windowHint(glfw.hBlueBits, mode.blueBits)
-  glfw.windowHint(glfw.hAlphaBits, 8)
-  glfw.windowHint(glfw.hDepthBits, 24)
-  glfw.windowHint(glfw.hStencilBits, 8)
-  if wopt.antialiasLevel != 0:
-    glfw.windowHint(glfw.hSamples, wopt.antialiasLevel.int32)
+  # glfw.windowHint(glfw.hRedBits, mode.redBits)
+  # glfw.windowHint(glfw.hGreenBits, mode.greenBits)
+  # glfw.windowHint(glfw.hBlueBits, mode.blueBits)
+  # glfw.windowHint(glfw.hAlphaBits, 8)
+  # glfw.windowHint(glfw.hDepthBits, 24)
+  # glfw.windowHint(glfw.hStencilBits, 8)
+  # if wopt.antialiasLevel != 0:
+  #   glfw.windowHint(glfw.hSamples, wopt.antialiasLevel.int32)
 
-  glfw.windowHint(glfw.hResizable, wopt.resizable.int32)
-  glfw.windowHint(glfw.hVisible, false.int32)
-  glfw.windowHint(glfw.hDecorated, wopt.decorated.int32)
-  glfw.windowHint(glfw.hFocused, wopt.focused.int32)
-  glfw.windowHint(glfw.hFloating, wopt.floating.int32)
-  glfw.windowHint(glfw.hMaximized, wopt.maximized.int32)
+  var winFlags = WINDOW_OPENGL.uint32
+  if wopt.fullscreen: winFlags = winFlags or WINDOW_FULLSCREEN_DESKTOP.uint32
+  if not wopt.visible: winFlags = winFlags or WINDOW_HIDDEN.uint32
+  if not wopt.decorated: winFlags = winFlags or WINDOW_BORDERLESS.uint32
+  if wopt.minimized: winFlags = winFlags or WINDOW_MINIMIZED.uint32
+  if wopt.maximized: winFlags = winFlags or WINDOW_MAXIMIZED.uint32
+  if wopt.resizable: winFlags = winFlags or WINDOW_RESIZABLE.uint32
 
-  glfw.windowHint(glfw.hContextVersionMajor, 3)
-  glfw.windowHint(glfw.hContextVersionMinor, 3)
-  glfw.windowHint(glfw.hOpenglProfile, glfw.opCoreProfile.int32)
-  glfw.windowHint(glfw.hOpenglDebugContext, 1)
+  # glfw.windowHint(glfw.hContextVersionMajor, 3)
+  # glfw.windowHint(glfw.hContextVersionMinor, 3)
+  # glfw.windowHint(glfw.hOpenglProfile, glfw.opCoreProfile.int32)
+  # glfw.windowHint(glfw.hOpenglDebugContext, 1)
   const
-    PosCentered = 0x2FFF0000.cint
+    PosCentered = 0x2FFF0000.cint #[SDL_WINDOWPOS_CENTERED]#
   result.handle = createWindow(wopt.title, PosCentered, PosCentered,
-                               wopt.width.cint, wopt.height.cint, 0)
-  if currentGlc.isNil:
-    result.context.makeCurrent()
+                               wopt.width.cint, wopt.height.cint, winFlags)
 
-  # center the window
-  glfw.setWindowPos(result.handle,
-    int32(mode.width / 2 - wopt.width / 2),
-    int32(mode.height / 2 - wopt.height / 2))
-
-  if wopt.visible: glfw.showWindow(result.handle)
-
-  once:
-    let status = initGl(result.handle)
-    if status != ieOK:
-      raise newException(GLError, $status)
-
-  glfw.setWindowUserPointer(result.handle, cast[pointer](result))
-  glfwCallbacks(result)
-
-proc destroy*(win: RWindow) =
-  ## Destroys a window.
-  glfw.destroyWindow(win.handle)
+  once initGl(result.handle)
 
 #--
 # Window attributes
 #--
 
-proc close*(win: var RWindow) =
-  ## Tells the window it should close. This doesn't immediately close the window;
-  ## the application might prevent the window from being closed.
-  glfw.setWindowShouldClose(win.handle, 1)
+proc shouldClose*(win: RWindow): bool =
+  ## Returns whether the window should close.
+  win.fClose
+proc `shouldClose=`*(win: RWindow, close: bool) =
+  ## Sets whether the window should be closed.
+  win.fClose = true
 
-proc pos*(win: RWindow): tuple[x, y: int] =
-  var x, y: int32
-  glfw.getWindowPos(win.handle, addr x, addr y)
-  result = (int x, int y)
-proc x*(win: RWindow): int = win.pos().x
-proc y*(win: RWindow): int = win.pos().y
-proc `pos=`*(win: var RWindow, pos: tuple[x, y: int]) =
-  glfw.setWindowSize(win.handle, int32 pos.x, int32 pos.y)
-proc `x=`*(win: var RWindow, x: int) = win.pos = (x, win.x)
-proc `y=`*(win: var RWindow, y: int) = win.pos = (y, win.y)
+proc close*(win: RWindow) =
+  ## An alias for ``win.shouldClose = true``.
+  win.shouldClose = true
 
-type
-  IntDimensions* = tuple[width, height: int]
-proc size*(win: RWindow): IntDimensions =
-  var w, h: int32
-  glfw.getWindowSize(win.handle, addr w, addr h)
-  result = (int w, int h)
-proc width*(win: RWindow): int = win.size().width
-proc height*(win: RWindow): int = win.size().height
-proc `size=`*(win: var RWindow, size: IntDimensions) =
-  glfw.setWindowSize(win.handle, int32 size.width, int32 size.height)
-proc `width=`*(win: var RWindow, width: int) = win.size = (width, win.width)
-proc `height=`*(win: var RWindow, height: int) = win.size = (win.width, height)
-proc limitSize*(win: var RWindow, min, max: IntDimensions) =
-  glfw.setWindowSizeLimits(win.handle,
-    int32 min.width, int32 min.height, int32 max.width, int32 max.height)
+proc pos*(win: RWindow): Vec2[float] =
+  var x, y: cint
+  getWindowPosition(win.handle, addr x, addr y)
+  result = vec2(x.float, y.float)
+proc x*(win: RWindow): float = win.pos.x
+proc y*(win: RWindow): float = win.pos.y
+proc `pos=`*(win: RWindow, pos: Vec2[float]) =
+  setWindowPosition(win.handle, pos.x.cint, pos.y.cint)
+proc `x=`*(win: RWindow, x: float) = win.pos = vec2(x, win.x)
+proc `y=`*(win: RWindow, y: float) = win.pos = vec2(y, win.y)
 
-proc fbSize*(win: RWindow): IntDimensions =
-  var w, h: int32
-  glfw.getFramebufferSize(win.handle, addr w, addr h)
-  result = (int w, int h)
+proc size*(win: RWindow): Vec2[float] =
+  var w, h: cint
+  getWindowSize(win.handle, addr w, addr h)
+  result = vec2(w.float, h.float)
+proc width*(win: RWindow): float = win.size.x
+proc height*(win: RWindow): float = win.size.y
+proc `size=`*(win: RWindow, size: Vec2[float]) =
+  setWindowSize(win.handle, size.x.cint, size.y.cint)
+proc `width=`*(win: RWindow, width: float) =
+  win.size = vec2(width, win.width)
+proc `height=`*(win: RWindow, height: float) =
+  win.size = vec2(win.width, height)
 
-proc iconify*(win: var RWindow) = glfw.iconifyWindow(win.handle)
-proc restore*(win: var RWindow) = glfw.restoreWindow(win.handle)
-proc maximize*(win: var RWindow) = glfw.maximizeWindow(win.handle)
-proc show*(win: var RWindow) = glfw.showWindow(win.handle)
-proc hide*(win: var RWindow) = glfw.hideWindow(win.handle)
-proc focus*(win: var RWindow) = glfw.focusWindow(win.handle)
+proc minSize*(win: RWindow): Vec2[float] =
+  var w, h: cint
+  getWindowMinimumSize(win.handle, addr w, addr h)
+  result = vec2(w.float, h.float)
+proc maxSize*(win: RWindow): Vec2[float] =
+  var w, h: cint
+  getWindowMaximumSize(win.handle, addr w, addr h)
+  result = vec2(w.float, h.float)
+proc `minSize=`*(win: RWindow, size: Vec2[float]) =
+  setWindowMinimumSize(win.handle, size.x.cint, size.y.cint)
+proc `maxSize=`*(win: RWindow, size: Vec2[float]) =
+  setWindowMaximumSize(win.handle, size.x.cint, size.y.cint)
+
+proc iconify*(win: RWindow) = minimizeWindow(win.handle)
+proc restore*(win: RWindow) = restoreWindow(win.handle)
+proc maximize*(win: RWindow) = maximizeWindow(win.handle)
+proc show*(win: RWindow) = showWindow(win.handle)
+proc hide*(win: RWindow) = hideWindow(win.handle)
+proc focus*(win: RWindow) = raiseWindow(win.handle)
 
 proc focused*(win: RWindow): bool =
-  result = bool glfw.getWindowAttrib(win.handle, glfw.hFocused)
+  result = (getWindowFlags(win.handle) and WINDOW_INPUT_FOCUS.uint32) != 0
 proc iconified*(win: RWindow): bool =
-  result = bool glfw.getWindowAttrib(win.handle, glfw.Iconified)
+  result = (getWindowFlags(win.handle) and WINDOW_MINIMIZED.uint32) != 0
 proc maximized*(win: RWindow): bool =
-  result = bool glfw.getWindowAttrib(win.handle, glfw.hMaximized)
+  result = (getWindowFlags(win.handle) and WINDOW_MAXIMIZED.uint32) != 0
 proc visible*(win: RWindow): bool =
-  result = bool glfw.getWindowAttrib(win.handle, glfw.hVisible)
+  result = (getWindowFlags(win.handle) and WINDOW_HIDDEN.uint32) == 0
 proc decorated*(win: RWindow): bool =
-  result = bool glfw.getWindowAttrib(win.handle, glfw.hDecorated)
-proc floating*(win: RWindow): bool =
-  result = bool glfw.getWindowAttrib(win.handle, glfw.hFloating)
+  result = (getWindowFlags(win.handle) and WINDOW_BORDERLESS.uint32) == 0
 
 #~~
 # Input
@@ -329,8 +321,14 @@ callbackProc(onClose, RCloseProc):
 callbackProc(onResize, RResizeProc):
   ## Adds a callback executed when the window is resized.
 
-proc key*(win: RWindow, key: glfw.Key): glfw.KeyAction =
-  glfw.KeyAction(glfw.getKey(win.handle, int32(key)))
+proc pollEvents*(win: RWindow) =
+  ## Polls any events, and updates any internal state structs.
+  var event:
+  win.keyState = cast[ptr UncheckedArray[uint8]](getKeyboardState(nil))
+
+proc key*(win: RWindow, key: RScancode): bool =
+  assert win.keyState != nil, "Attempt to use `key` before `pollEvents`"
+
 
 proc mouseButton*(win: RWindow, btn: glfw.MouseButton): glfw.KeyAction =
   glfw.KeyAction(glfw.getMouseButton(win.handle, int32(btn)))

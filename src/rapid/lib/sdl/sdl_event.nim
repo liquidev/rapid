@@ -5,15 +5,8 @@
 # licensed under the MIT license - see LICENSE file for more information
 #--
 
-## SDL_rect.h wrapper.
+## SDL.h wrapper.
 
 import sdl_base
 
-sdlImport("SDL_error.h")
-
-type
-  SDLError* = object of CatchableError
-
-template sdlTry*(action) =
-  if action != 0:
-    raise newException(SDLError, $getError())
+sdlImport("SDL_event.h")
