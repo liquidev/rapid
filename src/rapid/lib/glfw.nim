@@ -237,6 +237,7 @@ type
     hAutoIconify = 0x00020006
     hFloating = 0x00020007
     hMaximized = 0x00020008
+    hTransparentFramebuffer = 0x0002000A
     hRedBits = 0x00021001
     hGreenBits = 0x00021002
     hBlueBits = 0x00021003
@@ -387,6 +388,7 @@ macro generateProcs() =
     proc getMonitorPhysicalSize*(monitor: Monitor; widthMM: ptr int32;
       heightMM: ptr int32)
     proc getMonitorName*(monitor: Monitor): cstring
+    proc getMonitorWorkarea*(monitor: Monitor, xpos, ypos, width, height: ptr int32)
     proc setMonitorCallback*(cbfun: Monitorfun): Monitorfun
     proc getVideoModes*(monitor: Monitor; count: ptr int32): VideoMode
     proc getVideoMode*(monitor: Monitor): VideoMode

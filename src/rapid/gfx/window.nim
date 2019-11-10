@@ -101,6 +101,7 @@ type
     width, height: Natural
     title: string
     resizable, visible, decorated, focused, floating, maximized: bool
+    transparent: bool
     antialiasLevel: int
   #--
   # Events
@@ -179,6 +180,8 @@ builderBool(floating):
   ## Defines if the built window will float (stay on top of other windows).
 builderBool(maximized):
   ## Defines if the built window will be maximized.
+builderBool(transparent):
+  ## Defines if the built window will be transparent on a per-pixel basis.
 
 proc antialiasLevel*(wopt; level: int): WindowOptions =
   ## Builds the window with the specified antialiasing level.
@@ -262,6 +265,7 @@ proc open*(wopt): RWindow =
   glfw.windowHint(glfw.hStencilBits, 8)
   if wopt.antialiasLevel != 0:
     glfw.windowHint(glfw.hSamples, wopt.antialiasLevel.int32)
+  glfw.windowHint(glfw.hTransparentFramebuffer, wopt.transparent.int32)
 
   glfw.windowHint(glfw.hResizable, wopt.resizable.int32)
   glfw.windowHint(glfw.hVisible, false.int32)
@@ -320,7 +324,7 @@ proc pos*(win: RWindow): tuple[x, y: int] =
 proc x*(win: RWindow): int = win.pos().x
 proc y*(win: RWindow): int = win.pos().y
 proc `pos=`*(win: var RWindow, pos: tuple[x, y: int]) =
-  glfw.setWindowSize(win.handle, int32 pos.x, int32 pos.y)
+  glfw.setWindowPos(win.handle, int32 pos.x, int32 pos.y)
 proc `x=`*(win: var RWindow, x: int) = win.pos = (x, win.x)
 proc `y=`*(win: var RWindow, y: int) = win.pos = (y, win.y)
 
@@ -416,8 +420,14 @@ proc mousePos*(win: RWindow): tuple[x, y: float] =
 proc mouseX*(win: RWindow): float = win.mousePos.x
 proc mouseY*(win: RWindow): float = win.mousePos.y
 
-proc `mousePos=`*(win: var RWindow, x, y: float) =
+proc `mousePos=`*(win: RWindow, x, y: float) =
   glfw.setCursorPos(win.handle, float64 x, float64 y)
+
+proc dpyWorkArea*(): tuple[x, y, w, h: int] =
+  let mon = glfw.getPrimaryMonitor()
+  var x, y, w, h: int32
+  glfw.getMonitorWorkarea(mon, addr x, addr y, addr w, addr h)
+  result = (x.int, y.int, w.int, h.int)
 
 proc time*(): float =
   ## Returns the current process's time.
