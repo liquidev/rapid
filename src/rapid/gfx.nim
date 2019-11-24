@@ -980,3 +980,4 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
         let `drawStepName` = delta * RUpdateFreq
         `gfx`.render(`drawCtxName`):
           `drawBody`
+    glfw.terminate()
