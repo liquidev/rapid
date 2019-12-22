@@ -13,6 +13,7 @@ type
   RImage* = ref object
     width*, height*: int
     data*: string
+  ImageError* = object of CatchableError
 
 proc area*(img: RImage): int = img.width * img.height
 
@@ -40,6 +41,8 @@ proc newRImage*(width, height: int, data: pointer, colorChannels = 4): RImage =
 proc loadRImage*(path: string): RImage =
   ## Load an RGBA PNG image from the specified path.
   let png = loadPNG32(path)
+  if png == nil:
+    raise newException(ImageError, "could not load image " & path)
   result = newRImage(png.width, png.height, png.data)
 
 proc readRImagePng*(png: string): RImage =
@@ -47,6 +50,8 @@ proc readRImagePng*(png: string): RImage =
   ## with ``slurp``/``staticRead``, and allows for embedding resources in the
   ## executable itself.
   let png = decodePNG32(png)
+  if png == nil:
+    raise newException(ImageError, "could not read PNG from memory")
   result = newRImage(png.width, png.height, png.data)
 
 proc caddr*(img: RImage): ptr char =

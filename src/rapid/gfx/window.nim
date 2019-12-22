@@ -89,6 +89,12 @@ proc initGl(win: glfw.Window): InitErrorKind =
     quit(QuitFailure)
   return ieOK
 
+proc quitGfx*() =
+  ## Frees all resources allocated by ``gfx`` modules, eg. windows.
+  ## You **must** call this on every path that calls ``quit``, otherwise
+  ## bad things happen.
+  glfw.terminate()
+
 #--
 # Window building
 #--
