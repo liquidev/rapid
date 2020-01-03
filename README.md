@@ -168,8 +168,10 @@ surface.loop:
   draw ctx, step:
     ctx.clear(gray(0))
     ctx.texture = hello
+    ctx.begin()
     ctx.rect(32, 32, 32, 32)
-  update step:
+    ctx.draw()
+update step:
     discard
 ```
 
