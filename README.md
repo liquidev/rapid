@@ -137,10 +137,10 @@ var win = initRWindow()
 
 # We need to get a handle to the underlying framebuffer in order to draw on the
 # screen
-var gfx = win.openGfx()
+var surface = win.openGfx()
 
 # Then we can begin a game loop
-gfx.loop:
+surface.loop:
   draw ctx, step:
     ctx.clear(gray(255))
   update step:
@@ -158,18 +158,20 @@ var win = initRWindow()
   .size(800, 600)
   .open()
 
-var gfx = win.openGfx()
+var surface = win.openGfx()
 
 let
   # As of now, only PNGs are supported
   hello = loadRTexture("data/hello.png")
 
-gfx.loop:
+surface.loop:
   draw ctx, step:
     ctx.clear(gray(0))
     ctx.texture = hello
+    ctx.begin()
     ctx.rect(32, 32, 32, 32)
-  update step:
+    ctx.draw()
+update step:
     discard
 ```
 
@@ -188,7 +190,7 @@ var win = initRWindow()
   .size(800, 600)
   .open()
 
-var gfx = win.openGfx()
+var surface = win.openGfx()
 
 let
   # RImages are not textures, but rather raw image data
@@ -216,7 +218,7 @@ let
     sheet2.subimg(16, 0, 8, 8)
   ]
 
-gfx.loop:
+surface.loop:
   draw ctx, step:
     ctx.clear(gray(0))
 
