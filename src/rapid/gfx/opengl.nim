@@ -18,12 +18,13 @@ type
     fTex2D: GLuint
     fFramebuffers: FbPair
     fRenderbuffer: GLuint
-    fSrcBlend, fDestBlend: GLenum
+    fBlendEquation: GLenum
+    fBlendFunc: BlendFunc
     fStencilFunc: StencilFunc
     fStencilOp: StencilOp
     fViewport: Viewport
   FbPair* = tuple[read, draw: GLuint]
-  BlendFunc* = tuple[src, dest: GLenum]
+  BlendFunc* = tuple[srcRgb, destRgb, srcA, destA: GLenum]
   StencilFunc* = tuple[fn: GLenum, refer: GLint, mask: GLuint]
   StencilOp* = tuple[fail, zfail, zpass: GLenum]
   Viewport* = tuple[x, y: GLint, w, h: GLsizei]
@@ -67,13 +68,22 @@ proc `renderbuffer=`*(ctx: GLContext, rb: GLuint) =
   glBindRenderbuffer(GL_RENDERBUFFER, rb)
   ctx.fRenderbuffer = rb
 
+proc blendEquation*(ctx: GLContext): GLenum =
+  result = ctx.fBlendEquation
+
+proc `blendEquation=`*(ctx: GLContext, eq: GLenum) =
+  glBlendEquation(eq)
+  ctx.fBlendEquation = eq
+
 proc blendFunc*(ctx: GLContext): BlendFunc =
-  result = (ctx.fSrcBlend, ctx.fDestBlend)
+  result = ctx.fBlendFunc
+
+proc blendFunc*(ctx: GLContext, srcRgb, destRgb, srcA, destA: GLenum) =
+  glBlendFuncSeparate(srcRgb, destRgb, srcA, destA)
+  ctx.fBlendFunc = (srcRgb, destRgb, srcA, destA)
 
 proc blendFunc*(ctx: GLContext, src, dest: GLenum) =
-  glBlendFunc(src, dest)
-  ctx.fSrcBlend = src
-  ctx.fDestBlend = dest
+  ctx.blendFunc(src, dest, src, dest)
 
 proc `stencilFunc=`*(ctx: GLContext, fn: StencilFunc) =
   glStencilFunc(fn.fn, fn.refer, fn.mask)
@@ -110,7 +120,8 @@ withFor(StencilFunc, stencilFunc, StencilFunc)
 withFor(StencilOp, stencilOp, StencilOp)
 withFor(Viewport, viewport, Viewport)
 
-template withBlendFunc*(ctx: GLContext, src, dest: GLenum, body) =
+template withBlendFunc*(ctx: GLContext, srcRgb, destRgb, srcA, destA: GLenum,
+                        body) =
   let
     prevSrc = ctx.fSrcBlend
     prevDest = ctx.fDestBlend
@@ -132,7 +143,8 @@ proc newGLContext*(win: glfw.Window): GLContext =
     window: win,
     fTex2D: 0,
     fFramebuffers: (0.GLuint, 0.GLuint),
-    fSrcBlend: GL_ONE, fDestBlend: GL_ZERO,
+    fBlendEquation: GL_FUNC_ADD,
+    fBlendFunc: (GL_ONE.GLenum, GL_ZERO.GLenum, GL_ONE.GLenum, GL_ZERO.GLenum),
     fStencilFunc: (GL_ALWAYS, 0.GLint, 255.GLuint),
     fStencilOp: (GL_KEEP, GL_KEEP, GL_KEEP)
   )

@@ -398,6 +398,7 @@ type
     sLineWidth: float
     sLineSmooth: bool
     sAntialiasing: bool
+    sBlendMode: RBlendMode
     # Transformations
     fTransform: Mat3[float]
   RVertex* = tuple
@@ -431,6 +432,13 @@ type
     scGreaterEq
     scEq
     scNotEq
+  RBlendMode* = enum
+    bmNormal
+    bmPremultAlpha
+    bmReplace
+    bmAdd
+    bmSubtract
+    bmMultiply
 
 proc gfx*(ctx: RGfxContext): RGfx =
   ## Get the context's parent Gfx.
@@ -523,6 +531,33 @@ proc `color=`*(ctx: RGfxContext, col: RColor) =
   ## color is specified in the vertex.
   ctx.sColor = col
 
+proc blendMode*(ctx: RGfxContext): RBlendMode =
+  result = ctx.sBlendMode
+
+proc `blendMode=`*(ctx: RGfxContext, blendMode: RBlendMode) =
+  case blendMode
+  of bmNormal:
+    currentGlc.blendEquation = GL_FUNC_ADD
+    currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  of bmPremultAlpha:
+    currentGlc.blendEquation = GL_FUNC_ADD
+    currentGlc.blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
+  of bmReplace:
+    currentGlc.blendEquation = GL_FUNC_ADD
+    currentGlc.blendFunc(GL_ONE, GL_ZERO)
+  of bmAdd:
+    currentGlc.blendEquation = GL_FUNC_ADD
+    currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE,
+                         GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  of bmSubtract:
+    currentGlc.blendEquation = GL_FUNC_REVERSE_SUBTRACT
+    currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE,
+                         GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  of bmMultiply:
+    currentGlc.blendEquation = GL_FUNC_ADD
+    currentGlc.blendFunc(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_SRC_ALPHA)
+  ctx.sBlendMode = blendMode
+
 proc noTexture*(ctx: RGfxContext) =
   ## Disables the texture, and draws with plain colors.
   currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -541,12 +576,10 @@ proc setTextureImpl(ctx: RGfxContext, tex: RTexture) =
 
 proc `texture=`*(ctx: RGfxContext, tex: RTexture) =
   ## Sets the texture to draw with.
-  currentGlc.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
   ctx.setTextureImpl(tex)
 
 proc `texture=`*(ctx: RGfxContext, canvas: RCanvas) =
   ## Draws using a canvas as a texture.
-  currentGlc.blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
   ctx.setTextureImpl(canvas.target)
 
 proc texture*(ctx: RGfxContext): RTexture =
@@ -852,6 +885,7 @@ proc ctx*(gfx: RGfx): RGfxContext =
   )
   result.defaultProgram()
   result.updateUniforms()
+  result.blendMode = bmNormal
 
 #--
 # Rendering
