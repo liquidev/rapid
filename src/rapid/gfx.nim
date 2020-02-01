@@ -279,12 +279,18 @@ proc canvas*(gfx: RGfx): RCanvas =
   ## ID is 0 pointing to the window's framebuffer.
   gfx.fCanvas
 
+const
+  RFramerateDen* {.intdefine.} = 1 ## \
+    ## The framerate denominator. This can be used in conjunction with VSync to
+    ## simulate a lower framerate, using the formula
+    ## ``refreshRate / RFramerateDen``.
+
 proc vsync*(gfx: RGfx): bool =
   ## Get whether VSync is enabled for the Gfx's window.
   gfx.fVsync
 proc `vsync=`*(gfx: RGfx, enabled: bool) =
-  ## Set whether VSync should be enabled for the Gfx's window. This must be done
-  ## outside of the draw loop.
+  ## Set whether VSync should be enabled for the Gfx's window.
+  glfw.swapInterval(int32(enabled) * RFramerateDen)
   gfx.fVsync = enabled
 
 proc reallocVbo(gfx: RGfx) =
@@ -921,10 +927,6 @@ template render*(gfx: RGfx, ctxVar, body: untyped): untyped =
       body
 
 const
-  RFramerateDen* {.intdefine.} = 1 ## \
-    ## The framerate denominator. This can be used in conjunction with VSync to
-    ## simulate a lower framerate, using the formula
-    ## ``refreshRate / RFramerateDen``.
   RUpdateFreq* {.intdefine.} = 60 ## \
     ## This is the update frequency to be used in your game loop. This specifies
     ## how many times a second the update block should execute. This is also
@@ -960,24 +962,24 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
   # reason doing so causes a segmentation fault under Windows.
   var
     drawBody, updateBody: NimNode
-    drawCtxName, drawStepName, updateStepName: NimNode
+    drawCtxName, drawStepName: NimNode
     initBody = newNimNode(nnkStmtList)
     initCtxName = ident"ctx"
   body.expectKind(nnkStmtList)
   for st in body:
-    st.expectKind(nnkCommand)
-    st[1].expectKind(nnkIdent)
+    st.expectKind({nnkCall, nnkCommand})
     if st[0].eqIdent("draw"):
+      st[1].expectKind(nnkIdent)
       st[2].expectKind(nnkIdent)
       st[3].expectKind(nnkStmtList)
       drawCtxName = st[1]
       drawStepName = st[2]
       drawBody = st[3]
     elif st[0].eqIdent("update"):
-      st[2].expectKind(nnkStmtList)
-      updateStepName = st[1]
-      updateBody = st[2]
+      st[1].expectKind(nnkStmtList)
+      updateBody = st[1]
     elif st[0].eqIdent("init"):
+      st[1].expectKind(nnkIdent)
       st[2].expectKind(nnkStmtList)
       initCtxName = st[1]
       initBody = st[2]
@@ -1006,7 +1008,6 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
 
       block update:
         while lag >= SecPerUpdate:
-          let `updateStepName` = delta * RUpdateFreq
           `updateBody`
           lag -= SecPerUpdate
 
