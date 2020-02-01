@@ -48,13 +48,14 @@ var freetypeLib*: FT_Library
 proc handle*(font: RFont): FT_Face = font.fHandle
 proc packer*(font: RFont): RTexturePacker = font.fPacker
 
-proc loadRFont*(file: string, height: Natural, width = 0.Natural,
-                textureConfig = DefaultTextureConfig,
-                texWidth = 512.Natural, texHeight = 512.Natural): RFont =
-  ## Create a new font loaded from the specified file, with the specified
+proc newRFont*(data: string, height: Natural, width = 0.Natural,
+               textureConfig = DefaultTextureConfig,
+               texWidth, texHeight = 512.Natural,
+               filename = ""): RFont =
+  ## Create a new font from some loaded data, with the specified
   ## dimensions, texture configuration, and atlas size.
   ## The atlas size should be tweaked when lots of Unicode characters are used,
-  ## but 512×512 is usually enough for most use cases.
+  ## but 512×512 is enough for most use cases.
   once:
     let err = FT_Init_Freetype(addr freetypeLib).bool
     doAssert not err, "Could not initialize FreeType"
@@ -69,13 +70,25 @@ proc loadRFont*(file: string, height: Natural, width = 0.Natural,
     fLineSpacing: 1.3,
     fTabWidth: 96
   )
-  var err = FT_New_Face(freetypeLib, file, 0, addr result.fHandle)
+  var err = FT_New_Memory_Face(freetypeLib,
+                               cast[ptr FTByte](data[0].unsafeAddr),
+                               data.len, 0, addr result.fHandle)
   if err == FT_Err_Unknown_File_Format:
-    raise newException(FreetypeError, "Unknown font format (" & file & ")")
+    raise newException(FreetypeError, "Unknown font format" &
+                       (if filename != "": " (" & filename & ")" else: ""))
   elif err.bool:
-    raise newException(FreetypeError, "Could not load font " & file & "")
+    raise newException(FreetypeError, "Could not load font" &
+                       (if filename != "": " " & filename else: ""))
   err = FT_Set_Pixel_Sizes(result.handle, width.FT_uint, height.FT_uint)
   doAssert not err.bool, "Could not set font size"
+
+proc loadRFont*(file: string, height: Natural, width = 0.Natural,
+                textureConfig = DefaultTextureConfig,
+                texWidth, texHeight = 512.Natural): RFont =
+  ## Load a font from the specified file. See ``newRFont`` for details on the
+  ## parameters.
+  result = newRFont(readFile(file), height, width,
+                    textureConfig, texWidth, texHeight, file)
 
 proc width*(font: RFont): int =
   ## Get the width of the font.
