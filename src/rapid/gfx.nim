@@ -405,6 +405,8 @@ type
     sLineSmooth: bool
     sAntialiasing: bool
     sBlendMode: RBlendMode
+    sScissorEnabled: bool
+    sScissorBox: tuple[x, y, w, h: float]
     # Transformations
     fTransform: Mat3[float]
   RVertex* = tuple
@@ -826,6 +828,44 @@ proc draw*(ctx: RGfxContext, primitive = prTriShape) =
                    of prTriStrip: GL_TRIANGLE_STRIP
                    of prTriFan:   GL_TRIANGLE_FAN
                    else:          GL_TRIANGLES, 0, GLsizei ctx.vertexCount)
+
+proc scissorEnabled*(ctx: RGfxContext): bool =
+  ## Returns whether scissor testing is enabled.
+  result = ctx.sScissorEnabled
+
+proc scissor*(ctx: RGfxContext): tuple[x, y, w, h: float] =
+  ## Returns the current scissor box.
+  result = ctx.sScissorBox
+
+proc scissor*(ctx: RGfxContext, x, y, width, height: float) =
+  ## Sets the current scissor box and enables scissor testing.
+  ## The scissor box is a rectangle in which pixels are drawn. Any pixels drawn
+  ## outside the scissor box are discarded.
+  glEnable(GL_SCISSOR_TEST)
+  currentGlc.scissor = (x.GLint, GLint(ctx.gfx.height - y - height),
+                        width.GLsizei, height.GLsizei)
+  ctx.sScissorEnabled = true
+  ctx.sScissorBox = (x, y, width, height)
+
+proc noScissor*(ctx: RGfxContext) =
+  ## Disables scissor testing.
+  glDisable(GL_SCISSOR_TEST)
+  ctx.sScissorEnabled = false
+
+template scissor*(ctx: RGfxContext, sx, sy, width, height: float,
+                  body: untyped) =
+  ## Sets the given scissor box and executes the given body.
+  ## After that, it resets to the old scissor state.
+  ## This may be nested.
+  let
+    oldScissorEnabled = ctx.scissorEnabled
+    oldScissor = ctx.scissor
+  ctx.scissor(sx, sy, width, height)
+  body
+  if oldScissorEnabled:
+    ctx.scissor(oldScissor.x, oldScissor.y, oldScissor.w, oldScissor.h)
+  else:
+    ctx.noScissor()
 
 proc clearStencil*(ctx: RGfxContext, value = 255) =
   ## Clear the stencil buffer.

@@ -138,6 +138,7 @@ proc effect*(fx: RFxSurface, eff: REffect, stencil = false) =
   let
     prevProgram = fx.ctx.program
     prevTexture = fx.ctx.texture
+    prevBlendMode = fx.ctx.blendMode
   if stencil:
     currentGlc.withFramebuffers((fx.a.id, fx.b.id)):
       glBlitFramebuffer(0, 0, fx.a.width.GLint, fx.a.height.GLint,
@@ -145,13 +146,15 @@ proc effect*(fx: RFxSurface, eff: REffect, stencil = false) =
                         GL_STENCIL_BUFFER_BIT, GL_NEAREST)
   fx.ctx.renderTo(fx.b):
     fx.ctx.clear(gray(0, 0))
-    fx.ctx.transform():
+    fx.ctx.transform:
       fx.ctx.resetTransform()
       fx.ctx.texture = fx.a
       fx.ctx.program = eff.program
+      fx.ctx.blendMode = bmPremultAlpha
       fx.ctx.begin()
       fx.ctx.rect(-1, 1, 2, -2)
       fx.ctx.draw()
+      fx.ctx.blendMode = prevBlendMode
       fx.ctx.program = prevProgram
       fx.ctx.texture = prevTexture
   swap(fx.a, fx.b)
@@ -163,7 +166,9 @@ proc finish*(fx: RFxSurface,
   ## to the target canvas. If ``replaceTarget`` is true, the pixels will be
   ## copied directly without any blending. This may save performance in some
   ## cases.
-  let prevTexture = fx.ctx.texture
+  let
+    prevTexture = fx.ctx.texture
+    prevBlendMode = fx.ctx.blendMode
   if replaceTarget:
     currentGlc.withFramebuffers((fx.a.id, fx.target.id)):
       glBlitFramebuffer(0, 0, fx.a.width.GLint, fx.a.height.GLint,
@@ -175,10 +180,12 @@ proc finish*(fx: RFxSurface,
       transform(fx.ctx):
         fx.ctx.resetTransform()
         fx.ctx.texture = fx.a
+        fx.ctx.blendMode = bmPremultAlpha
         fx.ctx.begin()
         fx.ctx.rect(0, 0, fx.target.width, fx.target.height)
         fx.ctx.draw()
-      fx.ctx.texture = prevTexture
+        fx.ctx.blendMode = prevBlendMode
+        fx.ctx.texture = prevTexture
   fx.reset()
   fx.ctx = nil
   currentGlc.framebuffers = fx.prevFbs

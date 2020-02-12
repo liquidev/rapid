@@ -22,7 +22,7 @@ type
     fBlendFunc: BlendFunc
     fStencilFunc: StencilFunc
     fStencilOp: StencilOp
-    fViewport: Viewport
+    fViewport, fScissorBox: Viewport
   FbPair* = tuple[read, draw: GLuint]
   BlendFunc* = tuple[srcRgb, destRgb, srcA, destA: GLenum]
   StencilFunc* = tuple[fn: GLenum, refer: GLint, mask: GLuint]
@@ -106,6 +106,10 @@ proc `viewport=`*(ctx: GLContext, vp: Viewport) =
 proc viewport*(ctx: GLContext): Viewport =
   result = ctx.fViewport
 
+proc `scissor=`*(ctx: GLContext, box: Viewport) =
+  glScissor(box.x, box.y, box.w, box.h)
+  ctx.fScissorBox = box
+
 template withFor(name, field, T) {.dirty.} =
   template `with name`*(ctx: GLContext, val: T, body) =
     let prev = ctx.field
@@ -139,6 +143,8 @@ template withFramebuffer*(ctx: GLContext, fb: GLuint, body) =
     ctx.framebuffer = prevFbs.read
 
 proc newGLContext*(win: glfw.Window): GLContext =
+  var w, h: int32
+  glfw.getWindowSize(win, addr w, addr h)
   GLContext(
     window: win,
     fTex2D: 0,
@@ -146,5 +152,6 @@ proc newGLContext*(win: glfw.Window): GLContext =
     fBlendEquation: GL_FUNC_ADD,
     fBlendFunc: (GL_ONE.GLenum, GL_ZERO.GLenum, GL_ONE.GLenum, GL_ZERO.GLenum),
     fStencilFunc: (GL_ALWAYS, 0.GLint, 255.GLuint),
-    fStencilOp: (GL_KEEP, GL_KEEP, GL_KEEP)
+    fStencilOp: (GL_KEEP, GL_KEEP, GL_KEEP),
+    fScissorBox: (0.GLint, 0.GLint, w.GLsizei, h.GLsizei)
   )
