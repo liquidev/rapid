@@ -18,6 +18,7 @@ import ../lib/glad/gl
 from ../lib/glfw import nil
 import opengl
 
+export glfw.CursorShape
 export glfw.Key
 export glfw.KeyAction
 export glfw.ModifierKey
@@ -100,18 +101,15 @@ proc quitGfx*() =
 #--
 
 type
-  #--
   # Building
-  #--
   WindowOptions = object
     width, height: Natural
     title: string
     resizable, visible, decorated, focused, floating, maximized: bool
     transparent: bool
     antialiasLevel: int
-  #--
+
   # Events
-  #--
   RModKeys* = set[glfw.ModifierKey]
   RCharProc* = proc (rune: Rune, mods: RModKeys)
   RCursorEnterProc* = proc ()
@@ -132,13 +130,13 @@ type
     onScroll: seq[RScrollProc]
     onClose: seq[RCloseProc]
     onResize: seq[RResizeProc]
-  #--
+
   # Windows
-  #--
   RWindowObj = object
     handle*: glfw.Window
     callbacks: WindowCallbacks
     context*: GLContext
+    cursors: array[glfw.CursorShape, glfw.Cursor]
   RWindow* = ref RWindowObj
 
 using
@@ -310,6 +308,9 @@ proc open*(wopt): RWindow =
   glfw.setWindowUserPointer(result.handle, cast[pointer](result))
   glfwCallbacks(result)
 
+  for cs in low(glfw.CursorShape)..high(glfw.CursorShape):
+    result.cursors[cs] = glfw.createStandardCursor(cs)
+
 proc destroy*(win: RWindow) =
   ## Destroys a window.
   glfw.destroyWindow(win.handle)
@@ -319,8 +320,8 @@ proc destroy*(win: RWindow) =
 #--
 
 proc close*(win: var RWindow) =
-  ## Tells the window it should close. This doesn't immediately close the window;
-  ## the application might prevent the window from being closed.
+  ## Tells the window it should close. This doesn't immediately close
+  ## the window; the application might prevent the window from being closed.
   glfw.setWindowShouldClose(win.handle, 1)
 
 proc pos*(win: RWindow): tuple[x, y: int] =
@@ -374,6 +375,9 @@ proc decorated*(win: RWindow): bool =
   result = bool glfw.getWindowAttrib(win.handle, glfw.hDecorated)
 proc floating*(win: RWindow): bool =
   result = bool glfw.getWindowAttrib(win.handle, glfw.hFloating)
+
+proc `cursor=`*(win: RWindow, cursor: glfw.CursorShape) =
+  glfw.setCursor(win.handle, win.cursors[cursor])
 
 #~~
 # Input
