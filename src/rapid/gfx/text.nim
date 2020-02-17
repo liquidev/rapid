@@ -218,36 +218,31 @@ proc penY(font: RFont, y, h: float, vAlign: RTextVAlign): float =
     of taBottom: h + y
   ) * 64
 
-proc text*(ctx: RGfxContext, font: RFont, x, y: float, text: string,
-           w, h = 0.0, hAlign = taLeft, vAlign = taTop) =
+proc text*[T: string | seq[Rune]](ctx: RGfxContext, font: RFont, x, y: float,
+                                  text: T, w, h = 0.0,
+                                  hAlign = taLeft, vAlign = taTop,
+                                  textureScaling = 1.0) =
   ## Renders a string of text using the specified font, at the specified
   ## position. The text must be UTF-8 encoded.
-  let previousTex = ctx.texture
+  ## The ``textureScaling`` parameter decides if the textures used should be
+  ## rendered using a larger font size. This setting does not affect how the
+  ## glyphs are laid out. It should be used when a scaling matrix is applied.
+  let
+    previousTex = ctx.texture
+    (oldWidth, oldHeight) = (font.width, font.height)
+  font.width = int(oldWidth.float * textureScaling)
+  font.height = int(oldHeight.float * textureScaling)
   var
-    penX = font.penX(text, x, w, hAlign)
-    penY = font.penY(y, h, vAlign)
-  ctx.uniform("rapid_renderText", 1)
-  ctx.texture = font.packer.texture
-  ctx.begin()
-  for r in text.runes:
-    ctx.drawChar(font, x, y, penX, penY, r)
-  ctx.draw()
-  ctx.uniform("rapid_renderText", 0)
-  ctx.texture = previousTex
-
-proc text*(ctx: RGfxContext, font: RFont, x, y: float, text: seq[Rune],
-           w, h = 0.0, hAlign = taLeft, vAlign = taTop) =
-  ## Renders a string of text using the specified font, at the specified
-  ## position.
-  let previousTex = ctx.texture
-  var
-    penX = font.penX(text, x, w, hAlign)
-    penY = font.penY(y, h, vAlign)
-  ctx.uniform("rapid_renderText", 1)
-  ctx.texture = font.packer.texture
-  ctx.begin()
-  for r in text:
-    ctx.drawChar(font, x, y, penX, penY, r)
-  ctx.draw()
-  ctx.uniform("rapid_renderText", 0)
-  ctx.texture = previousTex
+    penX = font.penX(text, x * textureScaling, w * textureScaling, hAlign)
+    penY = font.penY(y * textureScaling, h * textureScaling, vAlign)
+  ctx.transform:
+    ctx.scale(1 / textureScaling, 1 / textureScaling)
+    ctx.uniform("rapid_renderText", 1)
+    ctx.texture = font.packer.texture
+    ctx.begin()
+    for r in (when T is string: text.runes else: text):
+      ctx.drawChar(font, x, y, penX, penY, r)
+    ctx.draw()
+    ctx.uniform("rapid_renderText", 0)
+    ctx.texture = previousTex
+  (font.width, font.height) = (oldWidth, oldHeight)
