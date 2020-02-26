@@ -439,6 +439,12 @@ proc dpyWorkArea*(): tuple[x, y, w, h: int] =
   glfw.getMonitorWorkarea(mon, addr x, addr y, addr w, addr h)
   result = (x.int, y.int, w.int, h.int)
 
+proc dpyRefreshRate*(): float =
+  let
+    mon = glfw.getPrimaryMonitor()
+    mode = glfw.getVideoMode(mon)
+  result = mode.refreshRate.float
+
 proc time*(): float =
   ## Returns the current process's time.
   ## This should be used instead of ``cpuTime()``, because it properly deals \

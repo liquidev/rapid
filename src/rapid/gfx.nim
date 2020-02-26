@@ -447,6 +447,10 @@ type
     bmAdd
     bmSubtract
     bmMultiply
+  REventMethod* = enum
+    evmPoll ## poll for events
+    evmWait ## wait for events, enabling higher refresh rates at the cost of \
+            ## non-continuous rendering
 
 proc gfx*(ctx: RGfxContext): RGfx =
   ## Get the context's parent Gfx.
@@ -959,7 +963,6 @@ template render*(gfx: RGfx, ctxVar, body: untyped): untyped =
   with(gfx.win):
     var ctxVar {.inject.} = gfx.ctx()
     glfw.swapBuffers(gfx.win.handle)
-    glfw.pollEvents()
     withFramebuffer(currentGlc, 0):
       glBindVertexArray(gfx.vaoID)
       glBindBuffer(GL_ARRAY_BUFFER, gfx.vboID)
@@ -976,11 +979,18 @@ const
   SecPerUpdate = 1 / RUpdateFreq
 
 macro loop*(gfx: RGfx, body: untyped): untyped =
-  ## Runs a game loop on the specified window. ``draw`` and ``update`` events \
+  ## Runs a game loop on the specified window. ``draw`` and ``update`` events
   ## must be provided (see example). There's also an optional ``init`` event,
   ## which only gets the context.
-  ## The game loop is responsible for running the game at a constant speed, \
+  ## The game loop is responsible for running the game at a constant speed,
   ## independent of the hardware the game's running on.
+  ##
+  ## The method of polling events can be set by changing the ``events``
+  ## variable inside of the body. ``evmPoll`` should be used for games, since it
+  ## offers continuous rendering with VSync. ``evmWait`` does not use VSync, and
+  ## only renders when an input event happens. If ``maxWaitTime`` is specified
+  ## and the method is ``evmWait``, the loop will continue every
+  ## ``maxWaitTime``.
   runnableExamples:
     var
       win = initRWindow()
@@ -1005,30 +1015,45 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
     drawCtxName, drawStepName: NimNode
     initBody = newNimNode(nnkStmtList)
     initCtxName = ident"ctx"
+    events = newLit(evmPoll)
+    maxWaitTime = newLit(-1.0)
   body.expectKind(nnkStmtList)
   for st in body:
-    st.expectKind({nnkCall, nnkCommand})
-    if st[0].eqIdent("draw"):
-      st[1].expectKind(nnkIdent)
-      st[2].expectKind(nnkIdent)
-      st[3].expectKind(nnkStmtList)
-      drawCtxName = st[1]
-      drawStepName = st[2]
-      drawBody = st[3]
-    elif st[0].eqIdent("update"):
-      st[1].expectKind(nnkStmtList)
-      updateBody = st[1]
-    elif st[0].eqIdent("init"):
-      st[1].expectKind(nnkIdent)
-      st[2].expectKind(nnkStmtList)
-      initCtxName = st[1]
-      initBody = st[2]
+    case st.kind
+    of nnkCall, nnkCommand:
+      if st[0].eqIdent("draw"):
+        st[1].expectKind(nnkIdent)
+        st[2].expectKind(nnkIdent)
+        st[3].expectKind(nnkStmtList)
+        drawCtxName = st[1]
+        drawStepName = st[2]
+        drawBody = st[3]
+      elif st[0].eqIdent("update"):
+        st[1].expectKind(nnkStmtList)
+        updateBody = st[1]
+      elif st[0].eqIdent("init"):
+        st[1].expectKind(nnkIdent)
+        st[2].expectKind(nnkStmtList)
+        initCtxName = st[1]
+        initBody = st[2]
+      else:
+        error("invalid loop event: must be 'init', 'draw' or 'update'", st)
+    of nnkAsgn:
+      if st[0].eqIdent("events"):
+        events = st[1]
+      elif st[0].eqIdent("maxWaitTime"):
+        maxWaitTime = st[1]
+      else:
+        error("invalid loop parameter: must be 'events' or 'maxWaitTime'")
     else:
-      error("Invalid loop event! Must be 'init', 'draw' or 'update'", st)
+      error("unexpected: " & st.repr, st)
   if drawBody.isNil: error("Missing draw event", body)
   if updateBody.isNil: error("Missing update event", body)
   result = quote do:
     glfw.swapInterval(int32(`gfx`.vsync) * RFramerateDen)
+
+    if `maxWaitTime` != -1:
+      glfw.waitEventsTimeout(`maxWaitTime`.cdouble)
 
     block init:
       # Render 2 frames to fill both buffers
@@ -1055,4 +1080,8 @@ macro loop*(gfx: RGfx, body: untyped): untyped =
         let `drawStepName` = delta * RUpdateFreq
         `gfx`.render(`drawCtxName`):
           `drawBody`
+
+      case `events`
+      of evmPoll: glfw.pollEvents()
+      of evmWait: glfw.waitEvents()
     glfw.terminate()
