@@ -44,7 +44,7 @@ type
 const
   OggCallbacks = ov_callbacks(
     read_func:
-      proc (buf: pointer, size, nmemb: cuint, file: pointer): cuint {.cdecl.} =
+      proc (buf: pointer, size, nmemb: uint, file: pointer): uint {.cdecl.} =
         result = cast[File](file).readBuffer(buf, size * nmemb).cuint,
     seek_func:
       proc (file: pointer, offset: ogg_int64_t, whence: cint): cint {.cdecl.} =
