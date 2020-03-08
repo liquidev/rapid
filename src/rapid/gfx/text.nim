@@ -72,7 +72,7 @@ proc newRFont*(data: string, height: Natural, width = 0.Natural,
   )
   var err = FT_New_Memory_Face(freetypeLib,
                                cast[ptr FTByte](data[0].unsafeAddr),
-                               data.len, 0, addr result.fHandle)
+                               data.len.FT_Long, 0, addr result.fHandle)
   if err == FT_Err_Unknown_File_Format:
     raise newException(FreetypeError, "Unknown font format" &
                        (if filename != "": " (" & filename & ")" else: ""))
