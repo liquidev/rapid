@@ -107,6 +107,14 @@ proc loadRTexture*(filename: string, conf = DefaultTextureConfig): RTexture =
   let img = loadRImage(filename)
   result = newRTexture(img, conf)
 
+proc update*(tex: RTexture, image: RImage) =
+  ## Updates a texture's contents with the given image.
+  currentGlc.withTex2D(tex.id):
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8.GLint,
+                 image.width.GLsizei, image.height.GLsizei, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, image.caddr)
+
+
 proc `minFilter=`*(tex: RTexture, flt: RTextureFilter) =
   ## Sets the minification filter of the texture.
   currentGlc.withTex2D(tex.id):
