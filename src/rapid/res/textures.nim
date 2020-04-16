@@ -113,7 +113,8 @@ proc update*(tex: RTexture, image: RImage) =
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8.GLint,
                  image.width.GLsizei, image.height.GLsizei, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, image.caddr)
-
+  tex.width = image.width
+  tex.height = image.height
 
 proc `minFilter=`*(tex: RTexture, flt: RTextureFilter) =
   ## Sets the minification filter of the texture.
