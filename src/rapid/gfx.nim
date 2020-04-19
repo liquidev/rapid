@@ -375,6 +375,7 @@ proc init(gfx: RGfx) =
 
 proc openGfx*(win: RWindow, fxTexConfig = DefaultTextureConfig): RGfx =
   ## Opens a Gfx for a window.
+  assert win != nil, "window cannot be nil"
   result = RGfx(
     win: win,
     fWidth: win.width,
