@@ -143,7 +143,7 @@ var surface = win.openGfx()
 surface.loop:
   draw ctx, step:
     ctx.clear(gray(255))
-  update step:
+  update:
     discard
 ```
 
@@ -171,7 +171,7 @@ surface.loop:
     ctx.begin()
     ctx.rect(32, 32, 32, 32)
     ctx.draw()
-update step:
+update:
     discard
 ```
 
@@ -229,7 +229,7 @@ surface.loop:
         ctx.rect(x * 8, y * 8, 8, 8, sprite1[y])
     ctx.rect(32, 32, 16, 16, sprite2[0])
     ctx.draw()
-  update step:
+  update:
     discard
 
 ```
