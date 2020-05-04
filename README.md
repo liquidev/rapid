@@ -3,6 +3,9 @@
 A game engine written in Nim, optimized for rapid game development and easy
 prototyping. Made for convenience while coding, not striking performance.
 
+| Warning | rapid isn't actively maintained by me anymore. I'm focusing on other projects right now and don't know when I'll have time for improving the engine. Take care! |
+| ------- | --- |
+
 ## Goals
 
  - Be easy to understand, even for beginners,
