@@ -26,6 +26,14 @@ type
     fUnderruns: int
   RAudioDevice* = ref RAudioDeviceObj
 
+proc teardownDevice(device: ref RAudioDeviceObj) =
+  soundio_outstream_destroy(device.ostream)
+  soundio_device_unref(device.device)
+  soundio_destroy(device.sio)
+
+proc create(dev: var RAudioDevice) =
+  new(dev, teardownDevice)
+
 proc limit(val: float): float =
   result = clamp(val, -1.0, 1.0)
 
@@ -93,16 +101,11 @@ proc errorCallback(outstream: ptr SoundIoOutStream, errcode: cint) {.cdecl.} =
   if errcode.SoundIoError != SoundIoErrorUnderflow:
     raise newException(AudioError, $soundio_strerror(errcode))
 
-proc teardownDevice(device: ref RAudioDeviceObj) =
-  soundio_outstream_destroy(device.ostream)
-  soundio_device_unref(device.device)
-  soundio_destroy(device.sio)
-
 proc newRAudioDevice*(name = "rapid/audio device",
                       latency = 0.1): RAudioDevice =
   ## Creates a new audio device, with the specified name.
   var error: cint
-  new(result, teardownDevice)
+  result.create()
 
   result.sio = soundio_create()
   result.sio.app_name = name
@@ -122,11 +125,6 @@ proc newRAudioDevice*(name = "rapid/audio device",
     else: SoundIoFormatS16BE
   outstream.sample_rate = ROutputSampleRate
   outstream.software_latency = latency
-  outstream.name = "rapid/audio"
-  outstream.userdata = cast[pointer](result)
-  outstream.write_callback = writeCallback
-  outstream.underflow_callback = underflowCallback
-  outstream.error_callback = errorCallback
   result.ostream = outstream
 
   if (error = soundio_outstream_open(outstream); error != 0):
@@ -137,6 +135,12 @@ proc newRAudioDevice*(name = "rapid/audio device",
     raise newException(AudioError,
       "Could not set channel layout: " &
       $soundio_strerror(outstream.layout_error))
+
+  outstream.name = "rapid/audio"
+  outstream.userdata = cast[pointer](result)
+  outstream.write_callback = writeCallback
+  outstream.underflow_callback = underflowCallback
+  outstream.error_callback = errorCallback
 
 proc attach*(device: RAudioDevice, sampler: RSampler) =
   ## Attaches a sampler to the device. This must be done before starting audio

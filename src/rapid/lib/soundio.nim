@@ -20,7 +20,7 @@ const
 
 static:
   gitPull("https://github.com/andrewrk/libsoundio", BaseDir,
-          "src/*\nsoundio/*\n")
+          "src/*\nsoundio/*\n", checkout = "2.0.0")
 
 cIncludeDir(BaseDir)
 cIncludeDir(Incl)
@@ -126,6 +126,14 @@ static:
   writeFile(Src/"config.h", configH)
   when defined(RCompileDebug):
     echo configH
+
+cOverride:
+  type
+    SoundioBool = bool
+
+cPlugin:
+  proc onSymbol(sym: var Symbol) {.exportc, dynlib.} =
+    if sym.name == "_Bool": sym.name = "SoundioBool"
 
 cImport(Incl/"soundio.h")
 

@@ -37,7 +37,11 @@ proc gray*(gray: ColorCh, a = 255.ColorCh): RColor =
 proc hex*(str: string): RColor =
   ## Parses a hex code into a color.
   ## Possible combinations are RGB, RGBA, RRGGBB, or RRGGBBAA.
+  ## An extra # is allowed at the beginning.
   ## Anything else triggers an assertion.
+  var str = str
+  if str.len > 0 and str[0] == '#':
+    str = str[1..^1]
   assert str.len in [3, 4, 6, 8]
   var
     r, g, b: int
