@@ -1,18 +1,22 @@
 ## This module implements a simple hardware-accelerated 2D vector graphics
-## renderer. It should primarily be used for UIs, etc.
+## renderer. It should primarily be used for UIs and rapid prototyping.
+## Full-blown games should use aglet Meshes for things that don't move.
 
 import std/colors
 
 import aglet
 
-import math/vector
+import ../math/units
+import ../math/vector
 
 export colors except rgb  # use pixeltypes.rgba32f or pixeltypes.rgba instead
 
-type
+export units, vector
 
+type
   RawVertexIndex = uint16
   VertexIndex* = distinct RawVertexIndex
+    ## Index of a vertex, returned by ``addVertex``.
 
   Vertex2D* = object
     ## A vertex, as represented in graphics memory and shaders.
@@ -28,6 +32,9 @@ type
 
     fDefaultProgram: Program[Vertex2D]
     fDefaultDrawParams: DrawParams
+
+    transformEnabled: bool
+    fTransformMatrix: Mat3f
 
 
 
@@ -62,20 +69,20 @@ proc defaultProgram*(graphics: Graphics): Program[Vertex2D] =
   ## graphics context.
   graphics.fDefaultProgram
 
-proc `defaultProgram=`*(graphics: Graphics, program: Program[Vertex2D]) =
+proc `defaultProgram=`*(graphics: Graphics, newProgram: Program[Vertex2D]) =
   ## Sets the default program used for drawing using the graphics context.
   ##
   ## Using this to adjust the program on the fly is bad practice. This should
   ## only be used once to adjust the default program to your use case, and
   ## alternate programs should be specified directly in ``draw`` calls.
-  graphics.fDefaultProgram = program
+  graphics.fDefaultProgram = newProgram
 
 proc defaultDrawParams*(graphics: Graphics): DrawParams =
   ## Returns the default draw parameters for drawing using the
   ## graphics context.
   graphics.fDefaultDrawParams
 
-proc `defaultDrawParams=`*(graphics: Graphics, params: DrawParams) =
+proc `defaultDrawParams=`*(graphics: Graphics, newParams: DrawParams) =
   ## Sets the default draw parameters used for drawing using the graphics
   ## context.
   ##
@@ -83,11 +90,88 @@ proc `defaultDrawParams=`*(graphics: Graphics, params: DrawParams) =
   ## should only be used once to adjust the default draw parameters to your use
   ## case, and alternate sets of draw parameters should be specified directly in
   ## ``draw`` calls.
-  graphics.fDefaultDrawParams = params
+  graphics.fDefaultDrawParams = newParams
+
+proc transformMatrix*(graphics: Graphics): Mat3f =
+  ## Returns the transform matrix for vertices.
+  graphics.fTransformMatrix
+
+proc `transformMatrix=`*(graphics: Graphics, newMatrix: Mat3f) =
+  ## Returns the transform matrix for vertices.
+  graphics.transformEnabled = true
+  graphics.fTransformMatrix = newMatrix
+
+proc translate*(graphics: Graphics, translation: Vec2f) =
+  ## Translates the transform matrix by the given vector.
+
+  graphics.transformEnabled = true
+  # it's strange that nim-glm uses rows as columns in these constructors but ok
+  graphics.fTransformMatrix *= mat3f(
+    vec3f(1.0, 0.0, 0.0),
+    vec3f(0.0, 1.0, 0.0),
+    vec3f(translation.x, translation.y, 1.0),
+  )
+
+proc translate*(graphics: Graphics, x, y: float32) =
+  ## Shortcut for translating using separate X and Y coordinates.
+
+  graphics.translate(vec2(x, y))
+
+proc scale*(graphics: Graphics, scale: Vec2f) =
+  ## Scales the transform matrix by the given factors.
+
+  graphics.transformEnabled = true
+  graphics.fTransformMatrix *= mat3f(
+    vec3f(scale.x, 0.0, 0.0),
+    vec3f(0.0, scale.y, 0.0),
+    vec3f(0.0, 0.0, 1.0),
+  )
+
+proc scale*(graphics: Graphics, x, y: float32) =
+  ## Shortcut for scaling using separate X and Y factors.
+
+  graphics.scale(vec2(x, y))
+
+proc scale*(graphics: Graphics, xy: float32) =
+  ## Shortcut for scaling the X and Y axes uniformly using a single factor.
+
+  graphics.scale(vec2(xy))
+
+proc rotate*(graphics: Graphics, angle: Radians) =
+  ## Rotates the transform matrix by ``angle`` radians.
+
+  graphics.transformEnabled = true
+  graphics.fTransformMatrix = mat3f(
+    vec3f(cos(angle), sin(angle), 0.0),
+    vec3f(-sin(angle), cos(angle), 0.0),
+    vec3f(0.0, 0.0, 1.0),
+  )
+
+proc resetTransform*(graphics: Graphics) =
+  ## Resets the transform matrix.
+
+  graphics.transformEnabled = false
+  graphics.fTransformMatrix = mat3f()
+
+template transform*(graphics: Graphics, body: untyped) =
+  ## Saves the current transform matrix, executes the body, and restores the
+  ## transform matrix to the previously saved state.
+
+  let
+    enabled = graphics.transformEnabled
+    matrix = graphics.fTransformMatrix
+
+  body
+
+  graphics.transformEnabled = enabled
+  graphics.fTransformMatrix = matrix
 
 proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex =
   ## Adds a vertex to the graphics context's shape buffer.
 
+  var vertex = vertex
+  if graphics.transformEnabled:
+    vertex.position = xy(graphics.fTransformMatrix * vec3f(vertex.position, 1))
   result = graphics.vertexBuffer.len.VertexIndex
   graphics.vertexBuffer.add(vertex)
 
@@ -96,8 +180,7 @@ proc addVertex*(graphics: Graphics,
   ## Shorthand for initializing a vertex and adding it to the graphics context's
   ## shape buffer.
 
-  result = graphics.vertexBuffer.len.VertexIndex
-  graphics.vertexBuffer.add(vertex(position, color))
+  graphics.addVertex(vertex(position, color))
 
 proc addIndex*(graphics: Graphics, index: VertexIndex) =
   ## Adds an index into the graphics context's shape buffer.
@@ -179,7 +262,7 @@ proc ellipse*(graphics: Graphics, center: Vec2f, radii: Vec2f,
   var rimIndices: seq[VertexIndex]
   for pointIndex in 0..<points:
     let
-      angle = pointIndex / points * (2 * Pi)
+      angle = radians(pointIndex / points * (2 * Pi))
       point = center + vec2f(cos(angle) * radii.x, sin(angle) * radii.y)
     rimIndices.add(graphics.addVertex(point, color))
   for index, rimIndex1 in rimIndices:
@@ -200,22 +283,25 @@ proc ellipse*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
   graphics.ellipse(vec2f(centerX, centerY), vec2f(radiusX, radiusY),
                    color, points)
 
-proc circle*(graphics: Graphics, center: Vec2f, radius: float,
+proc circle*(graphics: Graphics, center: Vec2f, radius: float32,
              color = rgba32f(1, 1, 1, 1),
              points = Natural(2 * Pi * abs(radius) * 0.25)) =
-  ## Shortcut for adding a circle using the ``ellipse`` procedure. The main
-  ## advantage of using this is that the amount of points is adjusted
-  ## automatically, depending on the perimeter of the circle, but it might be
-  ## too little for very small circles.
+  ## Shortcut for adding a circle using the ``ellipse`` procedure.
 
   graphics.ellipse(center, vec2f(radius), color, points)
 
-proc circle*(graphics: Graphics, centerX, centerY: float, radius: float,
+proc circle*(graphics: Graphics, centerX, centerY: float32, radius: float32,
              color = rgba32f(1, 1, 1, 1),
              points = Natural(2 * Pi * abs(radius) * 0.25)) =
   ## Shortcut for adding a circle using separate center X and Y coordinates.
 
   graphics.ellipse(vec2f(centerX, centerY), vec2f(radius), color, points)
+
+proc point*(graphics: Graphics, center: Vec2f, size: float32 = 1.0,
+            color = rgba32f(1, 1, 1, 1)) =
+  ## Adds a point at the given position, with the given size and color.
+
+  graphics.rectangle(center - vec2f(size) / 2, vec2f(size), color)
 
 proc line*(graphics: Graphics, a, b: Vec2f, thickness: float32 = 1.0,
            colorA, colorB = rgba32f(1, 1, 1, 1)) =
@@ -337,6 +423,7 @@ proc newGraphics*(window: Window): Graphics =
     window.newProgram[:Vertex2D](DefaultVertexShader, DefaultFragmentShader)
   result.fDefaultDrawParams = defaultDrawParams().derive:
     blend blendAlpha
+  result.fTransformMatrix = mat3f()
 
 converter rgba32f*(color: Color): Rgba32f =
   ## Converts an stdlib color to an aglet RGBA float32 pixel.
