@@ -5,6 +5,8 @@ import std/colors
 
 import aglet
 
+import math/vector
+
 export colors except rgb  # use pixeltypes.rgba32f or pixeltypes.rgba instead
 
 type
@@ -17,14 +19,16 @@ type
     position: Vec2f
     color: Vec4f
 
-  Vectorial* = ref object
+  Graphics* = ref object
     ## Hardware accelerated 2D vector graphics renderer.
     window: Window
     mesh: Mesh[Vertex2D]
     vertexBuffer: seq[Vertex2D]
     indexBuffer: seq[RawVertexIndex]
-    defaultProgram: Program[Vertex2D]
-    defaultDrawParams: DrawParams
+
+    fDefaultProgram: Program[Vertex2D]
+    fDefaultDrawParams: DrawParams
+
 
 
 # Blending modes
@@ -51,82 +55,96 @@ proc vertex*(position: Vec2f, color = rgba32f(1, 1, 1, 1)): Vertex2D =
   Vertex2D(position: position, color: color.Vec4f)
 
 
-# Vectorial
+# Graphics
 
-proc size*(vectorial: Vectorial): Vec2f =
-  ## Returns the size of the vectorial as a vector.
-  ## This returns the size of the parent window, but as a more convenient
-  ## vector of floats.
-  result = vectorial.window.size.vec2f
+proc defaultProgram*(graphics: Graphics): Program[Vertex2D] =
+  ## Returns the default program used for drawing using using the
+  ## graphics context.
+  graphics.fDefaultProgram
 
-proc width*(vectorial: Vectorial): float32 =
-  ## Returns the width of the vectorial.
-  result = vectorial.size.x
+proc `defaultProgram=`*(graphics: Graphics, program: Program[Vertex2D]) =
+  ## Sets the default program used for drawing using the graphics context.
+  ##
+  ## Using this to adjust the program on the fly is bad practice. This should
+  ## only be used once to adjust the default program to your use case, and
+  ## alternate programs should be specified directly in ``draw`` calls.
+  graphics.fDefaultProgram = program
 
-proc height*(vectorial: Vectorial): float32 =
-  ## Returns the height of the vectorial.
-  result = vectorial.size.y
+proc defaultDrawParams*(graphics: Graphics): DrawParams =
+  ## Returns the default draw parameters for drawing using the
+  ## graphics context.
+  graphics.fDefaultDrawParams
 
-proc defaultProgram*(vectorial: Vectorial): Program[Vertex2D] =
-  ## Returns the default program used for drawing using the vectorial.
-  vectorial.defaultProgram
+proc `defaultDrawParams=`*(graphics: Graphics, params: DrawParams) =
+  ## Sets the default draw parameters used for drawing using the graphics
+  ## context.
+  ##
+  ## Using this to adjust the draw parameters on the fly is bad practice. This
+  ## should only be used once to adjust the default draw parameters to your use
+  ## case, and alternate sets of draw parameters should be specified directly in
+  ## ``draw`` calls.
+  graphics.fDefaultDrawParams = params
 
-proc defaultDrawParams*(vectorial: Vectorial): DrawParams =
-  ## Returns the default draw parameters for drawing with the vectorial.
-  vectorial.defaultDrawParams
+proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex =
+  ## Adds a vertex to the graphics context's shape buffer.
 
-proc addVertex*(vectorial: Vectorial, vertex: Vertex2D): VertexIndex =
-  ## Adds a vertex to the vectorial's shape buffer.
-  result = vectorial.vertexBuffer.len.VertexIndex
-  vectorial.vertexBuffer.add(vertex)
+  result = graphics.vertexBuffer.len.VertexIndex
+  graphics.vertexBuffer.add(vertex)
 
-proc addVertex*(vectorial: Vectorial,
+proc addVertex*(graphics: Graphics,
                 position: Vec2f, color = rgba32f(1, 1, 1, 1)): VertexIndex =
-  ## Shorthand for initializing a vertex and adding it to the vectorial's
+  ## Shorthand for initializing a vertex and adding it to the graphics context's
   ## shape buffer.
-  result = vectorial.vertexBuffer.len.VertexIndex
-  vectorial.vertexBuffer.add(vertex(position, color))
 
-proc addIndex*(vectorial: Vectorial, index: VertexIndex) =
-  ## Adds an index into the vectorial's shape buffer.
-  vectorial.indexBuffer.add(index.RawVertexIndex)
+  result = graphics.vertexBuffer.len.VertexIndex
+  graphics.vertexBuffer.add(vertex(position, color))
 
-proc addIndices*(vectorial: Vectorial, indices: openArray[VertexIndex]) =
-  ## Adds multiple indices to the vectorial's shape buffer in one go.
+proc addIndex*(graphics: Graphics, index: VertexIndex) =
+  ## Adds an index into the graphics context's shape buffer.
+
+  graphics.indexBuffer.add(index.RawVertexIndex)
+
+proc addIndices*(graphics: Graphics, indices: openArray[VertexIndex]) =
+  ## Adds multiple indices to the graphics context's shape buffer in one go.
+
   for index in indices:
-    vectorial.indexBuffer.add(index.RawVertexIndex)
+    graphics.indexBuffer.add(index.RawVertexIndex)
 
-proc resetShape*(vectorial: Vectorial) =
-  ## Resets the vectorial's shape buffer.
-  vectorial.vertexBuffer.setLen(0)
-  vectorial.indexBuffer.setLen(0)
+proc resetShape*(graphics: Graphics) =
+  ## Resets the graphics context's shape buffer.
 
-proc triangle*(vectorial: Vectorial, a, b, c: Vec2f,
+  graphics.vertexBuffer.setLen(0)
+  graphics.indexBuffer.setLen(0)
+
+proc triangle*(graphics: Graphics, a, b, c: Vec2f,
                color = rgba32f(1, 1, 1, 1)) =
-  ## Adds a triangle to the vectorial's shape buffer, tinted with the given
-  ## color.
-  var
-    e = vectorial.addVertex(a, color)
-    f = vectorial.addVertex(b, color)
-    g = vectorial.addVertex(c, color)
-  vectorial.addIndices([e, f, g])
+  ## Adds a triangle to the graphics context's shape buffer,
+  ## tinted with the given color.
 
-proc quad*(vectorial: Vectorial, a, b, c, d: Vec2f,
+  var
+    e = graphics.addVertex(a, color)
+    f = graphics.addVertex(b, color)
+    g = graphics.addVertex(c, color)
+  graphics.addIndices([e, f, g])
+
+proc quad*(graphics: Graphics, a, b, c, d: Vec2f,
            color = rgba32f(1, 1, 1, 1)) =
-  ## Adds a quad to the vectorial's shape buffer, tinted with the given color.
-  ## The vertices must be wound clockwise.
-  var
-    e = vectorial.addVertex(a, color)
-    f = vectorial.addVertex(b, color)
-    g = vectorial.addVertex(c, color)
-    h = vectorial.addVertex(d, color)
-  vectorial.addIndices([e, f, g, g, h, e])
+  ## Adds a quad to the graphics context's shape buffer, tinted with the given
+  ## color. The vertices must be wound clockwise.
 
-proc rectangle*(vectorial: Vectorial, rect: Rectf,
+  var
+    e = graphics.addVertex(a, color)
+    f = graphics.addVertex(b, color)
+    g = graphics.addVertex(c, color)
+    h = graphics.addVertex(d, color)
+  graphics.addIndices([e, f, g, g, h, e])
+
+proc rectangle*(graphics: Graphics, rect: Rectf,
                 color = rgba32f(1, 1, 1, 1)) =
-  ## Adds a rectangle to the vectorial's shape buffer, tinted with the given
-  ## color.
-  vectorial.quad(
+  ## Adds a rectangle to the graphics context's shape buffer, tinted with the
+  ## given color.
+
+  graphics.quad(
     rect.position,
     rect.position + vec2f(rect.width, 0),
     rect.position + rect.size,
@@ -134,18 +152,101 @@ proc rectangle*(vectorial: Vectorial, rect: Rectf,
     color
   )
 
-proc rectangle*(vectorial: Vectorial, position, size: Vec2f,
+proc rectangle*(graphics: Graphics, position, size: Vec2f,
                 color = rgba32f(1, 1, 1, 1)) =
-  ## Shortcut for adding a rectangle to the vectorial's shape buffer using
-  ## position and size vectors, tinted with the given color.
-  vectorial.rectangle(rectf(position, size), color)
+  ## Shortcut for adding a rectangle to the graphics context's shape buffer
+  ## using position and size vectors, tinted with the given color.
 
-proc rectangle*(vectorial: Vectorial, x, y, width, height: float32,
+  graphics.rectangle(rectf(position, size), color)
+
+proc rectangle*(graphics: Graphics, x, y, width, height: float32,
                 color = rgba32f(1, 1, 1, 1)) =
-  ## Shortcut for adding a rectangle to the vectorial's shape buffer using
-  ## separate X and Y coordinates, a width, and a height, tinted with the given
-  ## color.
-  vectorial.rectangle(rectf(x, y, width, height), color)
+  ## Shortcut for adding a rectangle to the graphics context's shape buffer
+  ## using separate X and Y coordinates, a width, and a height, tinted with
+  ## the given color.
+
+  graphics.rectangle(rectf(x, y, width, height), color)
+
+proc ellipse*(graphics: Graphics, center: Vec2f, radii: Vec2f,
+              color = rgba32f(1, 1, 1, 1), points = 16.Natural) =
+  ## Adds an ellipse to the graphics context's shape buffer using vectors for
+  ## its center and X/Y radii, tinted with the given color. ``points`` controls
+  ## the number of vertices along the ellipse's perimeter; smaller ellipses
+  ## should use less points, as there are less pixels, while larger ellipses
+  ## should use more points, to appear more smooth.
+
+  let centerIndex = graphics.addVertex(center, color)
+  var rimIndices: seq[VertexIndex]
+  for pointIndex in 0..<points:
+    let
+      angle = pointIndex / points * (2 * Pi)
+      point = center + vec2f(cos(angle) * radii.x, sin(angle) * radii.y)
+    rimIndices.add(graphics.addVertex(point, color))
+  for index, rimIndex1 in rimIndices:
+    let rimIndex2 =
+      # ↓ this is about 2x faster than using mod
+      if index + 1 == rimIndices.len:
+        rimIndices[0]
+      else:
+        rimIndices[index + 1]
+    graphics.addIndices([centerIndex, rimIndex1, rimIndex2])
+
+proc ellipse*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
+              color = rgba32f(1, 1, 1, 1), points = 16.Natural) =
+  ## Shortcut for adding an ellipse to the graphics context's shape buffer
+  ## using separate center X and Y coordinates, and separate X and Y radii,
+  ## tinted with the given color.
+
+  graphics.ellipse(vec2f(centerX, centerY), vec2f(radiusX, radiusY),
+                   color, points)
+
+proc circle*(graphics: Graphics, center: Vec2f, radius: float,
+             color = rgba32f(1, 1, 1, 1),
+             points = Natural(2 * Pi * abs(radius) * 0.25)) =
+  ## Shortcut for adding a circle using the ``ellipse`` procedure. The main
+  ## advantage of using this is that the amount of points is adjusted
+  ## automatically, depending on the perimeter of the circle, but it might be
+  ## too little for very small circles.
+
+  graphics.ellipse(center, vec2f(radius), color, points)
+
+proc circle*(graphics: Graphics, centerX, centerY: float, radius: float,
+             color = rgba32f(1, 1, 1, 1),
+             points = Natural(2 * Pi * abs(radius) * 0.25)) =
+  ## Shortcut for adding a circle using separate center X and Y coordinates.
+
+  graphics.ellipse(vec2f(centerX, centerY), vec2f(radius), color, points)
+
+proc line*(graphics: Graphics, a, b: Vec2f, thickness: float32 = 1.0,
+           colorA, colorB = rgba32f(1, 1, 1, 1)) =
+  ## Adds a line between ``a`` and ``b``, with the given thickness and colors.
+  ## Keep in mind that this is a "quick'n'dirty" line triangulator, and it isn't
+  ## suited very well for drawing polylines. For that, use ``polyline``.
+
+  # implementation detail: this does not use GL's line rasterizer as it does not
+  # guarantee that all line widths are supported. this makes drawing lines less
+  # efficient, but at least developers can expect consistent behavior on all
+  # graphics cards.
+
+  if a == b: return  # prevent division by 0 if length == 0
+
+  let
+    direction = b - a
+    normDirection = normalize(direction)
+    baseOffset = normDirection * (thickness / 2)
+    offsetCw = baseOffset.perpClockwise
+    offsetCcw = baseOffset.perpCounterClockwise
+    e = graphics.addVertex(a + offsetCw, colorA)
+    f = graphics.addVertex(a + offsetCcw, colorA)
+    g = graphics.addVertex(b + offsetCcw, colorB)
+    h = graphics.addVertex(b + offsetCw, colorB)
+  graphics.addIndices([e, f, g, g, h, e])
+
+proc line*(graphics: Graphics, a, b: Vec2f, thickness: float32 = 1.0,
+           color = rgba32f(1, 1, 1, 1)) =
+  ## Shortcut for adding a line with a solid color.
+
+  graphics.line(a, b, thickness, color, color)
 
 const
   DefaultVertexShader* = glsl"""
@@ -180,16 +281,16 @@ const
   """
 
 type
-  VectorialUniforms* = object
+  GraphicsUniforms* = object
     ## Extra uniforms for use with aglet's ``uniforms`` macro.
     projection*: Mat4f
     `?targetSize`*: Vec2f
 
-proc uniforms*(vectorial: Vectorial, target: Target): VectorialUniforms =
-  ## Adds some extra uniforms from the vectorial to ``input``:
+proc uniforms*(graphics: Graphics, target: Target): GraphicsUniforms =
+  ## Returns some extra uniforms related to the graphics context:
   ##  - ``projection: mat4`` – the projection matrix
   ##  - ``?targetSize: vec2`` – the size of the target
-  result = VectorialUniforms(
+  result = GraphicsUniforms(
     projection: ortho(left = 0'f32, top = 0'f32,
                       right = target.width.float32,
                       bottom = target.height.float32,
@@ -197,42 +298,44 @@ proc uniforms*(vectorial: Vectorial, target: Target): VectorialUniforms =
     `?targetSize`: target.size.vec2f
   )
 
-proc updateMesh(vectorial: Vectorial) =
+proc updateMesh(graphics: Graphics) =
   ## Updates the internal mesh with client-side shape data.
-  vectorial.mesh.uploadVertices(vectorial.vertexBuffer)
-  vectorial.mesh.uploadIndices(vectorial.indexBuffer)
+  graphics.mesh.uploadVertices(graphics.vertexBuffer)
+  graphics.mesh.uploadIndices(graphics.indexBuffer)
 
-proc draw*[U: UniformSource](vectorial: Vectorial, target: Target,
+proc draw*[U: UniformSource](graphics: Graphics, target: Target,
                              uniforms: U,
-                             program = vectorial.defaultProgram,
-                             drawParams = vectorial.defaultDrawParams) =
-  ## Draws the vectorial's shape buffer onto the given target.
+                             program = graphics.defaultProgram,
+                             drawParams = graphics.defaultDrawParams) =
+  ## Draws the graphics context's shape buffer onto the given target.
   ## Optionally, a program, uniforms, and draw parameters can be specified.
-  ## When specifying uniforms, always add a ``..vectorial.uniforms``.
-  ## Otherwise the drawing results will be incorrect!
+  ## When specifying uniforms, always add ``..graphics.uniforms``.
+  ## Otherwise, shader programs won't compile!
 
-  vectorial.updateMesh()
-  target.draw(program, vectorial.mesh, uniforms, drawParams)
+  graphics.updateMesh()
+  target.draw(program, graphics.mesh, uniforms, drawParams)
 
-proc draw*(vectorial: Vectorial, target: Target,
-           program = vectorial.defaultProgram,
-           drawParams = vectorial.defaultDrawParams) =
-  ## Overload of ``draw`` that uses ``vectorial.uniforms(target)`` as the
+proc draw*(graphics: Graphics, target: Target,
+           program = graphics.defaultProgram,
+           drawParams = graphics.defaultDrawParams) =
+  ## Overload of ``draw`` that uses ``graphics.uniforms(target)`` as the
   ## uniform source.
+  # workaround to Nim/#14913 which causes a compiler crash when trying to use a
+  # default value for a concept parameter
 
-  vectorial.updateMesh()
-  target.draw(program, vectorial.mesh, vectorial.uniforms(target),
-              vectorial.defaultDrawParams)
+  graphics.updateMesh()
+  target.draw(program, graphics.mesh, graphics.uniforms(target),
+              graphics.defaultDrawParams)
 
-proc newVectorial*(window: Window): Vectorial =
-  ## Creates a new vectorial.
+proc newGraphics*(window: Window): Graphics =
+  ## Creates a new graphics context.
   new(result)
   result.window = window
   result.mesh =
     window.newMesh[:Vertex2D](usage = muDynamic, primitive = dpTriangles)
-  result.defaultProgram =
+  result.fDefaultProgram =
     window.newProgram[:Vertex2D](DefaultVertexShader, DefaultFragmentShader)
-  result.defaultDrawParams = defaultDrawParams().derive:
+  result.fDefaultDrawParams = defaultDrawParams().derive:
     blend blendAlpha
 
 converter rgba32f*(color: Color): Rgba32f =
