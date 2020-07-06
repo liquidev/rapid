@@ -2,8 +2,10 @@ import aglet
 import aglet/window/glfw
 import rapid/graphics
 
-proc main =
+# ↓ doesn't work due to a bug or something. haven't verified it yet.
+# proc main() =
 
+block:
   var agl = initAglet()
   agl.initWindow()
 
@@ -40,4 +42,4 @@ proc main =
     win.pollEvents do (event: InputEvent):
       discard
 
-main()
+# main()

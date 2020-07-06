@@ -1,6 +1,7 @@
 ## This module implements a simple hardware-accelerated 2D vector graphics
 ## renderer. It should primarily be used for UIs and rapid prototyping.
-## Full-blown games should use aglet Meshes for things that don't move.
+## Full-blown games should use aglet Meshes for things that don't change their
+## geometry.
 
 import std/colors
 
