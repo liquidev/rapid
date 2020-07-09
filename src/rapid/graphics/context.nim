@@ -37,7 +37,6 @@ type
     fTransformMatrix: Mat3f
 
 
-
 # Blending modes
 
 const
@@ -60,6 +59,22 @@ proc color*(vertex: Vertex2D): Rgba32f =
 proc vertex*(position: Vec2f, color = rgba32f(1, 1, 1, 1)): Vertex2D =
   ## Constructs a 2D vertex.
   Vertex2D(position: position, color: color.Vec4f)
+
+
+proc position*(index: VertexIndex, graphics: Graphics): Vec2f =
+  ## Returns the position of a vertex at the given index.
+  ## For debugging purposes only.
+  graphics.vertexBuffer[index.int].position
+
+proc color*(index: VertexIndex, graphics: Graphics): Rgba32f =
+  ## Returns the color of a vertex at the given index.
+  ## For debugging purposes only.
+  graphics.vertexBuffer[index.int].color.Rgba32f
+
+
+proc `$`*(index: VertexIndex): string =
+  ## Stringifies a vertex index for debugging purposes.
+  "VertexIndex(" & $index.RawVertexIndex & ")"
 
 
 # Graphics
@@ -279,10 +294,12 @@ proc arc*(graphics: Graphics, center: Vec2f, radii: Vec2f,
   ## vertices along the arc's perimeter; arcs with a smaller surface area should
   ## use less points, as there are less pixels.
 
-  var rimIndices: seq[VertexIndex]
+  # rimIndices is a global because we want to reuse the memory across calls
+  var rimIndices {.global, threadvar.}: seq[VertexIndex]
+  rimIndices.setLen(0)
+  let pointCountOffset = ord(mode in {amOpen, amChord})
   for pointIndex in 0..<points:
     let
-      pointCountOffset = ord(mode in {amOpen, amChord})
       angle = float32(pointIndex / (points - pointCountOffset))
         .mapRange(0, 1, startAngle.float32, endAngle.float32)
         .radians
@@ -394,7 +411,7 @@ proc line*(graphics: Graphics, a, b: Vec2f, thickness: float32 = 1.0,
     capOffset =
       case cap
       of lcButt, lcRound: vec2f(0)
-      of lcSquare: normDirection * thickness / 2
+      of lcSquare: baseOffset
     e = graphics.addVertex(a + offsetCw - capOffset, colorA)
     f = graphics.addVertex(a + offsetCcw - capOffset, colorA)
     g = graphics.addVertex(b + offsetCcw + capOffset, colorB)

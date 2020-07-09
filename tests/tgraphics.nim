@@ -30,7 +30,8 @@ proc shapes(target: Target, graphics: Graphics, time: float32) =
         vec2f(0, 0),
         angle.toVector * 48
       ]
-    graphics.polyline(points, thickness = 6.0, color = rgba(1, 1, 1, 0.5))
+    graphics.polyline(points, thickness = 16.0, cap = lcRound, join = ljRound,
+                      color = rgba(1, 1, 1, 1))
 
 block:
   var agl = initAglet()

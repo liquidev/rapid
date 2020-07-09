@@ -9,13 +9,13 @@
 
 proc polyline*(graphics: Graphics, points: openArray[Vec2f],
                thickness: float32 = 1.0, cap = lcButt, join: LineJoin = ljMiter,
-               color = rgba32f(1, 1, 1, 1), miterLimit = 45.degrees.toRadians) =
+               color = rgba32f(1, 1, 1, 1)) =
   ## Draws a polyline spanning the given set of points. This is the "expensive"
   ## line triangulator that produces nice results at the cost of performance.
   ## Use sparingly for drawing graphs, complex outlines, etc.
-  ## Because the miter line join can cause the line to go infinitely high up
-  ## with small angles, there's also a *miter limit*. If the angle between two
-  ## lines is less than the miter limit, the join is switched to a bevel joint.
+  ##
+  ## This algorithm is not perfect. It produces some overdraw when drawing round
+  ## caps and round joints, so you should not use those with transparent colors.
 
   if points.len == 1:
     case cap
@@ -44,50 +44,112 @@ proc polyline*(graphics: Graphics, points: openArray[Vec2f],
       t[1] = -t[1]
     t[0] = t[0].normalize
     t[1] = t[1].normalize
-    t[0] *= thickness
-    t[1] *= thickness
+    t[0] *= thickness / 2
+    t[1] *= thickness / 2
 
     let
-      a0 = graphics.addVertex(a + t[0], color)
-      a1 = graphics.addVertex(a - t[0], color)
-      c0 = graphics.addVertex(c + t[1], color)
-      c1 = graphics.addVertex(c - t[1], color)
-      aT = graphics.addVertex(b + t[0], color)
-      bT = graphics.addVertex(b + t[1], color)
-      (_, vPpoint) = lineIntersect(a + t[0], b + t[0], c + t[1], b + t[1])
-      vP = graphics.addVertex(vPpoint, color)
-      nvP = graphics.addVertex(b - (vPpoint - b), color)
+      a0 = a + t[0]
+      a1 = a - t[0]
+      c0 = c + t[1]
+      c1 = c - t[1]
+      aT = b + t[0]
+      bT = b + t[1]
+      (_, vPv) = lineIntersect(a + t[0], b + t[0], c + t[1], b + t[1])
+      nvP = b - (vPv - b)
+      a0v = graphics.addVertex(a0, color)
+      a1v = graphics.addVertex(a1, color)
+      c0v = graphics.addVertex(c0, color)
+      c1v = graphics.addVertex(c1, color)
+      aTv = graphics.addVertex(aT, color)
+      bTv = graphics.addVertex(bT, color)
+      nvPv = graphics.addVertex(nvP, color)
+      bv = graphics.addVertex(b, color)
 
     let
       intersection = lineIntersect(c + t[1], c - t[1], b - t[0], a - t[0])
       degenerated = intersection[0] == irInsideBoth
 
     if not degenerated:
-      graphics.addIndices([a0, a1, nvP, a0, nvP, aT])
-      graphics.addIndices([c0, c1, nvP, c0, nvP, bT])
+      graphics.addIndices([a0v, a1v, nvPv, a0v, nvPv, aTv])
+      graphics.addIndices([c0v, c1v, nvPv, c0v, nvPv, bTv])
     else:
       let tp = graphics.addVertex(intersection[1], color)
-      graphics.addIndices([a0, a1, bT, bT, aT, a0])
-      graphics.addIndices([tp, bT, c0])
+      graphics.addIndices([a0v, a1v, bTv, bTv, aTv, a0v])
+      graphics.addIndices([tp, bTv, c0v])
 
+    let
+      jointBottomVertex =
+        if degenerated: bv
+        else: nvPv
     case join
     of ljBevel, ljMiter:
       if not degenerated:
-        graphics.addIndices([nvP, aT, bT])
+        graphics.addIndices([jointBottomVertex, aTv, bTv])
         if join == ljMiter:
-          graphics.addIndices([vP, aT, bT])
-      else:
-        graphics.addIndices([graphics.addVertex(b, color), aT, bT])
+          let vPv = graphics.addVertex(vPv, color)
+          graphics.addIndices([vPv, aTv, bTv])
     of ljRound:
-      discard  # TODO
+      let
+        startAngle = angle(aT - b)
+        endAngle = angle(bT - b)
+        pointCount =
+          int(float32(endAngle - startAngle).abs * (thickness / 2))
+      # ↓ this is a global for memory efficiency
+      var rimIndices {.global, threadvar.}: seq[VertexIndex]
+      rimIndices.setLen(0)
+      rimIndices.add(aTv)
+      for pointIndex in 0..<pointCount:
+        let
+          angle = float32(pointIndex / max(1, pointCount - 1))
+            .mapRange(0, 1, startAngle.float32, endAngle.float32)
+            .radians
+          point = b + angle.toVector * (thickness / 2)
+        rimIndices.add(graphics.addVertex(point, color))
+      rimIndices.add(bTv)
+      for index in 0..<rimIndices.len - 1:
+        let
+          rimIndex1 = rimIndices[index]
+          rimIndex2 = rimIndices[index + 1]
+        graphics.addIndices([jointBottomVertex, rimIndex1, rimIndex2])
+
+  proc squareCap(point: var Vec2f, center: Vec2f, amount: float32) {.nimcall.} =
+    ## Extends ``point`` ``amount`` pixels from ``center`` to create
+    ## a square cap.
+    let
+      direction = point - center
+      normDirection = direction.normalize
+    point += normDirection * amount
 
   for index in 0..<points.len - 2:
     let
-      a =
-        if index == 0: points[index]
-        else: (points[index] + points[index + 1]) / 2
       b = points[index + 1]
+      a =
+        if index == 0:
+          var point = points[index]
+          if cap == lcSquare:
+            squareCap(point, b, thickness / 2)
+          point
+        else: (points[index] + b) / 2
       c =
-        if index == points.len - 3: points[index + 2]
-        else: (points[index + 1] + points[index + 2]) / 2
+        if index == points.len - 3:
+          var point = points[index + 2]
+          if cap == lcSquare:
+            squareCap(point, b, thickness / 2)
+          point
+        else: (points[index + 2] + b) / 2
     anchor(graphics, a, b, c, thickness, join, color, miterLimit)
+
+  proc roundCap(graphics: Graphics, cap, next: Vec2f,
+                radius: float32, color: Rgba32f) {.nimcall.} =
+    ## Adds an arc at ``cap`` facing opposite of ``next`` with the given
+    ## ``radius`` to create a round cap.
+    let
+      direction = cap - next
+      angle = direction.angle
+      angleCcw = angle - radians(Pi / 2)
+    graphics.arc(cap, radius, angleCcw, angleCcw + Pi.radians, color,
+                 points = PolygonPoints(max(6, 2 * Pi * radius * 0.25)))
+
+  if cap == lcRound:
+    roundCap(graphics, points[0], points[1], thickness / 2, color)
+    roundCap(graphics, points[^1], points[^2], thickness / 2, color)
