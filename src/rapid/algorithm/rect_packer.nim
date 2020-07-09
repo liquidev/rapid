@@ -18,18 +18,18 @@ type
     nodes: seq[Node]
 
 # shortcuts to reduce verbosity
-proc x(node: Node): int32 = node.position.x
-proc y(node: Node): int32 = node.position.y
+proc x(node: Node): int32 {.inline.} = node.position.x
+proc y(node: Node): int32 {.inline.} = node.position.y
 
-proc size*(packer: RectPacker): Vec2i =
+proc size*(packer: RectPacker): Vec2i {.inline.} =
   ## Returns the size of the packer, as a vector.
   packer.size
 
-proc width*(packer: RectPacker): int32 =
+proc width*(packer: RectPacker): int32 {.inline.} =
   ## Returns the width of the packer.
   packer.width
 
-proc height*(packer: RectPacker): int32 =
+proc height*(packer: RectPacker): int32 {.inline.} =
   ## Returns the height of the packer.
   packer.height
 
@@ -122,3 +122,14 @@ proc pack*(packer: var RectPacker, size: Vec2i): Option[Recti] =
     let rect = recti(vec2i(bestPosition), size)
     packer.addNode(bestIndex, rect)
     result = some(rect)
+
+proc init*(packer: var RectPacker, size: Vec2i) =
+  ## Initializes a rect packer.
+
+  packer.size = size
+  packer.nodes.setLen(0)
+  packer.nodes.add(Node(width: size.x))
+
+proc initRectPacker*(size: Vec2i): RectPacker =
+  ## Creates and initializes a rect packer.
+  result.init(size)
