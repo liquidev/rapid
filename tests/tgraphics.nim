@@ -1,9 +1,11 @@
 import std/monotimes
+import std/sugar
 import std/times
 
 import aglet
 import aglet/window/glfw
 import rapid/graphics
+import glm/noise
 
 proc shapes(target: Target, graphics: Graphics, time: float32) =
   graphics.rectangle(32, 32, 32, 32)
@@ -32,6 +34,13 @@ proc shapes(target: Target, graphics: Graphics, time: float32) =
       ]
     graphics.polyline(points, thickness = 16.0, cap = lcRound, join = ljRound,
                       color = rgba(1, 1, 1, 1))
+  graphics.transform:
+    graphics.translate(128, 320)
+    let points = collect(newSeq):
+      for x in 0..<10:
+        let y = perlin(vec2f(x.float32 / 4.2, time)) * 64
+        vec2f(x.float32 * 16, y)
+    graphics.polyline(points, thickness = 4.0)
 
 block:
   var agl = initAglet()

@@ -33,8 +33,7 @@ proc polyline*(graphics: Graphics, points: openArray[Vec2f],
     (p2.x - p1.x) * (p3.y - p1.y) - (p3.x - p1.x) * (p2.y - p1.y)
 
   proc anchor(graphics: Graphics, a, b, c: Vec2f,
-              thickness: float32, join: LineJoin, color: Rgba32f,
-              miterLimit: Radians) {.nimcall.} =
+              thickness: float32, join: LineJoin, color: Rgba32f) {.nimcall.} =
     ## Draws a single "anchor", (two lines with one bend).
     var t: array[2, Vec2f]
     t[0] = perpCounterClockwise(b - a)
@@ -137,7 +136,7 @@ proc polyline*(graphics: Graphics, points: openArray[Vec2f],
             squareCap(point, b, thickness / 2)
           point
         else: (points[index + 2] + b) / 2
-    anchor(graphics, a, b, c, thickness, join, color, miterLimit)
+    anchor(graphics, a, b, c, thickness, join, color)
 
   proc roundCap(graphics: Graphics, cap, next: Vec2f,
                 radius: float32, color: Rgba32f) {.nimcall.} =
