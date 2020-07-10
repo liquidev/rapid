@@ -20,12 +20,13 @@ type
     ## Index of a vertex, returned by ``addVertex``.
 
   Vertex2D* = object
-    ## A vertex, as represented in graphics memory and shaders.
+    ## Vertex data, as represented in graphics memory and shaders.
     position: Vec2f
     color: Vec4f
     uv: Vec2f
 
   Sprite* = distinct uint32
+    ## An opaque sprite handle.
 
   Graphics* = ref object
     ## Hardware accelerated 2D vector graphics renderer.
@@ -510,8 +511,30 @@ proc addSprite*(graphics: Graphics, image: BinaryImageBuffer): Sprite =
   graphics.addSprite(vec2i(image.width, image.height),
                      cast[ptr Rgba8](image.data[0].unsafeAddr))
 
-proc sprite*(graphics: Graphics, rect: Rectf, tint = rgba(1, 1, 1, 1)) =
+proc sprite*(graphics: Graphics, sprite: Sprite, rect: Rectf,
+             tint = rgba(1, 1, 1, 1)) =
   ## Draws a sprite at the given rectangle, tinted with the given color.
+
+  let
+    spriteRect = graphics.spriteRects[sprite.int]
+    e = graphics.addVertex(rect.topLeft, tint, spriteRect.topLeft)
+    f = graphics.addVertex(rect.topRight, tint, spriteRect.topRight)
+    g = graphics.addVertex(rect.bottomRight, tint, spriteRect.bottomRight)
+    h = graphics.addVertex(rect.bottomLeft, tint, spriteRect.bottomLeft)
+  graphics.addIndices([e, f, g, g, h, e])
+
+proc sprite*(graphics: Graphics, sprite: Sprite, position, size: Vec2f,
+             tint = rgba(1, 1, 1, 1)) {.inline.} =
+  ## Shortcut for drawing a sprite using separate position and size vectors.
+
+  graphics.sprite(sprite, rectf(position, size), tint)
+
+proc sprite*(graphics: Graphics, sprite: Sprite, x, y, width, height: float32,
+             tint = rgba(1, 1, 1, 1)) {.inline.} =
+  ## Shortcut for drawing a sprite using separate X and Y coordinates, and
+  ## a separated width and height.
+
+  graphics.sprite(sprite, rectf(x, y, width, height), tint)
 
 const
   DefaultVertexShader* = glsl"""

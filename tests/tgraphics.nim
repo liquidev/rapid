@@ -7,21 +7,21 @@ import aglet/window/glfw
 import rapid/graphics
 import glm/noise
 
-var tiles: seq[Sprite]
+var tileset: seq[Sprite]
 
 proc loadTileset(graphics: Graphics) =
   const TilesetPng = slurp("sampleData/tileset.png")
   let image = readPngImage(TilesetPng)
   template tile(x, y: int32): Image = image[recti(x * 10 + 1, y * 10 + 1, 8, 8)]
-  tiles.add graphics.addSprite(tile(0, 1))
-  tiles.add graphics.addSprite(tile(1, 1))
-  tiles.add graphics.addSprite(tile(2, 1))
-  tiles.add graphics.addSprite(tile(0, 2))
-  tiles.add graphics.addSprite(tile(1, 2))
-  tiles.add graphics.addSprite(tile(2, 2))
-  tiles.add graphics.addSprite(tile(3, 2))
+  tileset.add graphics.addSprite(tile(0, 1))
+  tileset.add graphics.addSprite(tile(1, 1))
+  tileset.add graphics.addSprite(tile(2, 1))
+  tileset.add graphics.addSprite(tile(0, 2))
+  tileset.add graphics.addSprite(tile(1, 2))
+  tileset.add graphics.addSprite(tile(2, 2))
+  tileset.add graphics.addSprite(tile(3, 2))
 
-proc shapes(target: Target, graphics: Graphics, time: float32) =
+proc shapes(graphics: Graphics, time: float32) =
   graphics.rectangle(32, 32, 32, 32)
   graphics.line(vec2f(128, 32), vec2f(128 + 64, 32 + 64),
                 thickness = 10, cap = lcRound,
@@ -56,7 +56,15 @@ proc shapes(target: Target, graphics: Graphics, time: float32) =
         vec2f(x.float32 * 16, y)
     graphics.polyline(points, thickness = 4.0)
 
-block:
+proc tiles(graphics: Graphics) =
+  graphics.transform:
+    graphics.translate(256, 32)
+    for index, sprite in tileset:
+      let y = index.float32 * 32
+      graphics.sprite(sprite, 0, y, 32, 32)
+
+proc main() =
+
   var agl = initAglet()
   agl.initWindow()
 
@@ -66,6 +74,8 @@ block:
 
   graphics.defaultDrawParams = graphics.defaultDrawParams.derive:
     multisample on
+  graphics.spriteMinFilter = fmNearest
+  graphics.spriteMagFilter = fmNearest
 
   graphics.loadTileset()
 
@@ -77,10 +87,13 @@ block:
     frame.clearColor(rgba(0.125, 0.125, 0.125, 1.0))
 
     graphics.resetShape()
-    shapes(frame, graphics, time)
+    shapes(graphics, time)
+    tiles(graphics)
     graphics.draw(frame)
 
     frame.finish()
 
     win.pollEvents do (event: InputEvent):
       discard
+
+main()
