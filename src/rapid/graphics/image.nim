@@ -81,20 +81,16 @@ proc readPng*(image: var Image, data: string) =
 
 proc loadPng*(image: var Image, filename: string) =
   ## Loads a PNG image from the given path.
-
   image.readPng(readFile(filename))
 
-proc initImage*(size: Vec2i): Image =
+proc initImage*(size: Vec2i): Image {.inline.} =
   ## Creates and initializes an empty image buffer.
-
   result.init(size)
 
-proc readPngImage*(data: string): Image =
+proc readPngImage*(data: string): Image {.inline.} =
   ## Creates and reads a PNG image from the given string containing a PNG image.
-
   result.readPng(data)
 
-proc loadPngImage*(filename: string): Image =
+proc loadPngImage*(filename: string): Image {.inline.} =
   ## Creates and loads a PNG image from the given path.
-
   result.loadPng(filename)
