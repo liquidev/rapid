@@ -44,9 +44,12 @@ proc add*[T: ColorPixelType](atlas: AtlasTexture[T],
   ## Prefer the ``openArray`` or ``BinaryImageBuffer`` versions instead.
 
   let
-    paddedSize = size * vec2i(atlas.padding)
-    intRect = atlas.packer.pack(paddedSize)
-  if intRect.isSome:
+    paddedSize = size + vec2i(atlas.padding.int32) * 2
+    maybeIntRect = atlas.packer.pack(paddedSize)
+  if maybeIntRect.isSome:
+    var intRect = maybeIntRect.get
+    intRect.position += vec2i(atlas.padding.int32)
+    intRect.size -= vec2i(atlas.padding.int32) * 2
     atlas.texture.subImage(intRect.position, intRect.size, data)
     result = rectf(intRect.position.vec2f / atlas.size.vec2f,
                    intRect.size.vec2f / atlas.size.vec2f)
@@ -66,6 +69,19 @@ proc add*[T: ColorPixelType,
   ## This can be used with ``rapid/graphics/image``.
 
   result = atlas.add(vec2i(image.width, image.height), image.data[0].unsafeAddr)
+
+proc sampler*(atlas: AtlasTexture,
+              minFilter: TextureMinFilter = fmNearestMipmapLinear,
+              magFilter: TextureMagFilter = fmLinear,
+              wrapS, wrapT = twClampToEdge,
+              borderColor = rgba(0, 0, 0, 0)): Sampler =
+  ## Creates a sampler for the given atlas texture, with the given parameters.
+  ## Refer to aglet's documentation for details.
+  result = atlas.texture.sampler(
+    minFilter, magFilter,
+    wrapS, wrapT, wrapR = twClampToEdge,
+    borderColor,
+  )
 
 proc newAtlasTexture*[T: ColorPixelType](window: Window,
                                          size: Vec2i): AtlasTexture[T] =

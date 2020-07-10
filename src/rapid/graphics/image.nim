@@ -16,7 +16,7 @@ proc `[]`*(image: Image, position: Vec2i): Rgba8 {.inline.} =
   ## Returns the pixel at the given position.
 
   let
-    redIndex = position.x + position.y * image.width * 4
+    redIndex = (position.x + position.y * image.width) * 4
     greenIndex = redIndex + 1
     blueIndex = greenIndex + 1
     alphaIndex = blueIndex + 1
@@ -31,11 +31,27 @@ proc `[]`*(image: Image, x, y: int32): Rgba8 {.inline.} =
   ## Shortcut for querying a pixel with a vector.
   image[vec2i(x, y)]
 
+proc debugRepr*(image: Image): string =
+  ## Returns a string containing the image represented in ASCII. For debugging
+  ## purposes only.
+
+  for y in 0..<image.height:
+    if y > 0: result.add('\n')
+    for x in 0..<image.width:
+      const Intensities = " .:=+*#"
+      let
+        pixel = image[x, y]
+        intensity = (pixel.r.int / 255 +
+                     pixel.g.int / 255 +
+                     pixel.b.int / 255) / 3 *
+                    (pixel.a.int / 255)
+      result.add(Intensities[int(intensity * Intensities.len.float)])
+
 proc `[]=`*(image: var Image, position: Vec2i, pixel: Rgba8) {.inline.} =
   ## Sets the pixel at the given position.
 
   let
-    redIndex = position.x + position.y * image.width * 4
+    redIndex = (position.x + position.y * image.width) * 4
     greenIndex = redIndex + 1
     blueIndex = greenIndex + 1
     alphaIndex = blueIndex + 1
@@ -57,9 +73,11 @@ proc `[]`*(image: Image, rect: Recti): Image =
          rect.y + rect.height < image.height,
          "rect must not extend beyond the image's size"
 
+  result.width = rect.width
+  result.height = rect.height
   result.data.setLen(rect.width * rect.height * 4)
-  for y in rect.top..rect.bottom:
-    for x in rect.left..rect.right:
+  for y in rect.top..<rect.bottom:
+    for x in rect.left..<rect.right:
       let resultPosition = vec2i(x - rect.x, y - rect.y)
       result[resultPosition] = image[x, y]
 

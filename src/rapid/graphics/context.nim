@@ -8,6 +8,7 @@ import std/colors
 import aglet
 
 import ../math as rmath
+import atlas_texture
 
 export colors except rgb  # use pixeltypes.rgba32f or pixeltypes.rgba instead
 
@@ -22,6 +23,9 @@ type
     ## A vertex, as represented in graphics memory and shaders.
     position: Vec2f
     color: Vec4f
+    uv: Vec2f
+
+  Sprite* = distinct uint32
 
   Graphics* = ref object
     ## Hardware accelerated 2D vector graphics renderer.
@@ -35,6 +39,11 @@ type
 
     transformEnabled: bool
     fTransformMatrix: Mat3f
+
+    spriteAtlas: AtlasTexture[Rgba8]
+    spriteRects: seq[Rectf]
+    fSpriteMinFilter: TextureMinFilter
+    fSpriteMagFilter: TextureMagFilter
 
 
 # Blending modes
@@ -57,20 +66,26 @@ proc color*(vertex: Vertex2D): Rgba32f {.inline.} =
   vertex.color.Rgba32f
 
 proc vertex*(position: Vec2f,
-             color = rgba32f(1, 1, 1, 1)): Vertex2D {.inline.} =
+             color = rgba32f(1, 1, 1, 1),
+             uv = vec2f(0, 0)): Vertex2D {.inline.} =
   ## Constructs a 2D vertex.
-  Vertex2D(position: position, color: color.Vec4f)
+  Vertex2D(position: position, color: color.Vec4f, uv: uv)
 
 
 proc position*(index: VertexIndex, graphics: Graphics): Vec2f {.inline.} =
-  ## Returns the position of a vertex at the given index.
+  ## Returns the position of the vertex at the given index.
   ## For debugging purposes only.
   graphics.vertexBuffer[index.int].position
 
 proc color*(index: VertexIndex, graphics: Graphics): Rgba32f {.inline.} =
-  ## Returns the color of a vertex at the given index.
+  ## Returns the color of the vertex at the given index.
   ## For debugging purposes only.
   graphics.vertexBuffer[index.int].color.Rgba32f
+
+proc uv*(index: VertexIndex, graphics: Graphics): Vec2f {.inline.} =
+  ## Returns the texture coordinates of the vertex at the given index.
+  ## For debugging purposes only.
+  graphics.vertexBuffer[index.int].uv
 
 
 proc `$`*(index: VertexIndex): string {.inline.} =
@@ -185,7 +200,7 @@ template transform*(graphics: Graphics, body: untyped) =
     graphics.transformEnabled = enabled
     graphics.fTransformMatrix = matrix
 
-proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex {.inline.} =
+proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex =
   ## Adds a vertex to the graphics context's shape buffer.
 
   var vertex = vertex
@@ -194,13 +209,21 @@ proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex {.inline.} =
   result = graphics.vertexBuffer.len.VertexIndex
   graphics.vertexBuffer.add(vertex)
 
-proc addVertex*(graphics: Graphics,
-                position: Vec2f,
-                color = rgba32f(1, 1, 1, 1)): VertexIndex {.inline.} =
+proc addVertex*(graphics: Graphics, position: Vec2f,
+                color: Rgba32f, uv: Vec2f): VertexIndex {.inline.} =
   ## Shorthand for initializing a vertex and adding it to the graphics context's
   ## shape buffer.
 
-  graphics.addVertex(vertex(position, color))
+  graphics.addVertex(vertex(position, color, uv))
+
+proc addVertex*(graphics: Graphics,
+                position: Vec2f,
+                color = rgba32f(1, 1, 1, 1)): VertexIndex {.inline.} =
+  ## Shorthand for adding a vertex with UV coordinates positioned at the center
+  ## of the white pixel on the graphics context's sprite atlas.
+
+  graphics.addVertex(position, color,
+                     vec2f(0.5, 0.5) / graphics.spriteAtlas.size.vec2f)
 
 proc addIndex*(graphics: Graphics, index: VertexIndex) {.inline.} =
   ## Adds an index into the graphics context's shape buffer.
@@ -439,22 +462,76 @@ proc line*(graphics: Graphics, a, b: Vec2f, thickness: float32 = 1.0,
 
 include context_polyline
 
+proc spriteMinFilter*(graphics: Graphics): TextureMinFilter {.inline.} =
+  ## Returns the current sprite minification filter.
+  graphics.fSpriteMinFilter
+
+proc `spriteMinFilter=`*(graphics: Graphics, newFilter: TextureMinFilter)
+                        {.inline.} =
+  ## Sets the current sprite minification filter.
+  ## Texture filtering modes apply to the ``draw`` calls succeeding them. This
+  ## means that you cannot use multiple filtering modes in a single draw call.
+  graphics.fSpriteMinFilter = newFilter
+
+proc spriteMagFilter*(graphics: Graphics): TextureMagFilter {.inline.} =
+  ## Returns the current sprite magnification filter.
+  graphics.fSpriteMagFilter
+
+proc `spriteMagFilter=`*(graphics: Graphics, newFilter: TextureMagFilter)
+                        {.inline.} =
+  ## Sets the current sprite magnification filter.
+  ## Texture filtering modes apply to the ``draw`` calls succeeding them. This
+  ## means that you cannot use multiple filtering modes in a single draw call.
+  graphics.fSpriteMagFilter = newFilter
+
+proc addSprite*(graphics: Graphics, size: Vec2i, data: ptr Rgba8): Sprite =
+  ## Adds a sprite to the graphics context's sprite atlas with the provided
+  ## graphics data, and returns a handle to the newly created sprite.
+  ## Raises an error if the sprite won't fit onto the sprite atlas.
+  ##
+  ## This procedure deals with pointers, and so, it is inherently **unsafe**.
+  ## Prefer the ``openArray`` and ``BinaryImageBuffer`` versions.
+
+  let rect = graphics.spriteAtlas.add(size, data)
+  result = graphics.spriteRects.len.Sprite
+  graphics.spriteRects.add(rect)
+
+proc addSprite*(graphics: Graphics,
+                size: Vec2i, data: openArray[Rgba8]): Sprite =
+  ## Adds a sprite to the graphics context's sprite atlas and returns a handle
+  ## to it.
+
+  graphics.addSprite(size, data[0].unsafeAddr)
+
+proc addSprite*(graphics: Graphics, image: BinaryImageBuffer): Sprite =
+  ## Adds a sprite to the graphics context's sprite atlas and returns a handle
+  ## to it.
+
+  graphics.addSprite(vec2i(image.width, image.height),
+                     cast[ptr Rgba8](image.data[0].unsafeAddr))
+
+proc sprite*(graphics: Graphics, rect: Rectf, tint = rgba(1, 1, 1, 1)) =
+  ## Draws a sprite at the given rectangle, tinted with the given color.
+
 const
   DefaultVertexShader* = glsl"""
     #version 330 core
 
     in vec2 position;
     in vec4 color;
+    in vec2 uv;
 
     uniform mat4 projection;
 
     out Vertex {
       vec4 color;
+      vec2 uv;
     } toFragment;
 
     void main(void) {
       gl_Position = projection * vec4(position, 0.0, 1.0);
       toFragment.color = color;
+      toFragment.uv = uv;
     }
   """
   DefaultFragmentShader* = glsl"""
@@ -462,12 +539,15 @@ const
 
     in Vertex {
       vec4 color;
+      vec2 uv;
     } vertex;
+
+    uniform sampler2D spriteAtlas;
 
     out vec4 fbColor;
 
     void main(void) {
-      fbColor = vertex.color;
+      fbColor = vertex.color * texture(spriteAtlas, vertex.uv);
     }
   """
 
@@ -476,17 +556,25 @@ type
     ## Extra uniforms for use with aglet's ``uniforms`` macro.
     projection*: Mat4f
     `?targetSize`*: Vec2f
+    `?spriteAtlas`*: Sampler
 
 proc uniforms*(graphics: Graphics, target: Target): GraphicsUniforms =
   ## Returns some extra uniforms related to the graphics context:
   ##  - ``projection: mat4`` – the projection matrix
   ##  - ``?targetSize: vec2`` – the size of the target
+  ##  - ``?spriteAtlas: sampler2D`` – the sprite atlas texture
   result = GraphicsUniforms(
     projection: ortho(left = 0'f32, top = 0'f32,
                       right = target.width.float32,
                       bottom = target.height.float32,
                       zNear = -1.0, zFar = 1.0),
-    `?targetSize`: target.size.vec2f
+    `?targetSize`: target.size.vec2f,
+    `?spriteAtlas`: graphics.spriteAtlas.sampler(
+      minFilter = graphics.spriteMinFilter,
+      magFilter = graphics.spriteMagFilter,
+      wrapS = twClampToBorder,
+      wrapT = twClampToBorder,
+    )
   )
 
 proc updateMesh(graphics: Graphics) =
@@ -531,17 +619,31 @@ proc draw*(graphics: Graphics, target: Target) {.inline.} =
   graphics.draw(target, graphics.defaultProgram, graphics.uniforms(target),
                 graphics.defaultDrawParams)
 
-proc newGraphics*(window: Window): Graphics =
+proc newGraphics*(window: Window, spriteAtlasSize = 1024.Natural): Graphics =
   ## Creates a new graphics context.
   new(result)
+
   result.window = window
+
   result.mesh =
     window.newMesh[:Vertex2D](usage = muDynamic, primitive = dpTriangles)
+
   result.fDefaultProgram =
     window.newProgram[:Vertex2D](DefaultVertexShader, DefaultFragmentShader)
   result.fDefaultDrawParams = defaultDrawParams().derive:
     blend blendAlpha
+
   result.fTransformMatrix = mat3f()
+
+  result.spriteAtlas =
+    window.newAtlasTexture[:Rgba8](vec2i(spriteAtlasSize.int32))
+  # we need a single white pixel for the default color
+  block whitePixel:
+    result.spriteAtlas.padding = 0
+    discard result.spriteAtlas.add(vec2i(1), [rgba8(255, 255, 255, 255)])
+    result.spriteAtlas.padding = 1
+  result.fSpriteMinFilter = fmNearestMipmapLinear
+  result.fSpriteMagFilter = fmLinear
 
 converter rgba32f*(color: Color): Rgba32f {.inline.} =
   ## Converts an stdlib color to an aglet RGBA float32 pixel.

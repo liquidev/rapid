@@ -7,6 +7,20 @@ import aglet/window/glfw
 import rapid/graphics
 import glm/noise
 
+var tiles: seq[Sprite]
+
+proc loadTileset(graphics: Graphics) =
+  const TilesetPng = slurp("sampleData/tileset.png")
+  let image = readPngImage(TilesetPng)
+  template tile(x, y: int32): Image = image[recti(x * 10 + 1, y * 10 + 1, 8, 8)]
+  tiles.add graphics.addSprite(tile(0, 1))
+  tiles.add graphics.addSprite(tile(1, 1))
+  tiles.add graphics.addSprite(tile(2, 1))
+  tiles.add graphics.addSprite(tile(0, 2))
+  tiles.add graphics.addSprite(tile(1, 2))
+  tiles.add graphics.addSprite(tile(2, 2))
+  tiles.add graphics.addSprite(tile(3, 2))
+
 proc shapes(target: Target, graphics: Graphics, time: float32) =
   graphics.rectangle(32, 32, 32, 32)
   graphics.line(vec2f(128, 32), vec2f(128 + 64, 32 + 64),
@@ -52,6 +66,8 @@ block:
 
   graphics.defaultDrawParams = graphics.defaultDrawParams.derive:
     multisample on
+
+  graphics.loadTileset()
 
   let startTime = getMonoTime()
   while not win.closeRequested:

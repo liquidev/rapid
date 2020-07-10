@@ -1,7 +1,5 @@
 ## Dynamic rectangle packer using a skyline packing algorithm.
 
-# thank you @mrgaturus for this!
-
 import std/options
 
 import aglet
@@ -27,101 +25,99 @@ proc size*(packer: RectPacker): Vec2i {.inline.} =
 
 proc width*(packer: RectPacker): int32 {.inline.} =
   ## Returns the width of the packer.
-  packer.width
+  packer.size.x
 
 proc height*(packer: RectPacker): int32 {.inline.} =
   ## Returns the height of the packer.
-  packer.height
+  packer.size.y
 
-proc rectFits(packer: RectPacker, index: Natural, size: Vec2i): Option[int32] =
-  ## Checks whether the given rect fits within the node at ``index``. Returns
-  ## ``Some(y)`` if it fits, or ``None`` if it doesn't fit.
+# algorithm stolen from fontstash
+# https://github.com/memononen/fontstash/blob/master/src/fontstash.h#L608
+# thank you for the pointer, @mrgaturus!
 
-  # return none if it's out of bounds
-  if packer.nodes[index].x + size.x > packer.width:
+proc addSkylineLevel(packer: var RectPacker, index: int, rect: Recti) =
+
+  # insert node
+  let node = Node(position: vec2i(rect.x, rect.y + rect.height),
+                  width: rect.width)
+  packer.nodes.insert(node, index)
+
+  # delete skyline segments that fall under the shadow of the new segment
+  block:
+    var i = index + 1
+    while i < packer.nodes.len:
+      if packer.nodes[i].x < packer.nodes[i - 1].x + packer.nodes[i - 1].width:
+        let shrink =
+          packer.nodes[i - 1].x + packer.nodes[i - 1].width - packer.nodes[i].x
+        packer.nodes[i].position.x += shrink
+        packer.nodes[i].width -= shrink
+        if packer.nodes[i].width <= 0:
+          packer.nodes.delete(i)
+          dec(i)
+        else:
+          break
+      else:
+        break
+      inc(i)
+
+  # merge same height skyline segments that are next to each other
+  block:
+    var i = 0
+    while i < packer.nodes.len - 1:
+      if packer.nodes[i].y == packer.nodes[i + 1].y:
+        packer.nodes[i].width += packer.nodes[i + 1].width
+        packer.nodes.delete(i + 1)
+        dec(i)
+      inc(i)
+
+proc rectFits(packer: RectPacker, index: int, size: Vec2i): Option[int32] =
+  ## Checks if there's enough space at the location of skyline span at the given
+  ## ``index``. Returns ``Some(y)``, where y is the max height of all skyline
+  ## spans under that location, or ``None`` if no space was found.
+
+  var
+    position = packer.nodes[index].position
+    spaceLeft = size.x
+
+  if position.x + size.x > packer.width:
     return int32.none
 
-  # find space for the rectangle
-  var
-    y = packer.nodes[index].y
-    spaceLeft = size.x
-    index = index
+  var i = index
   while spaceLeft > 0:
-    if index == packer.nodes.len:
-      # reached the end, no space available
-      # XXX: this should probably be reported somehow.
+    if i == packer.nodes.len:
       return int32.none
-    y = max(y, packer.nodes[index].y)
-    if y + size.y > packer.height:
-      # reached the bottom, out of bounds
+    position.y = max(position.y, packer.nodes[i].y)
+    if position.y + size.y > packer.height:
       return int32.none
-    spaceLeft -= packer.nodes[index].width
-    inc(index)
-  # rectangle fits
-  result = some(y)
-
-proc addNode(packer: var RectPacker, index: Natural, rect: Recti) =
-  ## Adds a new node.
-
-  # add the node
-  block addNode:
-    let node = Node(position: vec2i(rect.x, rect.y), width: rect.width)
-    packer.nodes.insert(node, index)
-
-  # remove segments that are under the new segment
-  block removeOldSegments:
-    var index = index + 1
-    while index < packer.nodes.len:
-      let
-        previousNode = packer.nodes[index - 1]
-        currentNode = packer.nodes[index]
-      if currentNode.x < previousNode.x + previousNode.width:
-        let shrink = previousNode.x - currentNode.x + previousNode.width
-        packer.nodes[index].position.x += shrink
-        packer.nodes[index].width -= shrink
-        if currentNode.x <= 0:
-          packer.nodes.delete(index)
-          dec(index)
-        else: break
-      else: break
-      inc(index)
-
-  # merge segments that have the same height and are next to each other
-  block mergeSegments:
-    var index = 0
-    while index < packer.nodes.len:
-      let
-        nextNode = packer.nodes[index + 1]
-        currentNode = packer.nodes[index]
-      if currentNode.y == nextNode.y:
-        packer.nodes[index].width += nextNode.width
-        packer.nodes.delete(index + 1)
-        dec(index)
-      inc(index)
+    spaceLeft -= packer.nodes[i].width
+    inc(i)
+  result = some(position.y)
 
 proc pack*(packer: var RectPacker, size: Vec2i): Option[Recti] =
-  ## Packs a rectangle of the given ``size`` onto the rect packer's surface.
-  ## Returns ``None`` if the rectangle could not be packed.
+  ## Packs a rectangle to the packer's bin and returns ``Some(rect)``. If the
+  ## rectangle doesn't fit, returns ``None``.
 
   var
-    bestIndex = -1
-    bestPosition = vec2i(-1)
+    bestSize = packer.size
+    bestPosition = Vec2i.none
+    bestIndex = int.none
 
-  block findBest:
-    var bestSize = packer.size
-    for index, node in packer.nodes:
-      let maybeY = packer.rectFits(index, size)
-      if maybeY.isSome:
-        let y = maybeY.get
-        if y + size.y <= bestSize.y and node.width < bestSize.x:
-          bestIndex = index
-          bestPosition = vec2i(node.x, y)
-          bestSize = vec2i(node.width, y + size.y)
+  for index, node in packer.nodes:
+    let maybeY = packer.rectFits(index, size)
+    if maybeY.isSome:
+      let y = maybeY.get
+      if y + size.y < bestSize.y or
+         (y + size.y == bestSize.y and node.width < bestSize.x):
+        bestIndex = some(index)
+        bestSize = vec2i(node.width, y + size.y)
+        bestPosition = some(vec2i(node.x, y))
 
-  if bestIndex != -1:
-    let rect = recti(vec2i(bestPosition), size)
-    packer.addNode(bestIndex, rect)
-    result = some(rect)
+  if bestIndex.isNone:
+    return Recti.none
+
+  let rect = recti(bestPosition.get, size)
+  packer.addSkylineLevel(bestIndex.get, rect)
+  result = some(rect)
 
 proc init*(packer: var RectPacker, size: Vec2i) =
   ## Initializes a rect packer.
