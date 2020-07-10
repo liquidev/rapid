@@ -25,8 +25,10 @@ type
     color: Vec4f
     uv: Vec2f
 
-  Sprite* = distinct uint32
-    ## An opaque sprite handle.
+  Sprite* = object
+    ## A mostly opaque sprite handle.
+    id: uint32
+    fSize: Vec2i
 
   Graphics* = ref object
     ## Hardware accelerated 2D vector graphics renderer.
@@ -485,6 +487,18 @@ proc `spriteMagFilter=`*(graphics: Graphics, newFilter: TextureMagFilter)
   ## means that you cannot use multiple filtering modes in a single draw call.
   graphics.fSpriteMagFilter = newFilter
 
+proc size*(sprite: Sprite): Vec2i {.inline.} =
+  ## Returns the size of the sprite as a vector.
+  sprite.fSize
+
+proc width*(sprite: Sprite): int32 =
+  ## Returns the width of the sprite.
+  sprite.size.x
+
+proc height*(sprite: Sprite): int32 =
+  ## Returns the height of the sprite.
+  sprite.size.x
+
 proc addSprite*(graphics: Graphics, size: Vec2i, data: ptr Rgba8): Sprite =
   ## Adds a sprite to the graphics context's sprite atlas with the provided
   ## graphics data, and returns a handle to the newly created sprite.
@@ -494,7 +508,7 @@ proc addSprite*(graphics: Graphics, size: Vec2i, data: ptr Rgba8): Sprite =
   ## Prefer the ``openArray`` and ``BinaryImageBuffer`` versions.
 
   let rect = graphics.spriteAtlas.add(size, data)
-  result = graphics.spriteRects.len.Sprite
+  result = Sprite(id: graphics.spriteRects.len.uint32, fSize: size)
   graphics.spriteRects.add(rect)
 
 proc addSprite*(graphics: Graphics,
@@ -516,7 +530,7 @@ proc sprite*(graphics: Graphics, sprite: Sprite, rect: Rectf,
   ## Draws a sprite at the given rectangle, tinted with the given color.
 
   let
-    spriteRect = graphics.spriteRects[sprite.int]
+    spriteRect = graphics.spriteRects[sprite.id]
     e = graphics.addVertex(rect.topLeft, tint, spriteRect.topLeft)
     f = graphics.addVertex(rect.topRight, tint, spriteRect.topRight)
     g = graphics.addVertex(rect.bottomRight, tint, spriteRect.bottomRight)
@@ -535,6 +549,23 @@ proc sprite*(graphics: Graphics, sprite: Sprite, x, y, width, height: float32,
   ## a separated width and height.
 
   graphics.sprite(sprite, rectf(x, y, width, height), tint)
+
+proc sprite*(graphics: Graphics, sprite: Sprite, position: Vec2f,
+             scale: float32 = 1, tint = rgba(1, 1, 1, 1)) {.inline.} =
+  ## Shortcut for drawing a sprite using a vector for position. This proc
+  ## ensures that the aspect ratio remains correct by using a single
+  ## ``scale`` parameter.
+  ## Note that using this parameter is much faster than using an equivalent
+  ## transform matrix.
+
+  graphics.sprite(sprite, rectf(position, sprite.size.vec2f * scale), tint)
+
+proc sprite*(graphics: Graphics, sprite: Sprite, x, y: float32,
+             scale: float32 = 1, tint = rgba(1, 1, 1, 1)) {.inline.} =
+  ## Shortcut for drawing a scaled sprite using separate X and Y coordinates for
+  ## position.
+
+  graphics.sprite(sprite, vec2f(x, y), scale, tint)
 
 const
   DefaultVertexShader* = glsl"""

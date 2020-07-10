@@ -61,7 +61,7 @@ proc tiles(graphics: Graphics) =
     graphics.translate(256, 32)
     for index, sprite in tileset:
       let y = index.float32 * 32
-      graphics.sprite(sprite, 0, y, 32, 32)
+      graphics.sprite(sprite, 0, y, scale = 4)
 
 proc main() =
 
