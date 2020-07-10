@@ -48,43 +48,45 @@ const
 
 # Vertex
 
-proc position*(vertex: Vertex2D): Vec2f =
+proc position*(vertex: Vertex2D): Vec2f {.inline.} =
   ## Returns the vertex's position.
   vertex.position
 
-proc color*(vertex: Vertex2D): Rgba32f =
+proc color*(vertex: Vertex2D): Rgba32f {.inline.} =
   ## Returns the vertex's tint color.
   vertex.color.Rgba32f
 
-proc vertex*(position: Vec2f, color = rgba32f(1, 1, 1, 1)): Vertex2D =
+proc vertex*(position: Vec2f,
+             color = rgba32f(1, 1, 1, 1)): Vertex2D {.inline.} =
   ## Constructs a 2D vertex.
   Vertex2D(position: position, color: color.Vec4f)
 
 
-proc position*(index: VertexIndex, graphics: Graphics): Vec2f =
+proc position*(index: VertexIndex, graphics: Graphics): Vec2f {.inline.} =
   ## Returns the position of a vertex at the given index.
   ## For debugging purposes only.
   graphics.vertexBuffer[index.int].position
 
-proc color*(index: VertexIndex, graphics: Graphics): Rgba32f =
+proc color*(index: VertexIndex, graphics: Graphics): Rgba32f {.inline.} =
   ## Returns the color of a vertex at the given index.
   ## For debugging purposes only.
   graphics.vertexBuffer[index.int].color.Rgba32f
 
 
-proc `$`*(index: VertexIndex): string =
+proc `$`*(index: VertexIndex): string {.inline.} =
   ## Stringifies a vertex index for debugging purposes.
   "VertexIndex(" & $index.RawVertexIndex & ")"
 
 
 # Graphics
 
-proc defaultProgram*(graphics: Graphics): Program[Vertex2D] =
+proc defaultProgram*(graphics: Graphics): Program[Vertex2D] {.inline.} =
   ## Returns the default program used for drawing using using the
   ## graphics context.
   graphics.fDefaultProgram
 
-proc `defaultProgram=`*(graphics: Graphics, newProgram: Program[Vertex2D]) =
+proc `defaultProgram=`*(graphics: Graphics,
+                        newProgram: Program[Vertex2D]) {.inline.} =
   ## Sets the default program used for drawing using the graphics context.
   ##
   ## Using this to adjust the program on the fly is bad practice. This should
@@ -92,12 +94,13 @@ proc `defaultProgram=`*(graphics: Graphics, newProgram: Program[Vertex2D]) =
   ## alternate programs should be specified directly in ``draw`` calls.
   graphics.fDefaultProgram = newProgram
 
-proc defaultDrawParams*(graphics: Graphics): DrawParams =
+proc defaultDrawParams*(graphics: Graphics): DrawParams {.inline.} =
   ## Returns the default draw parameters for drawing using the
   ## graphics context.
   graphics.fDefaultDrawParams
 
-proc `defaultDrawParams=`*(graphics: Graphics, newParams: DrawParams) =
+proc `defaultDrawParams=`*(graphics: Graphics,
+                           newParams: DrawParams) {.inline.} =
   ## Sets the default draw parameters used for drawing using the graphics
   ## context.
   ##
@@ -107,16 +110,16 @@ proc `defaultDrawParams=`*(graphics: Graphics, newParams: DrawParams) =
   ## ``draw`` calls.
   graphics.fDefaultDrawParams = newParams
 
-proc transformMatrix*(graphics: Graphics): Mat3f =
+proc transformMatrix*(graphics: Graphics): Mat3f {.inline.} =
   ## Returns the transform matrix for vertices.
   graphics.fTransformMatrix
 
-proc `transformMatrix=`*(graphics: Graphics, newMatrix: Mat3f) =
+proc `transformMatrix=`*(graphics: Graphics, newMatrix: Mat3f) {.inline.} =
   ## Returns the transform matrix for vertices.
   graphics.transformEnabled = true
   graphics.fTransformMatrix = newMatrix
 
-proc translate*(graphics: Graphics, translation: Vec2f) =
+proc translate*(graphics: Graphics, translation: Vec2f) {.inline.} =
   ## Translates the transform matrix by the given vector.
 
   graphics.transformEnabled = true
@@ -127,12 +130,12 @@ proc translate*(graphics: Graphics, translation: Vec2f) =
     vec3f(translation.x, translation.y, 1.0),
   )
 
-proc translate*(graphics: Graphics, x, y: float32) =
+proc translate*(graphics: Graphics, x, y: float32) {.inline.} =
   ## Shortcut for translating using separate X and Y coordinates.
 
   graphics.translate(vec2(x, y))
 
-proc scale*(graphics: Graphics, scale: Vec2f) =
+proc scale*(graphics: Graphics, scale: Vec2f) {.inline.} =
   ## Scales the transform matrix by the given factors.
 
   graphics.transformEnabled = true
@@ -142,17 +145,17 @@ proc scale*(graphics: Graphics, scale: Vec2f) =
     vec3f(0.0, 0.0, 1.0),
   )
 
-proc scale*(graphics: Graphics, x, y: float32) =
+proc scale*(graphics: Graphics, x, y: float32) {.inline.} =
   ## Shortcut for scaling using separate X and Y factors.
 
   graphics.scale(vec2(x, y))
 
-proc scale*(graphics: Graphics, xy: float32) =
+proc scale*(graphics: Graphics, xy: float32) {.inline.} =
   ## Shortcut for scaling the X and Y axes uniformly using a single factor.
 
   graphics.scale(vec2(xy))
 
-proc rotate*(graphics: Graphics, angle: Radians) =
+proc rotate*(graphics: Graphics, angle: Radians) {.inline.} =
   ## Rotates the transform matrix by ``angle`` radians.
 
   graphics.transformEnabled = true
@@ -162,7 +165,7 @@ proc rotate*(graphics: Graphics, angle: Radians) =
     vec3f(0.0, 0.0, 1.0),
   )
 
-proc resetTransform*(graphics: Graphics) =
+proc resetTransform*(graphics: Graphics) {.inline.} =
   ## Resets the transform matrix.
 
   graphics.transformEnabled = false
@@ -182,7 +185,7 @@ template transform*(graphics: Graphics, body: untyped) =
     graphics.transformEnabled = enabled
     graphics.fTransformMatrix = matrix
 
-proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex =
+proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex {.inline.} =
   ## Adds a vertex to the graphics context's shape buffer.
 
   var vertex = vertex
@@ -192,24 +195,26 @@ proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex =
   graphics.vertexBuffer.add(vertex)
 
 proc addVertex*(graphics: Graphics,
-                position: Vec2f, color = rgba32f(1, 1, 1, 1)): VertexIndex =
+                position: Vec2f,
+                color = rgba32f(1, 1, 1, 1)): VertexIndex {.inline.} =
   ## Shorthand for initializing a vertex and adding it to the graphics context's
   ## shape buffer.
 
   graphics.addVertex(vertex(position, color))
 
-proc addIndex*(graphics: Graphics, index: VertexIndex) =
+proc addIndex*(graphics: Graphics, index: VertexIndex) {.inline.} =
   ## Adds an index into the graphics context's shape buffer.
 
   graphics.indexBuffer.add(index.RawVertexIndex)
 
-proc addIndices*(graphics: Graphics, indices: openArray[VertexIndex]) =
+proc addIndices*(graphics: Graphics,
+                 indices: openArray[VertexIndex]) {.inline.} =
   ## Adds multiple indices to the graphics context's shape buffer in one go.
 
   for index in indices:
     graphics.indexBuffer.add(index.RawVertexIndex)
 
-proc resetShape*(graphics: Graphics) =
+proc resetShape*(graphics: Graphics) {.inline.} =
   ## Resets the graphics context's shape buffer.
 
   graphics.vertexBuffer.setLen(0)
@@ -252,14 +257,14 @@ proc rectangle*(graphics: Graphics, rect: Rectf,
   )
 
 proc rectangle*(graphics: Graphics, position, size: Vec2f,
-                color = rgba32f(1, 1, 1, 1)) =
+                color = rgba32f(1, 1, 1, 1)) {.inline.} =
   ## Shortcut for adding a rectangle to the graphics context's shape buffer
   ## using position and size vectors, tinted with the given color.
 
   graphics.rectangle(rectf(position, size), color)
 
 proc rectangle*(graphics: Graphics, x, y, width, height: float32,
-                color = rgba32f(1, 1, 1, 1)) =
+                color = rgba32f(1, 1, 1, 1)) {.inline.} =
   ## Shortcut for adding a rectangle to the graphics context's shape buffer
   ## using separate X and Y coordinates, a width, and a height, tinted with
   ## the given color.
@@ -267,7 +272,7 @@ proc rectangle*(graphics: Graphics, x, y, width, height: float32,
   graphics.rectangle(rectf(x, y, width, height), color)
 
 proc point*(graphics: Graphics, center: Vec2f, size: float32 = 1.0,
-            color = rgba32f(1, 1, 1, 1)) =
+            color = rgba32f(1, 1, 1, 1)) {.inline.} =
   ## Adds a point at the given position, with the given size and color.
 
   # this draws a square not only to mimic OpenGL behavior, but because drawing a
@@ -326,14 +331,14 @@ proc arc*(graphics: Graphics, center: Vec2f, radii: Vec2f,
 
 proc arc*(graphics: Graphics, center: Vec2f, radius: float32,
           startAngle, endAngle: Radians, color = rgba32f(1, 1, 1, 1),
-          points = 16.PolygonPoints, mode = amChord) =
+          points = 16.PolygonPoints, mode = amChord) {.inline.} =
   ## Shortcut for adding an arc with the same radius for X and Y coordinates.
 
   graphics.arc(center, vec2f(radius), startAngle, endAngle, color, points, mode)
 
 proc arc*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
           startAngle, endAngle: Radians, color = rgba32f(1, 1, 1, 1),
-          points = 16.PolygonPoints, mode = amChord) =
+          points = 16.PolygonPoints, mode = amChord) {.inline.} =
   ## Shortcut for adding an arc using separate center X and Y coordinates and
   ## separate X and Y radii.
 
@@ -342,7 +347,7 @@ proc arc*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
 
 proc arc*(graphics: Graphics, centerX, centerY, radius: float32,
           startAngle, endAngle: Radians, color = rgba32f(1, 1, 1, 1),
-          points = 16.PolygonPoints, mode = amChord) =
+          points = 16.PolygonPoints, mode = amChord) {.inline.} =
   ## Shortcut for adding an arc using separate center X and Y coordinates and
   ## a single radius used both for X and Y components.
 
@@ -350,7 +355,8 @@ proc arc*(graphics: Graphics, centerX, centerY, radius: float32,
                color, points, mode)
 
 proc ellipse*(graphics: Graphics, center: Vec2f, radii: Vec2f,
-              color = rgba32f(1, 1, 1, 1), points = 32.PolygonPoints) =
+              color = rgba32f(1, 1, 1, 1),
+              points = 32.PolygonPoints) {.inline.} =
   ## Shortcut for adding an arc from 0° to 360°, with the given center and X/Y
   ## radii, tinted with the given color, with the specified amount of points.
 
@@ -359,7 +365,8 @@ proc ellipse*(graphics: Graphics, center: Vec2f, radii: Vec2f,
                color, points)
 
 proc ellipse*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
-              color = rgba32f(1, 1, 1, 1), points = 32.PolygonPoints) =
+              color = rgba32f(1, 1, 1, 1),
+              points = 32.PolygonPoints) {.inline.} =
   ## Shortcut for adding an ellipse to the graphics context's shape buffer
   ## using separate center X and Y coordinates, and separate X and Y radii,
   ## tinted with the given color.
@@ -368,13 +375,15 @@ proc ellipse*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
                    color, points)
 
 proc circle*(graphics: Graphics, center: Vec2f, radius: float32,
-             color = rgba32f(1, 1, 1, 1), points = 32.PolygonPoints) =
+             color = rgba32f(1, 1, 1, 1),
+             points = 32.PolygonPoints) {.inline.} =
   ## Shortcut for adding a circle using the ``ellipse`` procedure.
 
   graphics.ellipse(center, vec2f(radius), color, points)
 
 proc circle*(graphics: Graphics, centerX, centerY, radius: float32,
-             color = rgba32f(1, 1, 1, 1), points = 32.PolygonPoints)=
+             color = rgba32f(1, 1, 1, 1),
+             points = 32.PolygonPoints) {.inline.} =
   ## Shortcut for adding a circle using separate center X and Y coordinates.
 
   graphics.ellipse(vec2f(centerX, centerY), vec2f(radius), color, points)
@@ -500,20 +509,21 @@ proc draw*[U: UniformSource](graphics: Graphics, target: Target,
   target.draw(program, graphics.mesh, uniforms, drawParams)
 
 proc draw*[U: UniformSource](graphics: Graphics, target: Target,
-                             program: Program, uniforms: U) =
+                             program: Program, uniforms: U) {.inline.} =
   ## Shortcut to ``draw`` that uses ``graphics.defaultDrawParams`` as
   ## the draw parameters.
 
   graphics.draw(target, program, uniforms, graphics.defaultDrawParams)
 
-proc draw*(graphics: Graphics, target: Target, drawParams: DrawParams) =
+proc draw*(graphics: Graphics, target: Target,
+           drawParams: DrawParams) {.inline.} =
   ## Shortcut to ``draw`` that uses ``graphics.defaultProgram`` for the program
   ## and ``graphics.uniforms(target)`` as the uniform source.
 
   graphics.draw(target, graphics.defaultProgram, graphics.uniforms(target),
                 drawParams)
 
-proc draw*(graphics: Graphics, target: Target) =
+proc draw*(graphics: Graphics, target: Target) {.inline.} =
   ## Shortcut to ``draw`` that uses ``graphics.defaultProgram`` for the shader
   ## program, ``graphics.uniforms(target)`` as the uniform source, and
   ## ``graphics.defaultDrawParams`` as the draw parameters.
@@ -533,7 +543,7 @@ proc newGraphics*(window: Window): Graphics =
     blend blendAlpha
   result.fTransformMatrix = mat3f()
 
-converter rgba32f*(color: Color): Rgba32f =
+converter rgba32f*(color: Color): Rgba32f {.inline.} =
   ## Converts an stdlib color to an aglet RGBA float32 pixel.
   let (r, g, b) = color.extractRgb
   result = rgba32f(r / 255, g / 255, b / 255, 1)

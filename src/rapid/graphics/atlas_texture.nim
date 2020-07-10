@@ -1,9 +1,12 @@
 ## Atlas texture. Allows for dynamic packing of smaller images to a larger
 ## texture stored on the GPU.
 
+import std/options
+
 import aglet
 
 import ../algorithm/rect_packer
+import ../graphics/image
 
 type
   AtlasTexture*[T: ColorPixelType] = ref object
@@ -11,14 +14,58 @@ type
     texture: Texture2D[T]
     packer: RectPacker
     padding: uint8
+  PackError* = object of ValueError
 
-proc padding*(atlas: AtlasTexture): uint8 =
+proc size*(atlas: AtlasTexture): Vec2i {.inline.} =
+  ## Returns the size of the texture, as a vector.
+  atlas.texture.size
+
+proc width*(atlas: AtlasTexture): Vec2i {.inline.} =
+  ## Returns the width of the texture.
+  atlas.size.x
+
+proc height*(atlas: AtlasTexture): Vec2i {.inline.} =
+  ## Returns the height of the texture.
+  atlas.size.y
+
+proc padding*(atlas: AtlasTexture): uint8 {.inline.} =
   ## Returns the amount of padding around each packed image, in pixels.
   atlas.padding
 
-proc `padding=`*(atlas: AtlasTexture, newPadding: uint8) =
+proc `padding=`*(atlas: AtlasTexture, newPadding: uint8) {.inline.} =
   ## Sets the amount of padding around each packed image, in pixels.
   atlas.padding = newPadding
+
+proc add*[T: ColorPixelType](atlas: AtlasTexture[T],
+                             size: Vec2i, data: ptr T): Rectf =
+  ## Packs a single image from ``data``, with the given ``size``, and returns
+  ## its texture coordinate rectangle.
+  ## This procedure deals with pointers and so, it is inherently **unsafe**.
+  ## Prefer the ``openArray`` or ``BinaryImageBuffer`` versions instead.
+
+  let
+    paddedSize = size * vec2i(atlas.padding)
+    intRect = atlas.packer.pack(paddedSize)
+  if intRect.isSome:
+    atlas.texture.subImage(intRect.position, intRect.size, data)
+    result = rectf(intRect.position.vec2f / atlas.size.vec2f,
+                   intRect.size.vec2f / atlas.size.vec2f)
+  else:
+    raise newException(PackError, "cannot pack image: no space left on texture")
+
+proc add*[T: ColorPixelType](atlas: AtlasTexture[T],
+                             size: Vec2i, data: openArray[T]): Rectf =
+  ## Safe version of ``add`` that accepts an ``openArray``.
+
+  result = atlas.add(size, data[0].unsafeAddr)
+
+proc add*[T: ColorPixelType,
+          I: BinaryImageBuffer](atlas: AtlasTexture[T],
+                                image: I): Rectf =
+  ## Safe, generic version of ``add`` that accepts a ``BinaryImageBuffer``.
+  ## This can be used with ``rapid/graphics/image``.
+
+  result = atlas.add(vec2i(image.width, image.height), image.data[0].unsafeAddr)
 
 proc newAtlasTexture*[T: ColorPixelType](window: Window,
                                          size: Vec2i): AtlasTexture[T] =

@@ -7,19 +7,19 @@ import glm/vec
 import units
 import util
 
-func perpClockwise*[T](v: Vec2[T]): Vec2[T] =
+func perpClockwise*[T](v: Vec2[T]): Vec2[T] {.inline.} =
   ## Returns a vector clockwise perpendicular to ``v``.
   vec2(v.y, -v.x)
 
-func perpCounterClockwise*[T](v: Vec2[T]): Vec2[T] =
+func perpCounterClockwise*[T](v: Vec2[T]): Vec2[T] {.inline.} =
   ## Returns a vector counter-clockwise perpendicular to ``v``.
   vec2(-v.y, v.x)
 
-func angle*[T: SomeFloat](v: Vec2[T]): Radians =
+func angle*[T: SomeFloat](v: Vec2[T]): Radians {.inline.} =
   ## Returns the angle of the vector from (0, 0) to (v.x, v.y).
   arctan2(v.y, v.x).radians
 
-func toVector*(angle: Radians): Vec2f =
+func toVector*(angle: Radians): Vec2f {.inline.} =
   ## Converts an angle to a vector.
   vec2f(cos(angle), sin(angle))
 
@@ -40,7 +40,7 @@ func lineIntersect*(a0, b0, a1, b1: Vec2f): (IntersectResult, Vec2f) =
   # (see graphics/context_polyline.nim for source)
 
   const Epsilon = 0.0000001
-  
+
   let
     den = (b1.y - a1.y) * (b0.x - a0.x) - (b1.x - a1.x) * (b0.y - a0.y)
     numA = (b1.x - a1.x) * (a0.y - a1.y) - (b1.y - a1.y) * (a0.x - a1.x)
@@ -67,7 +67,7 @@ func lineIntersect*(a0, b0, a1, b1: Vec2f): (IntersectResult, Vec2f) =
     elif out2: irOutside1
     else: irInsideBoth
 
-func angleBetweenLines*(a0, b0, a1, b1: Vec2f): Radians =
+func angleBetweenLines*(a0, b0, a1, b1: Vec2f): Radians {.inline.} =
   ## Returns the angle between the lines (a0, b0) and (a1, b1).
   let
     da = a1 - a0

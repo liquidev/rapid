@@ -31,12 +31,13 @@ func hermite*(t: float): float =
   elif t > 1: 1.0
   else: t * t * (3 - 2 * t)
 
-func interp*(a, b, t: float, fn: InterpFunc): float =
+func interp*(a, b, t: float, fn: InterpFunc): float {.inline.} =
   ## Interpolate between the two values using the given interpolation function.
   let c = fn(t)
   c * b + (1 - c) * a
 
-func interp*(vals: openarray[float], t: float, fn: InterpFunc): float =
+func interp*(vals: openarray[float], t: float,
+             fn: InterpFunc): float {.inline.} =
   ## Interpolate between an array of values using the given interpolation
   ## function.
   let

@@ -2,6 +2,8 @@
 
 import aglet/pixeltypes
 import aglet/rect
+from nimPNG import decodePng32
+import nimPNG/results
 
 import ../math as rmath
 
@@ -60,3 +62,39 @@ proc `[]`*(image: Image, rect: Recti): Image =
     for x in rect.left..rect.right:
       let resultPosition = vec2i(x - rect.x, y - rect.y)
       result[resultPosition] = image[x, y]
+
+proc init*(image: var Image, size: Vec2i) =
+  ## Initializes an empty image buffer.
+
+  image.width = size.x
+  image.height = size.y
+  image.data.setLen(image.width * image.height * 4)
+
+proc readPng*(image: var Image, data: string) =
+  ## Reads a PNG image from the given string containing a PNG image.
+
+  let png = decodePng32(data)
+  image.width = png.width.int32
+  image.height = png.height.int32
+  image.data.setLen(png.data.len)
+  copyMem(image.data[0].addr, png.data[0].addr, png.data.len)
+
+proc loadPng*(image: var Image, filename: string) =
+  ## Loads a PNG image from the given path.
+
+  image.readPng(readFile(filename))
+
+proc initImage*(size: Vec2i): Image =
+  ## Creates and initializes an empty image buffer.
+
+  result.init(size)
+
+proc readPngImage*(data: string): Image =
+  ## Creates and reads a PNG image from the given string containing a PNG image.
+
+  result.readPng(data)
+
+proc loadPngImage*(filename: string): Image =
+  ## Creates and loads a PNG image from the given path.
+
+  result.loadPng(filename)
