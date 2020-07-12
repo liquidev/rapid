@@ -89,7 +89,9 @@ proc main() =
     graphics.resetShape()
     shapes(graphics, time)
     tiles(graphics)
-    graphics.draw(frame)
+    graphics.draw(frame, graphics.defaultProgram, aglet.uniforms({
+      ..graphics.uniforms(frame),
+    }))
 
     frame.finish()
 

@@ -4,6 +4,7 @@
 ## geometry.
 
 import std/colors
+import std/options
 
 import aglet
 
@@ -30,12 +31,22 @@ type
     id: uint32
     fSize: Vec2i
 
+  Batch* = object
+    ## Info for a *batch*. Batches are a low-level component of the graphics
+    ## context. They allow for multiple draw calls to be executed in a single
+    ## call to the ``draw`` procedure, to allow for features like switching the
+    ## texture mid-draw.
+    range: Slice[int]
+    sampler: Option[Sampler]
+
   Graphics* = ref object
     ## Hardware accelerated 2D vector graphics renderer.
     window: Window
+
     mesh: Mesh[Vertex2D]
     vertexBuffer: seq[Vertex2D]
     indexBuffer: seq[RawVertexIndex]
+    batches: seq[Batch]
 
     fDefaultProgram: Program[Vertex2D]
     fDefaultDrawParams: DrawParams
@@ -240,11 +251,13 @@ proc addIndices*(graphics: Graphics,
   for index in indices:
     graphics.indexBuffer.add(index.RawVertexIndex)
 
-proc resetShape*(graphics: Graphics) {.inline.} =
+proc resetShape*(graphics: Graphics) =
   ## Resets the graphics context's shape buffer.
 
   graphics.vertexBuffer.setLen(0)
   graphics.indexBuffer.setLen(0)
+  graphics.batches.setLen(0)
+  graphics.batches.add(Batch(range: 0..0))
 
 proc triangle*(graphics: Graphics, a, b, c: Vec2f,
                color = rgba32f(1, 1, 1, 1)) =
@@ -567,6 +580,36 @@ proc sprite*(graphics: Graphics, sprite: Sprite, x, y: float32,
 
   graphics.sprite(sprite, vec2f(x, y), scale, tint)
 
+proc currentBatch*(graphics: Graphics): Batch =
+  ## Returns the currently running batch.
+  graphics.batches[^1]
+
+proc finalizeBatch(graphics: Graphics) =
+  ## Finalizes a batch by setting its last index to the index's buffer's last
+  ## element.
+  graphics.batches[^1].range.b = graphics.indexBuffer.len - 1
+
+proc batchNewSampler*(graphics: Graphics, newSampler: Sampler) =
+  ## Temporarily change the sprite atlas sampler. Used for rendering text and
+  ## other things that require the use of a separate texture.
+  ##
+  ## This is a low-level detail of how text rendering is implemented. Prefer
+  ## higher-level APIs instead.
+
+  let eboLen = graphics.indexBuffer.len
+  graphics.finalizeBatch()
+  graphics.batches.add(Batch(range: eboLen..eboLen,
+                             sampler: some(newSampler)))
+
+proc batchNewCopy*(graphics: Graphics, batch: Batch) =
+  ## Copies the given ``batch`` and appends it to the end of the batch buffer.
+
+  let eboLen = graphics.indexBuffer.len
+  var copy = batch
+  copy.range = eboLen..eboLen
+  graphics.finalizeBatch()
+  graphics.batches.add(copy)
+
 const
   DefaultVertexShader* = glsl"""
     #version 330 core
@@ -611,6 +654,9 @@ type
     projection*: Mat4f
     `?targetSize`*: Vec2f
     `?spriteAtlas`*: Sampler
+  GraphicsUniformSource* = concept x
+    ## Uniform source usable in a graphics context.
+    x is UniformSource
 
 proc uniforms*(graphics: Graphics, target: Target): GraphicsUniforms =
   ## Returns some extra uniforms related to the graphics context:
@@ -636,6 +682,23 @@ proc updateMesh(graphics: Graphics) =
   graphics.mesh.uploadVertices(graphics.vertexBuffer)
   graphics.mesh.uploadIndices(graphics.indexBuffer)
 
+proc useBatch(uniforms: var GraphicsUniforms, batch: Batch) =
+  if batch.sampler.isSome:
+    uniforms.`?spriteAtlas` = batch.sampler.get
+
+proc applyBatchSettings[U: UniformSource](graphics: Graphics, batch: Batch,
+                                          uniforms: var U) =
+  ## Applies the batch's new settings to the uniform source.
+
+  when U is GraphicsUniforms:
+    useBatch(uniforms, batch)
+  elif U is object | tuple:
+    for name, field in fieldPairs(uniforms):
+      when name.len >= 2 and name[0..1] == ".." and field is GraphicsUniforms:
+        useBatch(field, batch)
+  else:
+    {.error: "unsupported uniform source. use aglet.uniforms {}".}
+
 # this proc used to use default parameters but Nim/#11274 prevented me from
 # doing so, so now there's a bajillion overloads to fulfill all the common
 # use cases
@@ -647,8 +710,12 @@ proc draw*[U: UniformSource](graphics: Graphics, target: Target,
   ## When specifying uniforms, always add ``..graphics.uniforms``.
   ## Otherwise, shader programs won't compile!
 
+  graphics.finalizeBatch()
   graphics.updateMesh()
-  target.draw(program, graphics.mesh, uniforms, drawParams)
+  var uniforms = uniforms
+  for batch in graphics.batches:
+    graphics.applyBatchSettings(batch, uniforms)
+    target.draw(program, graphics.mesh[batch.range], uniforms, drawParams)
 
 proc draw*[U: UniformSource](graphics: Graphics, target: Target,
                              program: Program, uniforms: U) {.inline.} =
@@ -681,6 +748,7 @@ proc newGraphics*(window: Window, spriteAtlasSize = 1024.Natural): Graphics =
 
   result.mesh =
     window.newMesh[:Vertex2D](usage = muDynamic, primitive = dpTriangles)
+  result.resetShape()
 
   result.fDefaultProgram =
     window.newProgram[:Vertex2D](DefaultVertexShader, DefaultFragmentShader)
