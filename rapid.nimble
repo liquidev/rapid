@@ -18,5 +18,5 @@ srcDir =
 #~~
 
 requires "nim >= 0.20.0"
-requires "aglet >= 0.1.0"
+requires "aglet >= 0.3.0"
 requires "nimterop"

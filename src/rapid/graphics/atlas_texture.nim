@@ -36,6 +36,11 @@ proc `padding=`*(atlas: AtlasTexture, newPadding: uint8) {.inline.} =
   ## Sets the amount of padding around each packed image, in pixels.
   atlas.padding = newPadding
 
+proc texture*[T: ColorPixelType](atlas: AtlasTexture[T]): Texture2D[T]
+                                {.inline.} =
+  ## Returns the texture the atlas is packing to.
+  atlas.texture
+
 proc add*[T: ColorPixelType](atlas: AtlasTexture[T],
                              size: Vec2i, data: ptr T): Rectf =
   ## Packs a single image from ``data``, with the given ``size``, and returns
