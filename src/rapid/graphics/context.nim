@@ -694,8 +694,11 @@ proc applyBatchSettings[U: UniformSource](graphics: Graphics, batch: Batch,
     useBatch(uniforms, batch)
   elif U is object | tuple:
     for name, field in fieldPairs(uniforms):
-      when name.len >= 2 and name[0..1] == ".." and field is GraphicsUniforms:
-        useBatch(field, batch)
+      when name.len >= 2 and name[0..1] == "..":
+        when field is GraphicsUniforms:
+          useBatch(field, batch)
+        elif field is object | tuple:
+          graphics.applyBatchSettings(batch, field)
   else:
     {.error: "unsupported uniform source. use aglet.uniforms {}".}
 
