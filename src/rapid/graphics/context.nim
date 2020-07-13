@@ -9,6 +9,7 @@ import std/options
 import aglet
 
 import ../math as rmath
+import ../wrappers/freetype
 import atlas_texture
 
 export colors except rgb  # use pixeltypes.rgba32f or pixeltypes.rgba instead
@@ -58,6 +59,8 @@ type
     spriteRects: seq[Rectf]
     fSpriteMinFilter: TextureMinFilter
     fSpriteMagFilter: TextureMagFilter
+
+    freetype: FtLibrary
 
 
 # Blending modes
@@ -610,6 +613,8 @@ proc batchNewCopy*(graphics: Graphics, batch: Batch) =
   graphics.finalizeBatch()
   graphics.batches.add(copy)
 
+include context_text
+
 const
   DefaultVertexShader* = glsl"""
     #version 330 core
@@ -743,7 +748,7 @@ proc draw*(graphics: Graphics, target: Target) {.inline.} =
   graphics.draw(target, graphics.defaultProgram, graphics.uniforms(target),
                 graphics.defaultDrawParams)
 
-proc newGraphics*(window: Window, spriteAtlasSize = 1024.Natural): Graphics =
+proc newGraphics*(window: Window, spriteAtlasSize = 1024.Positive): Graphics =
   ## Creates a new graphics context.
   new(result)
 
@@ -769,6 +774,8 @@ proc newGraphics*(window: Window, spriteAtlasSize = 1024.Natural): Graphics =
     result.spriteAtlas.padding = 1
   result.fSpriteMinFilter = fmNearestMipmapLinear
   result.fSpriteMagFilter = fmLinear
+
+  result.initFreetype()
 
 converter rgba32f*(color: Color): Rgba32f {.inline.} =
   ## Converts an stdlib color to an aglet RGBA float32 pixel.
