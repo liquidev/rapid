@@ -591,6 +591,9 @@ proc finalizeBatch(graphics: Graphics) =
   ## Finalizes a batch by setting its last index to the index's buffer's last
   ## element.
   graphics.batches[^1].range.b = graphics.indexBuffer.len - 1
+  let range = graphics.currentBatch.range
+  if range.b - range.a <= 0:
+    graphics.batches.setLen(graphics.batches.len - 1)
 
 proc batchNewSampler*(graphics: Graphics, newSampler: Sampler) =
   ## Temporarily change the sprite atlas sampler. Used for rendering text and
@@ -599,10 +602,12 @@ proc batchNewSampler*(graphics: Graphics, newSampler: Sampler) =
   ## This is a low-level detail of how text rendering is implemented. Prefer
   ## higher-level APIs instead.
 
-  let eboLen = graphics.indexBuffer.len
-  graphics.finalizeBatch()
-  graphics.batches.add(Batch(range: eboLen..eboLen,
-                             sampler: some(newSampler)))
+  if graphics.currentBatch.sampler.isNone or
+     graphics.currentBatch.sampler.get != newSampler:
+    let eboLen = graphics.indexBuffer.len
+    graphics.finalizeBatch()
+    graphics.batches.add(Batch(range: eboLen..eboLen,
+                               sampler: some(newSampler)))
 
 proc batchNewCopy*(graphics: Graphics, batch: Batch) =
   ## Copies the given ``batch`` and appends it to the end of the batch buffer.

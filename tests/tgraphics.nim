@@ -63,14 +63,21 @@ proc tiles(graphics: Graphics) =
       let y = index.float32 * 32
       graphics.sprite(sprite, 0, y, scale = 4)
 
+proc text(graphics: Graphics, font: Font) =
+  graphics.text(font, vec2f(320, 48), "Hello, world!")
+  graphics.text(font, vec2f(320, 64), "iiiiiiiiiiiiiiiiii", fontHeight = 10)
+  graphics.text(font, vec2f(320, 96), "VA", fontHeight = 24)
+
 proc main() =
 
   var agl = initAglet()
   agl.initWindow()
 
+  const RubikTtf = slurp("sampleData/Rubik-Regular.ttf")
   var
     win = agl.newWindowGlfw(800, 600, "rapid/gfx", winHints(msaaSamples = 8))
     graphics = win.newGraphics()
+    font = graphics.newFont(RubikTtf, height = 16, hinting = on)
 
   graphics.defaultDrawParams = graphics.defaultDrawParams.derive:
     multisample on
@@ -89,6 +96,7 @@ proc main() =
     graphics.resetShape()
     shapes(graphics, time)
     tiles(graphics)
+    text(graphics, font)
     graphics.draw(frame)
 
     frame.finish()

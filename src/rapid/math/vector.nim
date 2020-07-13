@@ -1,5 +1,6 @@
 ## Extra vector math.
 
+import std/hashes
 import std/math
 
 import glm/vec
@@ -73,3 +74,9 @@ func angleBetweenLines*(a0, b0, a1, b1: Vec2f): Radians {.inline.} =
     da = a1 - a0
     db = b1 - b0
   result = arctan2(da.x * db.y - da.y * db.x, dot(da, db)).radians
+
+proc hash*[N, T](vec: Vec[N, T]): Hash =
+  result = Hash(0)
+  for component in vec.arr:
+    result = result !& hash(component)
+  result = !$result

@@ -8,7 +8,7 @@ import nimPNG/results
 import ../math as rmath
 
 type
-  Image* = object
+  Image* {.byref.} = object
     width*, height*: int32
     data*: seq[uint8]
 
