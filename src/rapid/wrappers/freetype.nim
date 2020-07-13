@@ -14,6 +14,7 @@ const
 macro genCompiles: untyped =
   const
     CompileList = [
+      "autofit/autofit.c",
       "base/ftsystem.c",
       "base/ftinit.c",
       "base/ftdebug.c",
@@ -24,12 +25,11 @@ macro genCompiles: untyped =
       "base/ftbitmap.c",
       "bdf/bdf.c",
       "cff/cff.c",
-      "sfnt/sfnt.c",
-      "truetype/truetype.c",
-      "smooth/smooth.c",
-      "autofit/autofit.c",
       "pshinter/pshinter.c",
       "psnames/psnames.c",
+      "sfnt/sfnt.c",
+      "smooth/smooth.c",
+      "truetype/truetype.c",
     ]
   var pragmas = newNimNode(nnkPragma)
   for file in CompileList:
