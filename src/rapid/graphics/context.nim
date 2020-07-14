@@ -602,12 +602,13 @@ proc batchNewSampler*(graphics: Graphics, newSampler: Sampler) =
   ## This is a low-level detail of how text rendering is implemented. Prefer
   ## higher-level APIs instead.
 
-  if graphics.currentBatch.sampler.isNone or
-     graphics.currentBatch.sampler.get != newSampler:
-    let eboLen = graphics.indexBuffer.len
-    graphics.finalizeBatch()
-    graphics.batches.add(Batch(range: eboLen..eboLen,
-                               sampler: some(newSampler)))
+  if graphics.currentBatch.sampler.isSome and
+     graphics.currentBatch.sampler.get == newSampler:
+    return
+  let eboLen = graphics.indexBuffer.len
+  graphics.finalizeBatch()
+  graphics.batches.add(Batch(range: eboLen..eboLen,
+                             sampler: some(newSampler)))
 
 proc batchNewCopy*(graphics: Graphics, batch: Batch) =
   ## Copies the given ``batch`` and appends it to the end of the batch buffer.

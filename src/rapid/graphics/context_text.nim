@@ -16,6 +16,7 @@ type
     ffVertical
     ffKerned
   Font* = ref object
+    ## A font face.
     face: FtFace
     flags: set[FontFlag]
     fSize: Vec2f
@@ -24,6 +25,18 @@ type
     kerning: Table[KerningIndex, Vec2f]
     hinting: bool
     widths: Table[WidthIndex, float32]
+    fLineSpacing, fTabWidth: float32
+
+  HorzTextAlign* = enum
+    ## Horizontal text alignment.
+    taLeft
+    taCenter
+    taRight
+  VertTextAlign* = enum
+    ## Vertical text alignment.
+    taTop
+    taMiddle
+    taBottom
 
   GlyphIndex = tuple[rune: Rune, size: Vec2f, subpixelOffset: float32]
   KerningIndex = tuple[left, right: Rune, size: Vec2f]
@@ -76,8 +89,28 @@ proc `height=`*(font: Font, newHeight: float32) {.inline.} =
   font.setSizes()
 
 proc pixelHeight*(font: Font): float32 {.inline.} =
-  ## Retrieves the height of the font in pixels.
+  ## Retrieves the design height of the font in pixels.
   font.face.size.metrics.height / 64
+
+proc lineSpacing*(font: Font): float32 {.inline.} =
+  ## Returns the line spacing multiplier.
+  font.fLineSpacing
+
+proc `lineSpacing=`*(font: Font, newSpacing: float32) {.inline.} =
+  ## Sets the line spacing multiplier.
+  font.fLineSpacing = newSpacing
+
+proc lineHeight*(font: Font): float32 {.inline.} =
+  ## Returns the height of a line, in pixels.
+  font.pixelHeight * font.lineSpacing
+
+proc tabWidth*(font: Font): float32 {.inline.} =
+  ## Returns the tab width of the font, in pixels.
+  font.fTabWidth
+
+proc `tabWidth=`*(font: Font, newWidth: float32) {.inline.} =
+  ## Sets the tab width of the font, in pixels.
+  font.fTabWidth = newWidth
 
 proc getGlyph(font: Font, rune: Rune, subpixelOffset: float32 = 0): Glyph =
   ## Retrieves a glyph from the font. Renders it if the glyph doesn't exist.
@@ -149,23 +182,36 @@ iterator typeset(font: Font, text: Text): TypesetGlyph =
     pen = vec2f(0)
     previous = Rune(0)
   for rune in runes(text):
-    let
-      subpixel = quantize(pen.x - trunc(pen.x), subpixelStep)
-      glyph = font.getGlyph(rune, subpixel)
-      offset = vec2f(glyph.offset.x.float32, -glyph.offset.y.float32)
-      kerning = font.getKerning(previous, rune)
-    yield TypesetGlyph (glyph, pen + offset + kerning)
-    pen += glyph.advance
-    previous = rune
+    case rune
+    of Rune '\l':  # line feed
+      pen.x = 0
+      pen.y += font.lineHeight
+    of Rune '\c':  # carriage return
+      pen.x = 0
+    of Rune '\t':  # horizontal tab
+      var column = pen.x / font.tabWidth
+      if column - trunc(column) <= 0.0001: column += 1
+      pen.x = ceil(column) * font.tabWidth
+    else:
+      let
+        kerning = font.getKerning(previous, rune)
+        kernedX = pen.x + kerning.x
+        subpixel = quantize(kernedX - trunc(kernedX), subpixelStep)
+        glyph = font.getGlyph(rune, subpixel)
+        offset = vec2f(glyph.offset.x.float32, -glyph.offset.y.float32)
+      yield TypesetGlyph (glyph, pen + offset + kerning)
+      pen += glyph.advance
+      previous = rune
 
-proc width*(font: Font, text: Text,
-            fontHeight, fontWidth: float32 = 0): float32 =
+proc textWidth*(font: Font, text: Text,
+                fontHeight, fontWidth: float32 = 0): float32 =
   ## Returns the width of the given text.
 
   let oldSize = font.size
-  font.size = vec2f(fontHeight, fontWidth)
+  if fontHeight != 0:
+    font.size = vec2f(fontHeight, fontWidth)
   for (glyph, pen) in font.typeset(text):
-    result = pen.x + glyph.size.x
+    result = pen.x + glyph.size.x.float32
   font.size = oldSize
 
 proc drawGlyph(graphics: Graphics, baselinePosition: Vec2f,
@@ -182,13 +228,24 @@ proc drawGlyph(graphics: Graphics, baselinePosition: Vec2f,
     h = graphics.addVertex(rect.bottomLeft, color, atlasRect.bottomLeft)
   graphics.addIndices([e, f, g, g, h, e])
 
-proc text*(graphics: Graphics, font: Font,
-           position: Vec2f, text: Text,
-           fontHeight, fontWidth: float32 = 0,
-           color = rgba(1, 1, 1, 1)) =
+proc text*(graphics: Graphics, font: Font, position: Vec2f, text: Text,
+           horzAlignment = taLeft, vertAlignment = taTop, alignBox = vec2f(0),
+           fontHeight, fontWidth: float32 = 0, color = rgba(1, 1, 1, 1)) =
   ## Draws text at the given position, tinted with the given color.
   ## If ``fontHeight`` is equal to zero, the rendering uses the
   ## font's size. Otherwise, it uses the specified size.
+  ##
+  ## Text alignment
+  ## --------------
+  ##
+  ## rapid makes it easy to align text inside of rectangles through its
+  ## "align box" concept. Alignment isn't done relative to the text's position,
+  ## but rather relative to the align box's boundaries. For instance, to center
+  ## text perfectly inside of a 64×64 rectangle, set
+  ## ``horzAlignment = taCenter``, ``vertAlignment = taMiddle``, and
+  ## ``alignBox = vec2f(64, 64)``.
+  ## Due to how the position calculations are made, if ``alignBox == vec2f(0)``,
+  ## the text will be aligned relative to ``position`` only.
 
   let
     defaultBatch = graphics.currentBatch
@@ -196,14 +253,40 @@ proc text*(graphics: Graphics, font: Font,
   if fontHeight != 0:
     font.size = vec2f(fontWidth, fontHeight)
   graphics.batchNewSampler(font.atlas.sampler)
+
+  var position = position
+  position.x =
+    case horzAlignment
+    of taLeft: position.x
+    of taCenter:
+      alignBox.x / 2 + position.x - font.textWidth(text) / 2
+    of taRight: alignBox.x + position.x - font.textWidth(text)
+  position.y =
+    case vertAlignment
+    of taTop: position.y + font.pixelHeight
+    of taMiddle: alignBox.y / 2 + position.y + font.pixelHeight / 2
+    of taBottom: alignBox.y + position.y
+
   for (glyph, pen) in font.typeset(text):
     if glyph.size.x > 0 and glyph.size.y > 0:
       graphics.drawGlyph(position, glyph, pen, color)
+
   graphics.batchNewCopy(defaultBatch)
   font.size = oldSize
 
+proc text*(graphics: Graphics, font: Font, x, y: float32, text: Text,
+           horzAlignment = taLeft, vertAlignment = taTop,
+           alignWidth, alignHeight: float32 = 0,
+           fontHeight, fontWidth: float32 = 0, color = rgba(1, 1, 1, 1)) =
+  ## Shortcut for drawing text with separate X and Y coordinates.
+
+  graphics.text(font, vec2f(x, y), text,
+                horzAlignment, vertAlignment, vec2f(alignWidth, alignHeight),
+                fontHeight, fontWidth, color)
+
 proc newFont*(graphics: Graphics, data: string,
               height: float32, width: float32 = 0,
+              lineSpacing: float32 = 1.4, tabWidth: float32 = 96,
               hinting = on, atlasSize = 256.Positive): Font =
   ## Creates and reads a font from an in-memory buffer.
 
@@ -226,16 +309,20 @@ proc newFont*(graphics: Graphics, data: string,
   result.atlas = graphics.window.newAtlasTexture[:Red8](vec2i(atlasSize.int32))
   result.atlas.texture.swizzleMask = [ccOne, ccOne, ccOne, ccRed]
 
+  result.lineSpacing = lineSpacing
+  result.tabWidth = tabWidth
   result.hinting = hinting
 
 proc loadFont*(graphics: Graphics, filename: string,
                height: float32, width: float32 = 0,
+               lineSpacing: float32 = 1.4, tabWidth: float32 = 96,
                hinting = on, atlasSize = 256.Positive): Font {.inline.} =
   ## Creates and loads a font from a file.
 
-  graphics.newFont(readFile(filename), height, width, hinting, atlasSize)
+  graphics.newFont(readFile(filename), height, width,
+                   lineSpacing, tabWidth, hinting, atlasSize)
 
 const FreeTypeLicense* = slurp("../wrappers/extern/freetype/FTL.TXT")
-  ## The FreeType license. rapid uses this library for rendering text, and
+  ## The FreeType license. rapid uses this library for rendering glyphs, and
   ## you're legally required to credit FreeType somewhere in your application's
   ## credits.
