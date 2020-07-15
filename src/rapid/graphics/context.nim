@@ -587,8 +587,12 @@ proc currentBatch*(graphics: Graphics): Batch =
   ## Returns the currently running batch.
   graphics.batches[^1]
 
+proc len(batch: Batch): int =
+  ## Returns the amount of indices in the batch.
+  batch.range.b - batch.range.a
+
 proc finalizeBatch(graphics: Graphics) =
-  ## Finalizes a batch by setting its last index to the index's buffer's last
+  ## Finalizes the batch by setting its last index to the index's buffer's last
   ## element.
   graphics.batches[^1].range.b = graphics.indexBuffer.len - 1
   let range = graphics.currentBatch.range
@@ -602,11 +606,11 @@ proc batchNewSampler*(graphics: Graphics, newSampler: Sampler) =
   ## This is a low-level detail of how text rendering is implemented. Prefer
   ## higher-level APIs instead.
 
+  graphics.finalizeBatch()
   if graphics.currentBatch.sampler.isSome and
      graphics.currentBatch.sampler.get == newSampler:
     return
   let eboLen = graphics.indexBuffer.len
-  graphics.finalizeBatch()
   graphics.batches.add(Batch(range: eboLen..eboLen,
                              sampler: some(newSampler)))
 

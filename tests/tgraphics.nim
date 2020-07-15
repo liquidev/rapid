@@ -67,7 +67,6 @@ proc text(graphics: Graphics, fontRegular, fontBlackItalic: Font) =
   graphics.text(fontRegular, 320, 48, "Hello, world!")
   graphics.text(fontRegular, 320, 64, "iiiiiiiiiiiiiiiiii",
                 fontHeight = 10)
-  graphics.text(fontBlackItalic, 320, 96, "VA", fontHeight = 24)
 
   for vert in VertTextAlign:
     for horz in HorzTextAlign:
@@ -76,6 +75,8 @@ proc text(graphics: Graphics, fontRegular, fontBlackItalic: Font) =
                     horzAlignment = horz, vertAlignment = vert,
                     alignWidth = 256, alignHeight = 256,
                     fontHeight = 12)
+
+  graphics.text(fontBlackItalic, 320, 96, "VA", fontHeight = 24)
 
 proc main() =
 
