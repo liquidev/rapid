@@ -28,6 +28,11 @@ proc shapes(graphics: Graphics, time: float32) =
                 colorA = colMagenta, colorB = colAqua)
   graphics.circle(48, 128, 32)
   graphics.arc(48, 160, 32, 0.degrees, 180.degrees)
+  graphics.lineCircle(48, 128, 32, thickness = 2, color = colAqua)
+  graphics.lineArc(48, 128, 32, 0.degrees, 270.degrees,
+                   thickness = 4, color = colMagenta, mode = amPie, points = 24)
+  graphics.lineArc(48, 160, 32, 0.degrees, 180.degrees,
+                   thickness = 4, color = colMagenta)
   graphics.transform:
     graphics.translate(128, 128)
     graphics.scale(32)
@@ -55,6 +60,10 @@ proc shapes(graphics: Graphics, time: float32) =
         let y = perlin(vec2f(x.float32 / 4.2, time)) * 64
         vec2f(x.float32 * 16, y)
     graphics.polyline(points, thickness = 4.0)
+  graphics.transform:
+    graphics.translate(32, 320)
+    graphics.lineTriangle(vec2f(0, 0), vec2f(0, 64), vec2f(96, 64),
+                          thickness = 16)
 
 proc tiles(graphics: Graphics) =
   graphics.transform:
@@ -64,6 +73,7 @@ proc tiles(graphics: Graphics) =
       graphics.sprite(sprite, 0, y, scale = 4)
 
 proc text(graphics: Graphics, fontRegular, fontBlackItalic: Font) =
+  graphics.lineRectangle(320, 160, 256, 256, 1.0, colRed)
   graphics.text(fontRegular, 320, 48, "Hello, world!")
   graphics.text(fontRegular, 320, 64, "iiiiiiiiiiiiiiiiii",
                 fontHeight = 10)

@@ -9,10 +9,13 @@
 
 proc polyline*(graphics: Graphics, points: openArray[Vec2f],
                thickness: float32 = 1.0, cap = lcButt, join: LineJoin = ljMiter,
-               color = rgba32f(1, 1, 1, 1)) =
+               close = false, color = rgba32f(1, 1, 1, 1)) =
   ## Draws a polyline spanning the given set of points. This is the "expensive"
   ## line triangulator that produces nice results at the cost of performance.
   ## Use sparingly for drawing graphs, complex outlines, etc.
+  ##
+  ## This can also be used for drawing closed polygon outlines, using the
+  ## ``close`` parameter.
   ##
   ## This algorithm is not perfect. It produces some overdraw when drawing round
   ## caps and round joints, so you should not use those with transparent colors.
@@ -119,23 +122,31 @@ proc polyline*(graphics: Graphics, points: openArray[Vec2f],
       normDirection = direction.normalize
     point += normDirection * amount
 
-  for index in 0..<points.len - 2:
+  template getPoint(index: int): Vec2f =
+    var i = index
+    if i >= points.len:
+      i -= points.len
+    points[i]
+
+  let lastIndex = points.len - 1 - ord(not close) * 2
+  for index in 0..lastIndex:
     let
-      b = points[index + 1]
+      b = getPoint(index + 1)
       a =
-        if index == 0:
-          var point = points[index]
-          if cap == lcSquare:
+        if index == 0 and not close:
+          var point = getPoint(index)
+          if not close and cap == lcSquare:
             squareCap(point, b, thickness / 2)
           point
-        else: (points[index] + b) / 2
+        else: (getPoint(index) + b) / 2
       c =
-        if index == points.len - 3:
-          var point = points[index + 2]
+        if index == lastIndex and not close:
+          var point = getPoint(index + 2)
           if cap == lcSquare:
             squareCap(point, b, thickness / 2)
           point
-        else: (points[index + 2] + b) / 2
+        else:
+          (getPoint(index + 2) + b) / 2
     anchor(graphics, a, b, c, thickness, join, color)
 
   proc roundCap(graphics: Graphics, cap, next: Vec2f,

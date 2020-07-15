@@ -83,7 +83,7 @@ proc color*(vertex: Vertex2D): Rgba32f {.inline.} =
   vertex.color.Rgba32f
 
 proc vertex*(position: Vec2f,
-             color = rgba32f(1, 1, 1, 1),
+             color = rgba(1, 1, 1, 1),
              uv = vec2f(0, 0)): Vertex2D {.inline.} =
   ## Constructs a 2D vertex.
   Vertex2D(position: position, color: color.Vec4f, uv: uv)
@@ -235,7 +235,7 @@ proc addVertex*(graphics: Graphics, position: Vec2f,
 
 proc addVertex*(graphics: Graphics,
                 position: Vec2f,
-                color = rgba32f(1, 1, 1, 1)): VertexIndex {.inline.} =
+                color = rgba(1, 1, 1, 1)): VertexIndex {.inline.} =
   ## Shorthand for adding a vertex with UV coordinates positioned at the center
   ## of the white pixel on the graphics context's sprite atlas.
 
@@ -263,7 +263,7 @@ proc resetShape*(graphics: Graphics) =
   graphics.batches.add(Batch(range: 0..0))
 
 proc triangle*(graphics: Graphics, a, b, c: Vec2f,
-               color = rgba32f(1, 1, 1, 1)) =
+               color = rgba(1, 1, 1, 1)) =
   ## Adds a triangle to the graphics context's shape buffer,
   ## tinted with the given color.
 
@@ -274,7 +274,7 @@ proc triangle*(graphics: Graphics, a, b, c: Vec2f,
   graphics.addIndices([e, f, g])
 
 proc quad*(graphics: Graphics, a, b, c, d: Vec2f,
-           color = rgba32f(1, 1, 1, 1)) =
+           color = rgba(1, 1, 1, 1)) =
   ## Adds a quad to the graphics context's shape buffer, tinted with the given
   ## color. The vertices must be wound clockwise.
 
@@ -286,27 +286,23 @@ proc quad*(graphics: Graphics, a, b, c, d: Vec2f,
   graphics.addIndices([e, f, g, g, h, e])
 
 proc rectangle*(graphics: Graphics, rect: Rectf,
-                color = rgba32f(1, 1, 1, 1)) =
+                color = rgba(1, 1, 1, 1)) =
   ## Adds a rectangle to the graphics context's shape buffer, tinted with the
   ## given color.
 
-  graphics.quad(
-    rect.position,
-    rect.position + vec2f(rect.width, 0),
-    rect.position + rect.size,
-    rect.position + vec2f(0, rect.height),
-    color
-  )
+  graphics.quad(rect.topLeft, rect.topRight,
+                rect.bottomRight, rect.bottomLeft,
+                color)
 
 proc rectangle*(graphics: Graphics, position, size: Vec2f,
-                color = rgba32f(1, 1, 1, 1)) {.inline.} =
+                color = rgba(1, 1, 1, 1)) {.inline.} =
   ## Shortcut for adding a rectangle to the graphics context's shape buffer
   ## using position and size vectors, tinted with the given color.
 
   graphics.rectangle(rectf(position, size), color)
 
 proc rectangle*(graphics: Graphics, x, y, width, height: float32,
-                color = rgba32f(1, 1, 1, 1)) {.inline.} =
+                color = rgba(1, 1, 1, 1)) {.inline.} =
   ## Shortcut for adding a rectangle to the graphics context's shape buffer
   ## using separate X and Y coordinates, a width, and a height, tinted with
   ## the given color.
@@ -314,7 +310,7 @@ proc rectangle*(graphics: Graphics, x, y, width, height: float32,
   graphics.rectangle(rectf(x, y, width, height), color)
 
 proc point*(graphics: Graphics, center: Vec2f, size: float32 = 1.0,
-            color = rgba32f(1, 1, 1, 1)) {.inline.} =
+            color = rgba(1, 1, 1, 1)) {.inline.} =
   ## Adds a point at the given position, with the given size and color.
 
   # this draws a square not only to mimic OpenGL behavior, but because drawing a
@@ -324,6 +320,7 @@ proc point*(graphics: Graphics, center: Vec2f, size: float32 = 1.0,
 type
   PolygonPoints* = range[3..high(int)]
   ArcMode* = enum
+    ## Arc rendering mode.
     amOpen
       ## last vertex goes directly to the first vertex in fill arcs only
     amChord
@@ -332,14 +329,14 @@ type
     amPie
       ## last vertex goes to center, then to the first vertex
 
-proc arc*(graphics: Graphics, center: Vec2f, radii: Vec2f,
-          startAngle, endAngle: Radians, color = rgba32f(1, 1, 1, 1),
+proc arc*(graphics: Graphics, center, radii: Vec2f,
+          startAngle, endAngle: Radians, color = rgba(1, 1, 1, 1),
           points = 16.PolygonPoints, mode = amChord) =
-  ## Adds an arc to the graphics context's shape buffer using vector for its
-  ## center and X/Y radii, with a starting angle ``range.a`` and ending angle
-  ## ``range.b``, tinted with the given color. ``points`` controls the number of
-  ## vertices along the arc's perimeter; arcs with a smaller surface area should
-  ## use less points, as there are less pixels.
+  ## Adds an arc to the graphics context's shape buffer using vectors for its
+  ## center and X/Y radii, with a starting angle ``startAngle`` and ending angle
+  ## ``endAngle``, tinted with the given color. ``points`` controls the number
+  ## of vertices along the arc's perimeter; arcs with a smaller surface area
+  ## should use less points, as there are less pixels.
 
   # rimIndices is a global because we want to reuse the memory across calls
   var rimIndices {.global, threadvar.}: seq[VertexIndex]
@@ -350,7 +347,7 @@ proc arc*(graphics: Graphics, center: Vec2f, radii: Vec2f,
       angle = float32(pointIndex / (points - pointCountOffset))
         .mapRange(0, 1, startAngle.float32, endAngle.float32)
         .radians
-      point = center + vec2f(cos(angle) * radii.x, sin(angle) * radii.y)
+      point = center + angle.toVector * radii
     rimIndices.add(graphics.addVertex(point, color))
   case mode
   of amOpen, amChord:
@@ -372,14 +369,14 @@ proc arc*(graphics: Graphics, center: Vec2f, radii: Vec2f,
       graphics.addIndices([startIndex, rimIndex1, rimIndex2])
 
 proc arc*(graphics: Graphics, center: Vec2f, radius: float32,
-          startAngle, endAngle: Radians, color = rgba32f(1, 1, 1, 1),
+          startAngle, endAngle: Radians, color = rgba(1, 1, 1, 1),
           points = 16.PolygonPoints, mode = amChord) {.inline.} =
   ## Shortcut for adding an arc with the same radius for X and Y coordinates.
 
   graphics.arc(center, vec2f(radius), startAngle, endAngle, color, points, mode)
 
 proc arc*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
-          startAngle, endAngle: Radians, color = rgba32f(1, 1, 1, 1),
+          startAngle, endAngle: Radians, color = rgba(1, 1, 1, 1),
           points = 16.PolygonPoints, mode = amChord) {.inline.} =
   ## Shortcut for adding an arc using separate center X and Y coordinates and
   ## separate X and Y radii.
@@ -388,7 +385,7 @@ proc arc*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
                startAngle, endAngle, color, points, mode)
 
 proc arc*(graphics: Graphics, centerX, centerY, radius: float32,
-          startAngle, endAngle: Radians, color = rgba32f(1, 1, 1, 1),
+          startAngle, endAngle: Radians, color = rgba(1, 1, 1, 1),
           points = 16.PolygonPoints, mode = amChord) {.inline.} =
   ## Shortcut for adding an arc using separate center X and Y coordinates and
   ## a single radius used both for X and Y components.
@@ -397,18 +394,15 @@ proc arc*(graphics: Graphics, centerX, centerY, radius: float32,
                color, points, mode)
 
 proc ellipse*(graphics: Graphics, center: Vec2f, radii: Vec2f,
-              color = rgba32f(1, 1, 1, 1),
-              points = 32.PolygonPoints) {.inline.} =
+              color = rgba(1, 1, 1, 1), points = 32.PolygonPoints) {.inline.} =
   ## Shortcut for adding an arc from 0° to 360°, with the given center and X/Y
   ## radii, tinted with the given color, with the specified amount of points.
 
-  graphics.arc(center, radii,
-               startAngle = 0.degrees, endAngle = 360.degrees,
+  graphics.arc(center, radii, startAngle = 0.degrees, endAngle = 360.degrees,
                color, points)
 
 proc ellipse*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
-              color = rgba32f(1, 1, 1, 1),
-              points = 32.PolygonPoints) {.inline.} =
+              color = rgba(1, 1, 1, 1), points = 32.PolygonPoints) {.inline.} =
   ## Shortcut for adding an ellipse to the graphics context's shape buffer
   ## using separate center X and Y coordinates, and separate X and Y radii,
   ## tinted with the given color.
@@ -417,15 +411,13 @@ proc ellipse*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
                    color, points)
 
 proc circle*(graphics: Graphics, center: Vec2f, radius: float32,
-             color = rgba32f(1, 1, 1, 1),
-             points = 32.PolygonPoints) {.inline.} =
+             color = rgba(1, 1, 1, 1), points = 32.PolygonPoints) {.inline.} =
   ## Shortcut for adding a circle using the ``ellipse`` procedure.
 
   graphics.ellipse(center, vec2f(radius), color, points)
 
 proc circle*(graphics: Graphics, centerX, centerY, radius: float32,
-             color = rgba32f(1, 1, 1, 1),
-             points = 32.PolygonPoints) {.inline.} =
+             color = rgba(1, 1, 1, 1), points = 32.PolygonPoints) {.inline.} =
   ## Shortcut for adding a circle using separate center X and Y coordinates.
 
   graphics.ellipse(vec2f(centerX, centerY), vec2f(radius), color, points)
@@ -441,7 +433,7 @@ type
     ljRound
 
 proc line*(graphics: Graphics, a, b: Vec2f, thickness: float32 = 1.0,
-           cap = lcButt, colorA, colorB = rgba32f(1, 1, 1, 1)) =
+           cap = lcButt, colorA, colorB = rgba(1, 1, 1, 1)) =
   ## Adds a line between ``a`` and ``b``, with the given thickness and colors.
   ## Keep in mind that this is a "quick'n'dirty" line triangulator, and it isn't
   ## suited very well for drawing polylines. For that, use ``polyline``.
@@ -480,6 +472,158 @@ proc line*(graphics: Graphics, a, b: Vec2f, thickness: float32 = 1.0,
                  points = PolygonPoints(max(6, 2 * Pi * thickness * 0.25)))
 
 include context_polyline
+
+proc lineTriangle*(graphics: Graphics, a, b, c: Vec2f,
+                   thickness: float32 = 1.0, color = rgba(1, 1, 1, 1))
+                  {.inline.} =
+  ## Adds a triangle outline, with the given points and stroke thickness,
+  ## tinted with the given color.
+
+  graphics.polyline([a, b, c], thickness, close = true, color = color)
+
+proc lineQuad*(graphics: Graphics, a, b, c, d: Vec2f,
+               thickness: float32 = 1.0, color = rgba(1, 1, 1, 1)) {.inline.} =
+  ## Adds a quad outline, with the given points and stroke thickness,
+  ## tinted with the given color.
+
+  graphics.polyline([a, b, c, d], thickness, close = true, color = color)
+
+proc lineRectangle*(graphics: Graphics, rect: Rectf,
+                    thickness: float32 = 1.0, color = rgba(1, 1, 1, 1)) =
+  ## Adds a rectangle outline, with the given thickness and color.
+  ## Note that this is faster than drawing an equivalent quad, as the joints in
+  ## a rectangle are at 90° angles, which makes vertices simple to calculate.
+
+  let
+    offsetLR = vec2f(thickness / 2)
+    offsetRL = vec2f(-offsetLR.x, offsetLR.y)
+    eInside = graphics.addVertex(rect.topLeft + offsetLR, color)
+    fInside = graphics.addVertex(rect.topRight + offsetRL, color)
+    gInside = graphics.addVertex(rect.bottomRight - offsetLR, color)
+    hInside = graphics.addVertex(rect.bottomLeft - offsetRL, color)
+    eOutside = graphics.addVertex(rect.topLeft - offsetLR, color)
+    fOutside = graphics.addVertex(rect.topRight - offsetRL, color)
+    gOutside = graphics.addVertex(rect.bottomRight + offsetLR, color)
+    hOutside = graphics.addVertex(rect.bottomLeft + offsetRL, color)
+  graphics.addIndices([
+    # quad ef
+    eInside, fInside, fOutside, fOutside, eOutside, eInside,
+    # quad fg
+    fInside, gInside, gOutside, gOutside, fOutside, fInside,
+    # quad gh
+    gInside, hInside, hOutside, hOutside, gOutside, gInside,
+    # quad he
+    hInside, eInside, eOutside, eOutside, hOutside, hInside,
+  ])
+
+proc lineRectangle*(graphics: Graphics, position, size: Vec2f,
+                    thickness: float32 = 1.0, color = rgba(1, 1, 1, 1))
+                   {.inline.} =
+  ## Shortcut for drawing a line rectangle using separate position and size
+  ## vectors.
+
+  graphics.lineRectangle(rectf(position, size), thickness, color)
+
+proc lineRectangle*(graphics: Graphics, x, y, width, height: float32,
+                    thickness: float32 = 1.0, color = rgba(1, 1, 1, 1))
+                   {.inline.} =
+  ## Shortcut for drawing a line rectangle using separate X/Y coordinates for
+  ## position and size.
+
+  graphics.lineRectangle(rectf(x, y, width, height), thickness, color)
+
+proc lineArc*(graphics: Graphics, center, radii: Vec2f,
+              startAngle, endAngle: Radians,
+              thickness: float32 = 1.0, color = rgba(1, 1, 1, 1),
+              points = 16.PolygonPoints, mode = amOpen, cap = lcButt) =
+  ## Adds an arc outline using vectors for its center and X/Y radii, with a
+  ## starting angle ``startAngle`` and ending angle ``endAngle``, tinted with
+  ## the given color. ``points`` controls the number of vertices along the arc's
+  ## perimeter; arcs with a smaller radius should use less points, as there are
+  ## less pixels.
+
+  # ↓ this is a global to reuse memory across calls
+  var rimPositions {.global, threadvar.}: seq[Vec2f]
+  rimPositions.setLen(0)
+  for pointIndex in 0..<points:
+    let
+      angle = float32(pointIndex / (points - 1))
+        .mapRange(0, 1, startAngle.float32, endAngle.float32)
+        .radians
+      point = center + angle.toVector * radii
+    rimPositions.add(point)
+  if mode == amPie:
+    rimPositions.add(center)
+  graphics.polyline(rimPositions, thickness, cap, join = ljMiter,
+                    close = mode in {amChord, amPie},
+                    color)
+
+proc lineArc*(graphics: Graphics, center: Vec2f, radius: float32,
+              startAngle, endAngle: Radians,
+              thickness: float32 = 1.0, color = rgba(1, 1, 1, 1),
+              points = 16.PolygonPoints, mode = amOpen, cap = lcButt)
+             {.inline.} =
+  ## Shortcut for adding an arc outline with the same radius for X and Y
+  ## coordinates.
+
+  graphics.lineArc(center, vec2f(radius), startAngle, endAngle, thickness,
+                   color, points, mode, cap)
+
+proc lineArc*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
+              startAngle, endAngle: Radians,
+              thickness: float32 = 1.0, color = rgba(1, 1, 1, 1),
+              points = 16.PolygonPoints, mode = amOpen, cap = lcButt)
+             {.inline.} =
+  ## Shortcut for adding an arc outline using separate center X and Y
+  ## coordinates and separate X and Y radii.
+
+  graphics.lineArc(vec2f(centerX, centerY), vec2f(radiusX, radiusY),
+                   startAngle, endAngle, thickness, color, points, mode, cap)
+
+proc lineArc*(graphics: Graphics, centerX, centerY, radius: float32,
+              startAngle, endAngle: Radians,
+              thickness: float32 = 1.0, color = rgba(1, 1, 1, 1),
+              points = 16.PolygonPoints, mode = amOpen, cap = lcButt)
+             {.inline.} =
+  ## Shortcut for adding an arc outline using separate center X and Y
+  ## coordinates and a single radius used both for X and Y components.
+
+  graphics.lineArc(vec2f(centerX, centerY), vec2f(radius),
+                   startAngle, endAngle, thickness, color, points, mode, cap)
+
+proc lineEllipse*(graphics: Graphics, center: Vec2f, radii: Vec2f,
+                  thickness: float32 = 1.0, color = rgba(1, 1, 1, 1),
+                  points = 32.PolygonPoints) {.inline.} =
+  ## Shortcut for drawing an arc outline from 0° to 360°.
+
+  graphics.lineArc(center, radii,
+                   startAngle = 0.degrees, endAngle = 360.degrees,
+                   thickness, color, points)
+
+proc lineEllipse*(graphics: Graphics,
+                  centerX, centerY, radiusX, radiusY: float32,
+                  thickness: float32 = 1.0, color = rgba(1, 1, 1, 1),
+                  points = 32.PolygonPoints) {.inline.} =
+  ## Shortcut for drawing an ellipse outline with separate X and Y coordinates
+  ## for the position and the radius.
+
+  graphics.lineEllipse(vec2f(centerX, centerY), vec2f(radiusX, radiusY),
+                       thickness, color, points)
+
+proc lineCircle*(graphics: Graphics, center: Vec2f, radius: float32,
+                 thickness: float32 = 1.0, color = rgba(1, 1, 1, 1),
+                 points = 32.PolygonPoints) {.inline.} =
+  ## Shortcut for adding a circle outline using the ``lineEllipse`` procedure.
+
+  graphics.lineEllipse(center, vec2f(radius), thickness, color, points)
+
+proc lineCircle*(graphics: Graphics, centerX, centerY, radius: float32,
+                 thickness: float32 = 1.0, color = rgba(1, 1, 1, 1),
+                 points = 32.PolygonPoints) {.inline.} =
+  ## Shortcut for adding a circle outline using separate center X and Y
+  ## coordinates.
+
+  graphics.lineCircle(vec2f(centerX, centerY), radius, thickness, color, points)
 
 proc spriteMinFilter*(graphics: Graphics): TextureMinFilter {.inline.} =
   ## Returns the current sprite minification filter.

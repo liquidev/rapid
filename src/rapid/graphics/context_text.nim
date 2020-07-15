@@ -90,7 +90,7 @@ proc `height=`*(font: Font, newHeight: float32) {.inline.} =
 
 proc pixelHeight*(font: Font): float32 {.inline.} =
   ## Retrieves the design height of the font in pixels.
-  font.face.size.metrics.height / 64
+  font.face.size.metrics.ascender / 64
 
 proc lineSpacing*(font: Font): float32 {.inline.} =
   ## Returns the line spacing multiplier.

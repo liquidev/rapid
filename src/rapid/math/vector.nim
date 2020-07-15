@@ -38,7 +38,7 @@ func lineIntersect*(a0, b0, a1, b1: Vec2f): (IntersectResult, Vec2f) =
 
   # actually I have no idea how this algorithm works
   # literally translated it from C from that polyline tesselation article
-  # (see graphics/context_polyline.nim for source)
+  # (see graphics/context_polyline.nim for link)
 
   const Epsilon = 0.0000001
 
@@ -75,7 +75,21 @@ func angleBetweenLines*(a0, b0, a1, b1: Vec2f): Radians {.inline.} =
     db = b1 - b0
   result = arctan2(da.x * db.y - da.y * db.x, dot(da, db)).radians
 
-proc hash*[N, T](vec: Vec[N, T]): Hash =
+func bisector*[T](anchor, a, b: Vec2[T]): Vec2[T] {.inline.} =
+  ## Calculates the bisector of the angle in the corner ``a, anchor, b``, and
+  ## returns it as a vector.
+  let
+    normA = normalize(a - anchor)
+    normB = normalize(b - anchor)
+    bisectorVector = normA + normB
+  if bisectorVector == vec2(T 0):
+    # avoid division by zero
+    normB.perpCounterClockwise
+  else:
+    normalize(bisectorVector)
+
+func hash*[N, T](vec: Vec[N, T]): Hash =
+  ## Returns the hash of the vector.
   result = Hash(0)
   for component in vec.arr:
     result = result !& hash(component)
