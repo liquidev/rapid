@@ -809,19 +809,16 @@ const
 
 type
   GraphicsUniforms* = object
-    ## Extra uniforms for use with aglet's ``uniforms`` macro.
-    projection*: Mat4f
-    `?targetSize`*: Vec2f
-    `?spriteAtlas`*: Sampler
+    ## Extra uniforms passed into shader programs when ``draw`` is used.
+    projection*: Mat4f        ## the projection matrix
+    `?targetSize`*: Vec2f     ## the size of the target
+    `?spriteAtlas`*: Sampler  ## the sprite atlas texture
   GraphicsUniformSource* = concept x
     ## Uniform source usable in a graphics context.
     x is UniformSource
 
-proc uniforms*(graphics: Graphics, target: Target): GraphicsUniforms =
-  ## Returns some extra uniforms related to the graphics context:
-  ##  - ``projection: mat4`` – the projection matrix
-  ##  - ``?targetSize: vec2`` – the size of the target
-  ##  - ``?spriteAtlas: sampler2D`` – the sprite atlas texture
+proc uniforms(graphics: Graphics, target: Target): GraphicsUniforms =
+  ## Returns some extra uniforms related to the graphics context.
   result = GraphicsUniforms(
     projection: ortho(left = 0'f32, top = 0'f32,
                       right = target.width.float32,
@@ -869,12 +866,15 @@ proc draw*[U: UniformSource](graphics: Graphics, target: Target,
                              drawParams: DrawParams) =
   ## Draws the graphics context's shape buffer onto the given target.
   ## Optionally, a program, uniforms, and draw parameters can be specified.
-  ## When specifying uniforms, always add ``..graphics.uniforms``.
-  ## Otherwise, shader programs won't compile!
+  ## By default, some extra uniforms are passed into the shader via
+  ## ``graphics.uniforms(target)``.
 
   graphics.finalizeBatch()
   graphics.updateMesh()
-  var uniforms = uniforms
+  var uniforms = aglet.uniforms {
+    ..uniforms,
+    ..graphics.uniforms(target),
+  }
   for batch in graphics.batches:
     graphics.applyBatchSettings(batch, uniforms)
     target.draw(program, graphics.mesh[batch.range], uniforms, drawParams)
@@ -891,7 +891,7 @@ proc draw*(graphics: Graphics, target: Target,
   ## Shortcut to ``draw`` that uses ``graphics.defaultProgram`` for the program
   ## and ``graphics.uniforms(target)`` as the uniform source.
 
-  graphics.draw(target, graphics.defaultProgram, graphics.uniforms(target),
+  graphics.draw(target, graphics.defaultProgram, NoUniforms,
                 drawParams)
 
 proc draw*(graphics: Graphics, target: Target) {.inline.} =
@@ -899,7 +899,7 @@ proc draw*(graphics: Graphics, target: Target) {.inline.} =
   ## program, ``graphics.uniforms(target)`` as the uniform source, and
   ## ``graphics.defaultDrawParams`` as the draw parameters.
 
-  graphics.draw(target, graphics.defaultProgram, graphics.uniforms(target),
+  graphics.draw(target, graphics.defaultProgram, NoUniforms,
                 graphics.defaultDrawParams)
 
 proc newGraphics*(window: Window, spriteAtlasSize = 1024.Positive): Graphics =

@@ -7,13 +7,11 @@ import glm
 export glm
 
 import math/[
-  interpolation,
   rectangle,
   units,
   util,
   vector,
 ]
-export interpolation
 export rectangle
 export units
 export util
