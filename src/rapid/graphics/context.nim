@@ -808,30 +808,27 @@ const
   """
 
 type
-  GraphicsUniforms* = object
+  GraphicsUniforms* = tuple
     ## Extra uniforms passed into shader programs when ``draw`` is used.
-    projection*: Mat4f        ## the projection matrix
-    `?targetSize`*: Vec2f     ## the size of the target
-    `?spriteAtlas`*: Sampler  ## the sprite atlas texture
-  GraphicsUniformSource* = concept x
-    ## Uniform source usable in a graphics context.
-    x is UniformSource
+    projection: Mat4f        ## the projection matrix
+    `?targetSize`: Vec2f     ## the size of the target
+    `?spriteAtlas`: Sampler  ## the sprite atlas texture
 
 proc uniforms(graphics: Graphics, target: Target): GraphicsUniforms =
   ## Returns some extra uniforms related to the graphics context.
-  result = GraphicsUniforms(
+  result = GraphicsUniforms aglet.uniforms {
     projection: ortho(left = 0'f32, top = 0'f32,
                       right = target.width.float32,
                       bottom = target.height.float32,
                       zNear = -1.0, zFar = 1.0),
-    `?targetSize`: target.size.vec2f,
-    `?spriteAtlas`: graphics.spriteAtlas.sampler(
+    ?targetSize: target.size.vec2f,
+    ?spriteAtlas: graphics.spriteAtlas.sampler(
       minFilter = graphics.spriteMinFilter,
       magFilter = graphics.spriteMagFilter,
       wrapS = twClampToBorder,
       wrapT = twClampToBorder,
     )
-  )
+  }
 
 proc updateMesh(graphics: Graphics) =
   ## Updates the internal mesh with client-side shape data.

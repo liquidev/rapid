@@ -1,5 +1,7 @@
 ## Post-processing filters and a ping-pong buffer.
 
+import std/tables
+
 import aglet
 from aglet/gl import OpenGl
 
@@ -42,7 +44,7 @@ const
       bufferUv = uv;
 
       vec2 invertedUv = uv;
-      uv.y = 1.0 - uv;
+      invertedUv.y = 1.0 - uv.y;
       pixelPosition = invertedUv * bufferSize;
     }
   """
@@ -66,7 +68,7 @@ const
 
     uniform sampler2D buffer;
 
-    out vec2 color;
+    out vec4 color;
 
     void main(void) {
       color = texture(buffer, bufferUv);
@@ -114,11 +116,9 @@ template createFramebuffer(window: Window, size: Vec2i,
   for i in 0..<colorTargetCount:
     colorSources.add(createColor(window, size, hdr))
 
-  let
-    depthSource = window.newRenderbuffer[:Depth32](size)
-    stencilSource = window.newRenderbuffer[:Stencil8](size)
+  let depthStencilSource = window.newRenderbuffer[:Depth24Stencil8](size)
 
-  window.newFramebuffer(colorSources, depthSource, stencilSource)
+  window.newFramebuffer(colorSources, depthStencilSource)
 
 proc resize*(buffer: EffectBuffer, size: Vec2i) =
   ## Resizes the effect buffer. This resets the contents of the buffer,
@@ -167,7 +167,8 @@ proc render*(buffer: EffectBuffer): EffectTarget =
   result.buffer = buffer
   result.useImpl = proc (target: Target, gl: OpenGl) =
     # ↓ java programming in a nutshell
-    target.EffectTarget.buffer.a.render().useImpl(target, gl)
+    let fbTarget = target.EffectTarget.buffer.a.render()
+    fbTarget.useImpl(fbTarget, gl)
 
 proc sampler*(buffer: EffectBuffer,
               minFilter, magFilter: TextureMagFilter = fmLinear,
@@ -195,24 +196,38 @@ proc apply*[U: UniformSource](buffer: EffectBuffer,
   ##
   ## The following extra uniforms are passed along:
   ## - ``?bufferSize: vec2`` – the size of the effect buffer
-  ## - ``?buffer: sampler2D[]`` – samplers for the effect buffer's color
-  ##    attachments. This is an array only if the effect buffer has >1 color
-  ##    attachment
+  ## - ``?buffer<n>: sampler2D`` – samplers for the effect buffer's color
+  ##    targets, where ``n`` is a 0-based number which is the index of the
+  ##    color target. If there is only one target, it's simply called
+  ##    ``buffer``.
   ##
   ## This procedure also accepts parameters for how the color attachments should
   ## be sampled by the ``?buffer`` uniform.
 
   var
     bTarget = buffer.b.render()
-    samplers {.global, threadvar.}: seq[Sampler]
-  for colorTarget in 0..<buffer.colorTargetCount:
-    samplers.add(buffer.sampler(minFilter, magFilter,
-                                wrapS, wrapT,
-                                borderColor,
-                                colorTarget))
-  bTarget.draw(effect.Program, buffer.fullscreenRect, aglet.uniforms {
+    samplers {.global, threadvar.}: Table[string, Uniform]
+
+  # this is perhaps a bit inefficient
+  samplers.clear()
+  if buffer.colorTargetCount > 1:
+    for colorTarget in 0..<buffer.colorTargetCount:
+      samplers["buffer" & $colorTarget] =
+        buffer.sampler(minFilter, magFilter,
+                       wrapS, wrapT,
+                       borderColor,
+                       colorTarget).toUniform
+  else:
+    samplers["buffer"] =
+      buffer.sampler(minFilter, magFilter,
+                     wrapS, wrapT,
+                     borderColor).toUniform
+
+  let program = effect.Program[:EffectVertex]
+  bTarget.clearColor(rgba(0, 0, 0, 0))
+  bTarget.draw(program, buffer.fullscreenRect, aglet.uniforms {
     ?bufferSize: buffer.size.vec2f,
-    ?buffer: samplers,
+    ..samplers,
     ..uniforms,
   }, buffer.drawParams)
 

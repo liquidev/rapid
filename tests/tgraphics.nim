@@ -5,6 +5,7 @@ import std/times
 import aglet
 import aglet/window/glfw
 import rapid/graphics
+import rapid/graphics/postprocess
 import glm/noise
 
 var tileset: seq[Sprite]
@@ -88,6 +89,17 @@ proc text(graphics: Graphics, fontRegular, fontBlackItalic: Font) =
 
   graphics.text(fontBlackItalic, 320, 96, "VA", fontHeight = 24)
 
+proc effects(graphics: Graphics, effects: EffectBuffer,
+             effect: PostProcess, time: float) =
+  let target = effects.render()
+  target.clearColor(rgba(0, 0, 0, 0))
+  graphics.resetShape()
+  graphics.rectangle(48, 48, 32, 32)
+  graphics.draw(target)
+  effects.apply(effect, uniforms {
+    time: float32(time),
+  })
+
 proc main() =
 
   var agl = initAglet()
@@ -96,12 +108,39 @@ proc main() =
   const
     LatoRegularTtf = slurp("sampleData/Lato-Regular.ttf")
     LatoBlackItalicTtf = slurp("sampleData/Lato-BlackItalic.ttf")
-  var
+  let
     win = agl.newWindowGlfw(800, 600, "rapid/gfx", winHints(msaaSamples = 8))
     graphics = win.newGraphics()
     fontRegular = graphics.newFont(LatoRegularTtf, height = 16, hinting = on)
     fontBlackItalic = graphics.newFont(LatoBlackItalicTtf, height = 16,
                                        hinting = on)
+    effects = win.newEffectBuffer(win.framebufferSize)
+    wave = win.newPostProcess(glsl"""
+      #version 330 core
+
+      in vec2 bufferUv;
+      in vec2 pixelPosition;
+
+      uniform sampler2D buffer;
+      uniform vec2 bufferSize;
+      uniform float time;
+
+      out vec4 color;
+
+      const float Pi = 3.14159265;
+
+      void main(void) {
+        // offset
+        vec2 uv = pixelPosition;
+        uv += vec2(0.0, sin(pixelPosition.x * 0.2 + time * Pi) * 3.0);
+
+        // transform to UV coordinates
+        uv /= bufferSize;
+        uv.y = 1.0 - uv.y;
+
+        color = texture(buffer, uv);
+      }
+    """)
 
   graphics.defaultDrawParams = graphics.defaultDrawParams.derive:
     multisample on
@@ -122,10 +161,13 @@ proc main() =
     tiles(graphics)
     text(graphics, fontRegular, fontBlackItalic)
     graphics.draw(frame)
+    effects(graphics, effects, wave, time)
+    effects.drawTo(frame)
 
     frame.finish()
 
     win.pollEvents do (event: InputEvent):
-      discard
+      if event.kind == iekWindowFrameResize:
+        effects.resize(event.size)
 
 main()
