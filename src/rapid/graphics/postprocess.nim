@@ -247,3 +247,32 @@ proc drawTo*(buffer: EffectBuffer, target: Target,
                            borderColor,
                            colorTarget),
   }, buffer.drawParams)
+
+proc copyFrom*(buffer: EffectBuffer, source: BaseFramebuffer,
+               buffers = {bbColor, bbDepth, bbStencil},
+               filter: BlitFilter = fmNearest) =
+  ## Copies all pixels from framebuffer ``source`` to the effect buffer.
+  ## ``buffers`` specifies which buffers should be copied (all by default).
+  ## ``filter`` specifies the filtering mode to use if the buffers' sizes
+  ## are not equal.
+
+  source.blit(buffer.a,
+              sourceArea = recti(vec2i(0), source.size),
+              destArea = recti(vec2i(0), buffer.a.size),
+              buffers, filter)
+
+proc copyTo*(buffer: EffectBuffer, dest: BaseFramebuffer,
+             buffers = {bbColor}, filter: BlitFilter = fmNearest) =
+  ## Copies all pixels from the effect buffer to the framebuffer ``dest``.
+  ## ``buffers`` specifies which buffers should be copied (color only by
+  ## default, since depth and stencil information is lost after applying
+  ## effects). ``filter`` specifies the filtering mode to use if the buffers'
+  ## sizes are not equal.
+  ##
+  ## Keep in mind that copying pixels does not do any alpha blending. If alpha
+  ## blending is needed, use ``drawTo`` instead.
+
+  buffer.a.blit(dest,
+                sourceArea = recti(vec2i(0), buffer.a.size),
+                destArea = recti(vec2i(0), dest.size),
+                buffers, filter)
