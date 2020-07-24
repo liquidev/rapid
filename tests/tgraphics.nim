@@ -92,7 +92,7 @@ proc text(graphics: Graphics, fontRegular, fontBlackItalic: Font) =
 proc effects(graphics: Graphics, effects: EffectBuffer,
              effect: PostProcess, time: float) =
   let target = effects.render()
-  # target.clearColor(rgba(0, 0, 0, 0))
+  target.clearColor(rgba(0, 0, 0, 0))
   graphics.resetShape()
   graphics.rectangle(48, 48, 32, 32)
   graphics.draw(target)
@@ -162,7 +162,7 @@ proc main() =
     text(graphics, fontRegular, fontBlackItalic)
     graphics.draw(frame)
 
-    effects.copyFrom(win.defaultFramebuffer)
+    # effects.copyFrom(win.defaultFramebuffer)
     effects(graphics, effects, wave, time)
     effects.drawTo(frame)
 

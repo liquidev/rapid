@@ -70,6 +70,8 @@ const
                           blendAdd(bfSrcAlpha, bfOneMinusSrcAlpha))
   blendAlphaPremult* = blendMode(blendAdd(bfOne, bfOneMinusSrcAlpha),
                                  blendAdd(bfOne, bfOneMinusSrcAlpha))
+  blendAdditive* = blendMode(blendAdd(bfOne, bfOne),
+                             blendAdd(bfOne, bfOne))
 
 
 # Vertex
@@ -865,6 +867,9 @@ proc draw*[U: UniformSource](graphics: Graphics, target: Target,
   ## Optionally, a program, uniforms, and draw parameters can be specified.
   ## By default, some extra uniforms are passed into the shader via
   ## ``graphics.uniforms(target)``.
+
+  # don't try to draw anything if there are no vertices
+  if graphics.vertexBuffer.len == 0: return
 
   graphics.finalizeBatch()
   graphics.updateMesh()

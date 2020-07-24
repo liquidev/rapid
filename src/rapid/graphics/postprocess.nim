@@ -101,6 +101,14 @@ proc height*(buffer: EffectBuffer): int32 {.inline.} =
   ## Returns the height of the effect buffer.
   buffer.size.y
 
+proc drawParams*(buffer: EffectBuffer): DrawParams {.inline.} =
+  ## Returns the draw params used when applying effects.
+  buffer.drawParams
+
+proc `drawParams=`*(buffer: EffectBuffer, params: DrawParams) {.inline.} =
+  ## Sets the draw params used when applying effects.
+  buffer.drawParams = params
+
 template createColor(window: Window, size: Vec2i, hdr: bool): ColorSource =
 
   if hdr:
@@ -125,6 +133,7 @@ proc resize*(buffer: EffectBuffer, size: Vec2i) =
   ## so be careful!
 
   buffer.size = size
+  echo "resizing to ", size
   buffer.a = createFramebuffer(buffer.window, buffer.size,
                                buffer.colorTargetCount, buffer.hdr)
   buffer.b = createFramebuffer(buffer.window, buffer.size,
@@ -166,7 +175,6 @@ proc render*(buffer: EffectBuffer): EffectTarget =
   result.gl = aTarget.gl
   result.buffer = buffer
   result.useImpl = proc (target: Target, gl: OpenGl) =
-    # ↓ java programming in a nutshell
     let fbTarget = target.EffectTarget.buffer.a.render()
     fbTarget.useImpl(fbTarget, gl)
 
@@ -212,13 +220,13 @@ proc apply*[U: UniformSource](buffer: EffectBuffer,
   samplers.clear()
   if buffer.colorTargetCount > 1:
     for colorTarget in 0..<buffer.colorTargetCount:
-      samplers["buffer" & $colorTarget] =
+      samplers["?buffer" & $colorTarget] =
         buffer.sampler(minFilter, magFilter,
                        wrapS, wrapT,
                        borderColor,
                        colorTarget).toUniform
   else:
-    samplers["buffer"] =
+    samplers["?buffer"] =
       buffer.sampler(minFilter, magFilter,
                      wrapS, wrapT,
                      borderColor).toUniform
@@ -241,7 +249,7 @@ proc drawTo*(buffer: EffectBuffer, target: Target,
   ## Draws the contents of the ``buffer``'s target ``colorTarget``
   ## onto ``target``, using the given sampling parameters.
 
-  target.draw(buffer.passthrough, buffer.fullscreenRect, aglet.uniforms {
+  target.draw(buffer.passthrough, buffer.fullscreenRect, uniforms {
     buffer: buffer.sampler(minFilter, magFilter,
                            wrapS, wrapT,
                            borderColor,
