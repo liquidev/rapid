@@ -9,13 +9,6 @@ import aglet/window/glfw
 import rapid/graphics
 import rapid/graphics/postprocess
 
-let dpAdditive = defaultDrawParams().derive:
-  blend blendAdditive
-
-proc laser(graphics: Graphics, a, b: Vec2f, glowColor, coreColor: Rgba32f) =
-  graphics.line(a, b, 32, lcSquare, glowColor, glowColor)
-  graphics.line(a, b, 16, lcSquare, coreColor, coreColor)
-
 const
   ThresholdSplitSource = glsl"""
     #version 330 core
@@ -103,6 +96,10 @@ const
     }
   """
 
+proc laser(graphics: Graphics, a, b: Vec2f, glowColor, coreColor: Rgba32f) =
+  graphics.line(a, b, 32, lcRound, glowColor, glowColor)
+  graphics.line(a, b, 16, lcRound, coreColor, coreColor)
+
 var
   fxThresholdSplit: PostProcess
   fxBlurCrossed: PostProcess
@@ -139,19 +136,35 @@ proc main() =
     graphics = window.newGraphics()
     effects = window.newEffectBuffer(window.framebufferSize,
                                      colorTargets = 2, hdr = on)
+    dpAdditive = defaultDrawParams().derive:
+      blend blendAdditive
+
+  var bloomEnabled = true
 
   fxThresholdSplit = window.newPostProcess(ThresholdSplitSource)
   fxBlurCrossed = window.newPostProcess(BlurCrossedSource)
   fxSumBuffers = window.newPostProcess(SumBuffersSource)
 
-  var lastTime = getMonoTime()
+  window.swapInterval = 0
+
+  var
+    lastTime = getMonoTime()
+    timeAccum = 0.0
+    framesSinceLastReport = 0
+  const ReportInterval = 500
   while not window.closeRequested:
     let
       currentTime = getMonoTime()
       deltaTime = currentTime - lastTime
       deltaMillis = deltaTime.inNanoseconds.int / 1_000_000
     lastTime = currentTime
-    echo deltaMillis, " ms"
+    timeAccum += deltaMillis
+    framesSinceLastReport.inc()
+    if framesSinceLastReport > ReportInterval:
+      echo timeAccum / ReportInterval, " ms (",
+           ReportInterval / (timeAccum / 1000), " fps)"
+      framesSinceLastReport = 0
+      timeAccum = 0
 
     var frame = window.render()
     frame.clearColor(rgba(0, 0, 0, 255))
@@ -162,11 +175,11 @@ proc main() =
       graphics.translate(window.size.vec2f / 2)
       graphics.resetShape()
       graphics.laser(a = vec2f(0), b = window.size.vec2f / 2 - window.mouse,
-                    GlowColor1, CoreColor)
+                     GlowColor1, CoreColor)
       graphics.laser(a = vec2f(0), b = window.mouse - window.size.vec2f / 2,
                      GlowColor2, CoreColor)
       graphics.draw(target, dpAdditive)
-    effects.bloom()
+    if bloomEnabled: effects.bloom()
     effects.drawTo(frame)
 
     frame.finish()
@@ -177,6 +190,9 @@ proc main() =
         echo "resize to ", event.size
         effects.resize(event.size)
         echo effects.size
+      of iekKeyPress:
+        if event.key == keyB:
+          bloomEnabled = not bloomEnabled
       else: discard
 
 when isMainModule: main()
