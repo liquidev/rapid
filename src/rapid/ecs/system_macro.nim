@@ -13,21 +13,22 @@ type
       # list of nnkIdentDefs containing all the required components
     implements*: seq[NimNode]
       # list of nnkProcDef containing all the implemented sysinterface procs
-  EcsSystem* = object
-    ## Dummy object for generating documentation.
 
 var ecsSystems* {.compileTime.}: Table[string, EcsSystemInfo]
+  ## Registry storing all the available ECS systems.
 
 macro addRequire(sysName: static string,
                  name: untyped{ident}, ty: typed{sym}) =
   ## Auxiliary macro used to resolve the type ``ty`` before adding a require to
   ## a system.
+
   if ty.symKind != nskType:
     error("type expected", ty)
   ecsSystems[sysName].requires.add(newIdentDefs(name, ty))
 
 proc genDocComment(sys: EcsSystemInfo): NimNode =
   ## Generates a doc comment for a system.
+
   const
     RequiresHeader = "Requires:"
     ImplementsHeader = "Implements:"
@@ -66,7 +67,6 @@ macro genSystemDoc(sysName: static string) =
   result.body.add(genDocComment(sys))
   result.addPragma(newColonExpr(ident"error",
                                 newLit("systems cannot be called")))
-  echo result.treeRepr
 
 macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
   ## Defines an ECS system. The body accepts:
@@ -118,7 +118,7 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
     else: assert false, "unreachable"
 
   for req in requireList:
-                                    # the following statement checks:
+                                    # the following statemeot checks:
     req.expectKind(nnkCall)         # a: T
     req[0].expectKind(nnkIdent)     # a
     req[1].expectKind(nnkStmtList)  # : T
@@ -136,7 +136,9 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
 
 import components/physics
 
-expandMacros:
+when isMainModule:
+  import components/physics
+
   system applyGravity:
     ## Applies gravity to physics bodies.
 
