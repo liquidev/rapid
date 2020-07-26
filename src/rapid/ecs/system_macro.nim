@@ -81,7 +81,7 @@ macro semcheck(what: typed) =
   ## Passing an untyped AST to a macro that accepts typed AST has an extra
   ## effect, though: it forces the AST to go through a semcheck. That's how the
   ## ``system`` macro manages to do typechecking on implemented system interface
-  ## procedures.
+  ## procedures, even though no code is generated just yet.
   discard
 
 macro checkSystem(sysName: static string) =
