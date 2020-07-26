@@ -1,5 +1,7 @@
 ## Physics systems and components.
 
+import glm/vec
+
 import components/basic
 import components/physics
 import system_macro

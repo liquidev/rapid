@@ -7,12 +7,19 @@ import std/tables
 
 type
   EcsSystemInfo* = object
-    doc*: string
+    doc: string
       # documentation string
     requires*: seq[NimNode]
       # list of nnkIdentDefs containing all the required components
     implements*: seq[NimNode]
       # list of nnkProcDef containing all the implemented sysinterface procs
+    earlyTypecheck: bool
+      # whether the system can be typechecked early
+
+  EntityBase* = uint32
+    ## Type used for entity ID storage.
+
+  AtEntity = distinct EntityBase
 
 var ecsSystems* {.compileTime.}: Table[string, EcsSystemInfo]
   ## Registry storing all the available ECS systems.
@@ -37,8 +44,9 @@ proc genDocComment(sys: EcsSystemInfo): NimNode =
 
   doc.add(&"\n\n**{RequiresHeader}** ")
   for i, req in sys.requires:
+    let ty = req[1]
+    if ty.kind != nnkSym: continue
     let
-      ty = req[1]
       owner = ty.owner
       name =
         if owner != nil and owner.symKind == nskModule:
@@ -68,23 +76,62 @@ macro genSystemDoc(sysName: static string) =
   result.addPragma(newColonExpr(ident"error",
                                 newLit("systems cannot be called")))
 
+macro semcheck(what: typed) =
+  ## Doesn't do anything. Accepts a ``typed`` and discards it.
+  ## Passing an untyped AST to a macro that accepts typed AST has an extra
+  ## effect, though: it forces the AST to go through a semcheck. That's how the
+  ## ``system`` macro manages to do typechecking on implemented system interface
+  ## procedures.
+  discard
+
+macro checkSystem(sysName: static string) =
+  ## Type checks a system's procedures.
+
+  result = newStmtList()
+
+  let sys = ecsSystems[sysName]
+  if not sys.earlyTypecheck: return
+
+  for impl in sys.implements:
+    var theProc = copy(impl)
+    if theProc[0].kind == nnkPostfix:
+      theProc[0] = theProc[0][1]
+    theProc.addPragma(ident"used")
+    for req in sys.requires:
+      let
+        name = req[0]
+        ty =
+          if req[1].strVal == "@entity": bindSym"AtEntity"
+          else: newTree(nnkVarTy, req[1])
+      theProc.params.add(newIdentDefs(name, ty))
+    result.add(newCall(bindSym"semcheck", newBlockStmt(theProc)))
+
 macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
   ## Defines an ECS system. The body accepts:
   ##
   ## - doc comments describing the system's behavior
-  ## - a list of name-component bindings for components required by the system
-  ##   (type names are without the ``Comp`` prefix)
+  ## - a list of name-component bindings for components required by the system.
+  ##   two special bindings may be used: ``<name>: @world``, and
+  ##   ``<name>: @entity``. these refer to the world and entity types generated
+  ##   by the ECS macro.
   ## - any number of implemented system interface procedures (endpoints).
-  ##
-  ## Implemented system interface procedures may use the special ``world`` and
-  ## ``entity`` ``usings``. These ``usings`` are added implicitly by the ``ecs``
-  ## macro.
   ##
   ## The macro will generate documentation about the system's requires and
   ## endpoints. Unfortunately, Nim does not allow for easily creating your own
   ## doc sections, so the documentation is put under the Procs section, and the
   ## procedure's name is prefixed with ``system:``. The resulting ``proc``
   ## cannot be called—attempting to do so will result in a compilation error.
+  ##
+  ## **Remarks:**
+  ##
+  ## Requiring an ``@entity`` without a ``@world`` is pretty much useless,
+  ## as all entity-related actions (such as getting components) also require
+  ## the world the entity belongs to (as that's what stores all the
+  ## actual data).
+  ## Requiring a ``@world`` disables all declaration-time checks. Just like with
+  ## generics, there's no way of knowing what the world type is—what components
+  ## it has, what system interface procs it implements, etc.—so all early checks
+  ## are delayed to the ``ecs`` macro.
 
   runnableExamples:
     import rapid/ecs/components/physics
@@ -94,14 +141,14 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
         physics: PhysicsBody
         gravity: Gravity
 
-      proc update*(world; entity; step: float32) =
+      proc update*(step: float32) =
         physics.acceleration += gravity.gravity
 
   let sysName = name.strVal
   result = newStmtList()
   if sysName in ecsSystems:
     error("redefinition of system " & sysName, name)
-  var sys = EcsSystemInfo()
+  var sys = EcsSystemInfo(earlyTypecheck: true)
 
   var requireList: NimNode
 
@@ -118,25 +165,32 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
     else: assert false, "unreachable"
 
   for req in requireList:
-                                    # the following statemeot checks:
-    req.expectKind(nnkCall)         # a: T
-    req[0].expectKind(nnkIdent)     # a
-    req[1].expectKind(nnkStmtList)  # : T
+    req.expectKind(nnkCall)                      # a: T
+    req[0].expectKind({nnkIdent, nnkAccQuoted})  # a
+    req[1].expectKind(nnkStmtList)               # : T
     req[1].expectLen(1)
-    req[1][0].expectKind(nnkIdent)  # T
+    req[1][0].expectKind({nnkIdent, nnkPrefix})  # T
+    if req[1][0].kind == nnkPrefix:
+      req[1][0][0].expectIdent("@")
+      req[1][0][1].expectKind(nnkIdent)
 
     let
       compName = req[0]
-      ty = ident(req[1][0].strVal)
-
-    result.add(newCall(bindSym"addRequire", newLit(sysName), compName, ty))
+      ty = req[1][0]
+    if ty.kind == nnkIdent:
+      result.add(newCall(bindSym"addRequire", newLit(sysName), compName, ty))
+    else:
+      if ty[1].strVal == "world":
+        sys.earlyTypecheck = false
+      sys.requires.add(newIdentDefs(compName, ident(ty.repr)))
 
   ecsSystems[sysName] = sys
   result.add(newCall(bindSym"genSystemDoc", newLit(sysName)))
-
-import components/physics
+  result.add(newCall(bindSym"checkSystem", newLit(sysName)))
 
 when isMainModule:
+  import glm/vec
+
   import components/physics
 
   system applyGravity:
@@ -146,5 +200,5 @@ when isMainModule:
       physics: PhysicsBody
       gravity: Gravity
 
-    proc update*(world; entity; step: float32) =
-      physics.acceleration += gravity
+    proc update*(step: float32) =
+      physics.acceleration += gravity.force

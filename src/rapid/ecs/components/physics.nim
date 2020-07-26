@@ -9,4 +9,4 @@ type
     velocity*, acceleration*: Vec2f
   Gravity* = object
     ## Gravity component. Signifies that the entity has gravity.
-    gravity*: Vec2f
+    force*: Vec2f
