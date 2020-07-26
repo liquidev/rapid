@@ -3,11 +3,11 @@
 import ../../graphics/context
 
 type
-  CompSprite* = object
-    ## Sprite rendering component. Signifies that an entity should be drawn as a
+  SpriteGraphic* = object
+    ## Sprite graphic component. Signifies that an entity should be drawn as a
     ## sprite.
     graphics*: Graphics
     sprite*: Sprite
-  CompRectShape* = object
-    ## "Flag" component. Signifies that an entity should be drawn as a
-    ## filled rectangle.
+  RectShapeGraphic* = object
+    ## Rect shape graphic component. Signifies that an entity should be drawn as
+    ## a filled rectangle.

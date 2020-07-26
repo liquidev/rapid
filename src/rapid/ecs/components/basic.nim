@@ -7,12 +7,9 @@
 import aglet
 
 type
-  CompPosition* = object
+  Position* = object
     ## Position component.
     position*: Vec2f
-  CompSize* = object
+  Size* = object
     ## Size component.
     size*: Vec2f
-  CompColor* = object
-    ## Color component.
-    color*: Rgba32f

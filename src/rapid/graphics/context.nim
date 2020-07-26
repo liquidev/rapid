@@ -11,9 +11,9 @@ import aglet
 import ../math as rmath
 import ../wrappers/freetype
 import atlas_texture
+import color
 
-export colors except rgb  # use pixeltypes.rgba32f or pixeltypes.rgba instead
-
+export color
 export rmath
 
 type
@@ -932,8 +932,3 @@ proc newGraphics*(window: Window, spriteAtlasSize = 1024.Positive): Graphics =
   result.fSpriteMagFilter = fmLinear
 
   result.initFreetype()
-
-converter rgba32f*(color: Color): Rgba32f {.inline.} =
-  ## Converts an stdlib color to an aglet RGBA float32 pixel.
-  let (r, g, b) = color.extractRgb
-  result = rgba32f(r / 255, g / 255, b / 255, 1)
