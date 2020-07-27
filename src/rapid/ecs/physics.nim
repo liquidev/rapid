@@ -13,10 +13,10 @@ system tickPhysics:
   ## acceleration.
 
   requires:
-    position: Position
-    physics: PhysicsBody
+    var position: Position
+    var physics: PhysicsBody
 
-  proc update*(step: float32) =
+  proc update*() =
     physics.velocity += physics.acceleration
     physics.acceleration = vec2f(0)
     position.position = physics.velocity
@@ -25,8 +25,8 @@ system applyGravity:
   ## Applies gravity to entities.
 
   requires:
-    physics: PhysicsBody
-    gravity: Gravity
+    var physics: PhysicsBody
+    let gravity: Gravity
 
-  proc update*(step: float32) =
-    physics.acceleration += gravity.gravity
+  proc update*() =
+    physics.acceleration += gravity.force

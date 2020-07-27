@@ -24,14 +24,20 @@ type
 var ecsSystems* {.compileTime.}: Table[string, EcsSystemInfo]
   ## Registry storing all the available ECS systems.
 
+proc extractVarType(maybeVar: NimNode): NimNode =
+  ## Extracts a type from a ``var`` expression.
+  if maybeVar.kind == nnkVarTy: maybeVar[0]
+  else: maybeVar
+
 macro addRequire(sysName: static string,
-                 name: untyped{ident}, ty: typed{sym}) =
+                 name: untyped{ident}, fullType: typed) =
   ## Auxiliary macro used to resolve the type ``ty`` before adding a require to
   ## a system.
 
+  let ty = fullType.extractVarType()
   if ty.symKind != nskType:
     error("type expected", ty)
-  ecsSystems[sysName].requires.add(newIdentDefs(name, ty))
+  ecsSystems[sysName].requires.add(newIdentDefs(name, fullType))
 
 proc genDocComment(sys: EcsSystemInfo): NimNode =
   ## Generates a doc comment for a system.
@@ -73,8 +79,10 @@ macro genSystemDoc(sysName: static string) =
   let sys = ecsSystems[sysName]
   result = newProc(name = postfix(ident("system:" & sysName), "*"))
   result.body.add(genDocComment(sys))
-  result.addPragma(newColonExpr(ident"error",
-                                newLit("systems cannot be called")))
+  # ↓ unfortunately this is not possible, since it doesn't play well with
+  # ecs_macro.useSym
+  # result.addPragma(newColonExpr(ident"error",
+  #                               newLit("systems cannot be called")))
 
 macro semcheck(what: typed) =
   ## Doesn't do anything. Accepts a ``typed`` and discards it.
@@ -100,9 +108,13 @@ macro checkSystem(sysName: static string) =
     for req in sys.requires:
       let
         name = req[0]
+        fullType = req[1].extractVarType()
+        typeSym =
+          if fullType.strVal == "@entity": bindSym"AtEntity"
+          else: fullType
         ty =
-          if req[1].strVal == "@entity": bindSym"AtEntity"
-          else: newTree(nnkVarTy, req[1])
+          if req[1].kind == nnkVarTy: newTree(nnkVarTy, typeSym)
+          else: typeSym
       theProc.params.add(newIdentDefs(name, ty))
     result.add(newCall(bindSym"semcheck", newBlockStmt(theProc)))
 
@@ -111,10 +123,15 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
   ##
   ## - doc comments describing the system's behavior
   ## - a list of name-component bindings for components required by the system.
+  ##   these take the form of ``var`` or ``let`` variable declarations, eg.
+  ##   ``let gravity: Gravity`` and ``var physics: PhysicsBody``. ``var``
+  ##   signifies that the component will be mutated, and ``let`` signifies that
+  ##   the component will only be read.
   ##   two special bindings may be used: ``<name>: @world``, and
   ##   ``<name>: @entity``. these refer to the world and entity types generated
   ##   by the ECS macro.
   ## - any number of implemented system interface procedures (endpoints).
+  ##   these may use any requires declared in the ``requires`` section.
   ##
   ## The macro will generate documentation about the system's requires and
   ## endpoints. Unfortunately, Nim does not allow for easily creating your own
@@ -164,25 +181,34 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
       sys.doc.add(stmt.strVal & '\n')
     else: assert false, "unreachable"
 
-  for req in requireList:
-    req.expectKind(nnkCall)                      # a: T
-    req[0].expectKind({nnkIdent, nnkAccQuoted})  # a
-    req[1].expectKind(nnkStmtList)               # : T
-    req[1].expectLen(1)
-    req[1][0].expectKind({nnkIdent, nnkPrefix})  # T
-    if req[1][0].kind == nnkPrefix:
-      req[1][0][0].expectIdent("@")
-      req[1][0][1].expectKind(nnkIdent)
+  if requireList == nil:
+    error("missing require list", body)
 
-    let
-      compName = req[0]
-      ty = req[1][0]
+  proc require(result: var NimNode, paramName, ty: NimNode, isVar: bool) =
     if ty.kind == nnkIdent:
-      result.add(newCall(bindSym"addRequire", newLit(sysName), compName, ty))
+      let varTy =
+        if isVar: newTree(nnkVarTy, ty)
+        else: ty
+      result.add(newCall(bindSym"addRequire", newLit(sysName),
+                         paramName, varTy))
     else:
       if ty[1].strVal == "world":
         sys.earlyTypecheck = false
-      sys.requires.add(newIdentDefs(compName, ident(ty.repr)))
+      let varTy =
+        if isVar: newTree(nnkVarTy, ident(ty.repr))
+        else: ident(ty.repr)
+      sys.requires.add(newIdentDefs(paramName, varTy))
+
+  for req in requireList:
+    req.expectKind({nnkVarSection, nnkLetSection})
+    for defs in req:
+      defs[0].expectKind({nnkIdent, nnkAccQuoted})
+      defs[1].expectKind({nnkIdent, nnkPrefix})
+      defs[2].expectKind(nnkEmpty)
+      let
+        paramName = defs[0]
+        ty = defs[1]
+      result.require(paramName, ty, isVar = req.kind == nnkVarSection)
 
   ecsSystems[sysName] = sys
   result.add(newCall(bindSym"genSystemDoc", newLit(sysName)))
@@ -197,8 +223,8 @@ when isMainModule:
     ## Applies gravity to physics bodies.
 
     requires:
-      physics: PhysicsBody
-      gravity: Gravity
+      var physics: PhysicsBody
+      let gravity: Gravity
 
-    proc update*(step: float32) =
+    proc update*() =
       physics.acceleration += gravity.force
