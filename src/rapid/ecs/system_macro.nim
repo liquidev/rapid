@@ -5,29 +5,7 @@ import std/strformat
 import std/strutils
 import std/tables
 
-type
-  EcsSystemInfo* = object
-    doc: string
-      # documentation string
-    requires*: seq[NimNode]
-      # list of nnkIdentDefs containing all the required components
-    implements*: seq[NimNode]
-      # list of nnkProcDef containing all the implemented sysinterface procs
-    earlyTypecheck: bool
-      # whether the system can be typechecked early
-
-  EntityBase* = uint32
-    ## Type used for entity ID storage.
-
-  AtEntity = distinct EntityBase
-
-var ecsSystems* {.compileTime.}: Table[string, EcsSystemInfo]
-  ## Registry storing all the available ECS systems.
-
-proc extractVarType(maybeVar: NimNode): NimNode =
-  ## Extracts a type from a ``var`` expression.
-  if maybeVar.kind == nnkVarTy: maybeVar[0]
-  else: maybeVar
+import common
 
 macro addRequire(sysName: static string,
                  name: untyped{ident}, fullType: typed) =
@@ -39,7 +17,7 @@ macro addRequire(sysName: static string,
     error("type expected", ty)
   ecsSystems[sysName].requires.add(newIdentDefs(name, fullType))
 
-proc genDocComment(sys: EcsSystemInfo): NimNode =
+proc genDocComment(sys: SystemInfo): NimNode =
   ## Generates a doc comment for a system.
 
   const
@@ -66,7 +44,7 @@ proc genDocComment(sys: EcsSystemInfo): NimNode =
   doc.add(&"\n\n**{ImplementsHeader}**\n\n")
   doc.add(".. code-block:: nim")
   for i, impl in sys.implements:
-    var decl = copy(impl)
+    var decl = copy(impl.abstract)
     decl[^1] = newEmptyNode()
     doc.add("\n " & decl.repr)
 
@@ -84,13 +62,18 @@ macro genSystemDoc(sysName: static string) =
   # result.addPragma(newColonExpr(ident"error",
   #                               newLit("systems cannot be called")))
 
-macro semcheck(what: typed) =
-  ## Doesn't do anything. Accepts a ``typed`` and discards it.
-  ## Passing an untyped AST to a macro that accepts typed AST has an extra
-  ## effect, though: it forces the AST to go through a semcheck. That's how the
-  ## ``system`` macro manages to do typechecking on implemented system interface
-  ## procedures, even though no code is generated just yet.
-  discard
+macro semcheckEndpointImpl(sysName: static string, implIndex: static int,
+                           blockWithProc: typed) =
+  ## Semchecks an endpoint implementation and saves it in the ``concrete`` field
+  ## of ``ecsSystem[sysName].implements[implIndex]``.
+
+  blockWithProc.expectKind({nnkBlockStmt, nnkBlockExpr})
+  # skip if the concrete implementation is nil (because @world was used)
+  if blockWithProc.kind == nnkBlockExpr:
+    return
+  blockWithProc[1].expectKind(nnkProcDef)
+
+  ecsSystems[sysName].implements[implIndex].concrete = blockWithProc[1]
 
 macro checkSystem(sysName: static string) =
   ## Type checks a system's procedures.
@@ -98,25 +81,10 @@ macro checkSystem(sysName: static string) =
   result = newStmtList()
 
   let sys = ecsSystems[sysName]
-  if not sys.earlyTypecheck: return
-
-  for impl in sys.implements:
-    var theProc = copy(impl)
-    if theProc[0].kind == nnkPostfix:
-      theProc[0] = theProc[0][1]
-    theProc.addPragma(ident"used")
-    for req in sys.requires:
-      let
-        name = req[0]
-        fullType = req[1].extractVarType()
-        typeSym =
-          if fullType.strVal == "@entity": bindSym"AtEntity"
-          else: fullType
-        ty =
-          if req[1].kind == nnkVarTy: newTree(nnkVarTy, typeSym)
-          else: typeSym
-      theProc.params.add(newIdentDefs(name, ty))
-    result.add(newCall(bindSym"semcheck", newBlockStmt(theProc)))
+  for index, impl in sys.implements:
+    let concrete = getConcrete(impl.abstract, sys)
+    result.add(newCall(bindSym"semcheckEndpointImpl",
+                       newLit(sysName), newLit(index), newBlockStmt(concrete)))
 
 macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
   ## Defines an ECS system. The body accepts:
@@ -165,7 +133,7 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
   result = newStmtList()
   if sysName in ecsSystems:
     error("redefinition of system " & sysName, name)
-  var sys = EcsSystemInfo(earlyTypecheck: true)
+  var sys = SystemInfo()
 
   var requireList: NimNode
 
@@ -176,7 +144,7 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
       stmt[0].expectIdent("requires")
       requireList = stmt[1]
     of nnkProcDef:
-      sys.implements.add(stmt)
+      sys.implements.add(SystemImpl(abstract: stmt))
     of nnkCommentStmt:
       sys.doc.add(stmt.strVal & '\n')
     else: assert false, "unreachable"
@@ -192,8 +160,6 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
       result.add(newCall(bindSym"addRequire", newLit(sysName),
                          paramName, varTy))
     else:
-      if ty[1].strVal == "world":
-        sys.earlyTypecheck = false
       let varTy =
         if isVar: newTree(nnkVarTy, ident(ty.repr))
         else: ident(ty.repr)
@@ -226,5 +192,5 @@ when isMainModule:
       var physics: PhysicsBody
       let gravity: Gravity
 
-    proc update*() =
+    proc update() =
       physics.acceleration += gravity.force
