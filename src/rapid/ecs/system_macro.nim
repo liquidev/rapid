@@ -82,6 +82,9 @@ macro checkSystem(sysName: static string) =
 
   let sys = ecsSystems[sysName]
   for index, impl in sys.implements:
+    if impl.abstract.params[0].kind != nnkEmpty:
+      error("endpoint implementations must not return anything",
+            impl.abstract.params[0])
     let concrete = getConcrete(impl.abstract, sys)
     result.add(newCall(bindSym"semcheckEndpointImpl",
                        newLit(sysName), newLit(index), newBlockStmt(concrete)))
@@ -116,7 +119,10 @@ macro system*(name: untyped{ident}, body: untyped{nkStmtList}) =
   ## Requiring a ``@world`` disables all declaration-time checks. Just like with
   ## generics, there's no way of knowing what the world type is—what components
   ## it has, what system interface procs it implements, etc.—so all early checks
-  ## are delayed to the ``ecs`` macro.
+  ## are delayed to the ``ecs`` macro. This has the drawback of symbols not
+  ## being bound early, so usage of any symbols from external modules will also
+  ## require these modules to be imported in the module that declares the ECS
+  ## world.
 
   runnableExamples:
     import rapid/ecs/components/physics

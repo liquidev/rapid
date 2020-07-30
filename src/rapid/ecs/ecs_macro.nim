@@ -92,7 +92,7 @@ proc genGetComponentProcs(worldType, entityType,
     result.addPragma(ident"used")
 
     result.body.add quote do:
-      assert T.toHasEnum in world.entityComponents[entity.BaseEntity],
+      assert T.toHasEnum in world.entityComponents[EntityBase(entity)],
         "entity must have the given component"
 
     var whenStmt = newNimNode(nnkWhenStmt)
@@ -121,7 +121,8 @@ proc genBaseSysInterface(sysInterface: NimNode,
       error("endpoints must not return anything", signature.params[0])
 
     var impl = copy(signature)
-    impl.params.insert(1, newIdentDefs(ident"world", worldType))
+    impl.params.insert(1, newIdentDefs(ident"world",
+                                       newTree(nnkVarTy, worldType)))
     impl.body =
       if impl.body.kind == nnkEmpty: newStmtList()
       else: newStmtList(impl.body)
@@ -234,8 +235,8 @@ proc findMatchingEndpoint(endpoints: Table[string, seq[Endpoint]],
       if sameSignature(endpoint.signature, signature):
         return some(endpoint)
 
-proc genEntityLoop(sys: SystemInfo, sysImpl: SystemImpl,
-                   implSym: NimNode): NimNode =
+proc genEntityLoop(sys: SystemInfo, endpoint: Endpoint,
+                   implSym, entityType, entityHasType: NimNode): NimNode =
   ## Generates a loop over all entities that executes the given system's
   ## endpoint implementation.
 
@@ -244,9 +245,37 @@ proc genEntityLoop(sys: SystemInfo, sysImpl: SystemImpl,
                    newDotExpr(ident"world", ident"entityComponents"),
                    body)
 
+  var requireHasSet = newNimNode(nnkCurly)
+  for req in sys.requires:
+    let
+      ty = req[^2].extractVarType
+      hasValue = newDotExpr(entityHasType, ty)
+    requireHasSet.add(hasValue)
+
+  var call = newCall(implSym)
+  for defs in endpoint.signature.params[1..^1]:
+    for name in defs[0..^3]:
+      call.add(name)
+  let entity = newCall(entityType, ident"index")
+  for req in sys.requires:
+    let
+      isVar = req[^2].kind == nnkVarTy
+      ty = req[^2].extractVarType
+      componentProc =
+        if isVar: ident"mcomponent"
+        else: ident"component"
+      componentInst = newTree(nnkBracketExpr, componentProc, ty)
+      componentCall = newCall(componentInst, ident"world", entity)
+    call.add(componentCall)
+
+  let
+    cond = infix(requireHasSet, "<=", ident"hasSet")
+    ifStmt = newIfStmt({cond: call})
+  body.add(ifStmt)
+
 proc addImplsToEndpoints(impls: seq[EndpointImpl],
                          endpoints: Table[string, seq[Endpoint]],
-                         entityType, worldType: NimNode) =
+                         entityType, worldType, entityHasType: NimNode) =
   ## Appends all implementations with signatures matching those of endpoints to
   ## respective endpoints.
 
@@ -260,12 +289,14 @@ proc addImplsToEndpoints(impls: seq[EndpointImpl],
       var concreteImpl =
         if impl.concrete != nil: impl.concrete
         else: getConcrete(impl.abstract, sys, entityType, worldType)
-      let implName = genSym(nskProc,
+      let implSym = genSym(nskProc,
                             endpointImpl.sysName & "_" &
                             concreteImpl.name.repr)
-      concreteImpl.name = implName
+      concreteImpl.name = implSym
+      concreteImpl.addPragma(ident"inline")
       endpoint.impl.body.add(concreteImpl)
-      endpoint.impl.body.add(genEntityLoop(sys, impl, implName))
+      endpoint.impl.body.add(genEntityLoop(sys, endpoint, implSym,
+                                           entityType, entityHasType))
 
 macro ecs*(body: untyped{nkStmtList}) =
   ## Generates an ECS world.
@@ -381,7 +412,8 @@ macro ecs*(body: untyped{nkStmtList}) =
   checkRequiredComponents(systemList, componentList)
   var endpointTable = genBaseSysInterface(systemInterfaceList, worldType)
   let impls = getAllImplementations(systemList)
-  addImplsToEndpoints(impls, endpointTable, entityType, worldType)
+  addImplsToEndpoints(impls, endpointTable,
+                      entityType, worldType, entityHasName)
 
   for _, endpoints in endpointTable:
     for endpoint in endpoints:

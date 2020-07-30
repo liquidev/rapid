@@ -15,7 +15,6 @@ system tickPhysics:
   requires:
     var position: Position
     var physics: PhysicsBody
-    let world: @world
 
   proc update() =
     physics.velocity += physics.acceleration
