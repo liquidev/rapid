@@ -579,6 +579,12 @@ when isMainModule:
     world.addComponent(entity, Position2D(position: vec2f(32, 32)))
     echo entity.int
 
+  world.addComponent(ents[1], Size(size: vec2f(64, 64)))
+  assert world.hasComponent[:Size](ents[1])
+  assert not world.hasComponent[:Size](ents[0])
+  world.delComponent[:Size](ents[1])
+  assert not world.hasComponent[:Size](ents[1])
+
   world.delEntity(ents[4])
   ents[4] = world.addEntity()
   assert ents[4].int == 4
