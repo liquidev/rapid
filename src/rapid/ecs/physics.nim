@@ -6,19 +6,19 @@ import components/basic
 import components/physics
 import system_macro
 
-export Position, PhysicsBody, Gravity
+export Position2D, PhysicsBody, Gravity
 
 system tickPhysics:
   ## Ticks the physics: updates the player's position, velocity, and
   ## acceleration.
 
   requires:
-    var position: Position
+    var position: Position2D
     var physics: PhysicsBody
 
   proc update() =
     physics.velocity += physics.acceleration
-    physics.acceleration = vec2f(0)
+    physics.acceleration.reset()
     position.position = physics.velocity
 
 system applyGravity:

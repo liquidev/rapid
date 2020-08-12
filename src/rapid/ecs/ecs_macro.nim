@@ -1,10 +1,11 @@
 ## ``ecs`` macro for creating ECS worlds.
 
+import std/deques
 import std/hashes
 import std/macros
+import std/options
 import std/sets
 import std/sugar
-import std/options
 import std/tables
 
 import common
@@ -41,14 +42,23 @@ proc genHasEnum(typeName, componentList: NimNode): NimNode =
   for comp in componentList:
     result.add(comp)
 
-proc genWorldObject(typeName, componentList, entityHas: NimNode): NimNode =
+proc genWorldObject(typeName, componentList: NimNode,
+                    entityType, entityHas: NimNode): NimNode =
   ## Generates the @world object from a list of components.
 
   var fields = newNimNode(nnkRecList)
 
-  let hasSet = newTree(nnkBracketExpr, ident"set", entityHas)
-  fields.add(newIdentDefs(ident"entityComponents",
-                          newTree(nnkBracketExpr, ident"seq", hasSet)))
+  let
+    hasSet = newTree(nnkBracketExpr, ident"set", entityHas)
+    headerFields = {
+      "aliveEntitiesDense": newTree(nnkBracketExpr, ident"seq", entityType),
+      "aliveEntitiesSparse": newTree(nnkBracketExpr, ident"seq", bindSym"int"),
+      "entityComponents": newTree(nnkBracketExpr, ident"seq", hasSet),
+      "freeIds": newTree(nnkBracketExpr, bindSym"Deque", bindSym"EntityBase"),
+      "nextId": bindSym"EntityBase",
+    }
+  for (name, field) in headerFields:
+    fields.add(newIdentDefs(name.ident, field))
 
   for comp in componentList:
     fields.add(newIdentDefs(ident("comp" & comp.repr),
@@ -68,48 +78,153 @@ proc genTypeToHasEnumProc(entityHas, componentList: NimNode): NimNode =
                          newAssignment(ident"result",
                                        newDotExpr(entityHas, comp)))
     whenStmt.add(branch)
-  whenStmt.add(newTree(nnkElse,
-                       newTree(nnkPragma,
-                               newColonExpr(ident"error",
-                                            newLit("invalid component type")))))
+  whenStmt.add(newTree(nnkElse, quote do:
+    {.error: "invalid component type".}))
 
   result.body.add(whenStmt)
 
-proc genGetComponentProcs(worldType, entityType,
-                          componentList: NimNode): NimNode =
-  ## Generates the ``component`` and ``mcomponent`` procs for retrieving
-  ## entities' components.
+proc genEntityManagerProcs(worldType, entityType, entityHas: NimNode,
+                           componentList: NimNode): NimNode =
+  ## Generates entity management procedures ``addEntity``, ``delEntity`` and the
+  ## ``entities`` iterator.
 
   result = newStmtList()
 
-  proc make(name: string, worldTy, returnTy: NimNode): NimNode =
-    result = newProc(name = name.ident,
-                     params = [returnTy,
-                               newIdentDefs(ident"world", worldTy),
-                               newIdentDefs(ident"entity", entityType)])
-    result[2] = newTree(nnkGenericParams,
-                        newIdentDefs(ident"T", newEmptyNode()))
-    result.addPragma(ident"used")
+  # just some idents to avoid `gensym2193812937129837891203890127 in public APIs
+  # and enable sharing idents between different calls to `quote`
+  let
+    iworld = ident"world"
+    ientity = ident"entity"
+    iid = ident"id"
+    iaddEntity = ident("add" & entityType.repr)
+    idelEntity = ident("del" & entityType.repr)
 
-    result.body.add quote do:
-      assert T.toHasEnum in world.entityComponents[EntityBase(entity)],
-        "entity must have the given component"
+  var sparseEntityDataSeqs = @[
+      newDotExpr(iworld, ident"entityComponents"),
+      newDotExpr(iworld, ident"aliveEntitiesSparse"),
+    ]
+  for comp in componentList:
+    sparseEntityDataSeqs.add(newDotExpr(iworld, ident("comp" & comp.repr)))
 
-    var whenStmt = newNimNode(nnkWhenStmt)
-    for comp in componentList:
-      var branch = newTree(nnkElifBranch, infix(ident"T", "is", comp))
+  var expandSeqsToId = newStmtList()
+  for seq in sparseEntityDataSeqs:
+    expandSeqsToId.add(newCall(bindSym"setLen", seq,
+                               infix(iid, "+", newLit(1))))
+  expandSeqsToId = quote do:
+    if `iworld`.entityComponents.len <= `iid`.int:
+      `expandSeqsToId`
+
+  result.add quote do:
+    proc `iaddEntity`*(`iworld`: var `worldType`): `entityType` =
+      ## Adds a new entity to the world and returns its ID.
+
+      let `iid` =
+        if `iworld`.freeIds.len > 0:
+          `iworld`.freeIds.popFirst()
+        else:
+          let i = `iworld`.nextId
+          inc(`iworld`.nextId)
+          i
+      result = `entityType`(`iid`)
+
+      let denseIndex = `iworld`.aliveEntitiesDense.len
+      `iworld`.aliveEntitiesDense.add(result)
+
+      `expandSeqsToId`
+      `iworld`.entityComponents[`iid`] = {}
+      `iworld`.aliveEntitiesSparse[`iid`] = denseIndex
+
+    proc `idelEntity`*(`iworld`: var `worldType`,
+                       `ientity`: sink `entityType`) =
+      ## Deletes an entity from the world. This is an O(1) operation.
+
       let
-        components = newDotExpr(ident"world", ident("comp" & comp.repr))
-        index = newDotExpr(ident"entity", bindSym"EntityBase")
-        component = newTree(nnkBracketExpr, components, index)
-        assignment = newAssignment(ident"result", component)
-      branch.add(assignment)
-      whenStmt.add(branch)
-    result.body.add(whenStmt)
+        sparseIndex = `ientity`.EntityBase
+        denseIndex = `iworld`.aliveEntitiesSparse[sparseIndex]
+        lastEntity = `iworld`.aliveEntitiesDense[^1]
+      `iworld`.aliveEntitiesDense[denseIndex] = lastEntity
+      `iworld`.aliveEntitiesSparse[lastEntity.EntityBase] = denseIndex
+      `iworld`.aliveEntitiesDense.setLen(`iworld`.aliveEntitiesDense.len - 1)
 
-  result.add(make("component", worldType, ident"T"),
-             make("mcomponent", newTree(nnkVarTy, worldType),
-                  newTree(nnkVarTy, ident"T")))
+      `iworld`.freeIds.addLast(sparseIndex)
+
+    iterator items*(`iworld`: `worldType`): `entityType` =
+      ## Returns all entities.
+
+      for entity in `iworld`.aliveEntitiesDense:
+        yield entity
+
+proc genComponentManagerProcs(worldType, entityType: NimNode,
+                              componentList: NimNode): NimNode =
+  ## Generates the ``component``, ``mcomponent``, ``addComponent``,
+  ## ``delComponent``, and ``hasComponent`` procs for managing entities'
+  ## components.
+
+  let
+    iworld = ident"world"
+    ientity = ident"entity"
+    icomponent = ident"component"
+
+  var getComponentSeqWhenStmt = newTree(nnkWhenStmt)
+
+  for comp in componentList:
+    var
+      branch = newTree(nnkElifBranch, infix(ident"T", "is", comp))
+      seq = newDotExpr(iworld, ident("comp" & comp.repr))
+      asgn = newAssignment(ident"result", seq)
+    branch.add(asgn)
+    getComponentSeqWhenStmt.add(branch)
+  getComponentSeqWhenStmt.add(
+    newTree(nnkElse, quote do:
+      {.error: "invalid component type".}))
+
+  result = quote do:
+
+    proc getComponentSeq*[T](`iworld`: var `worldType`): var seq[T] =
+      ## Low-level proc for accessing the internal sequence of components for
+      ## the component type ``T``.
+
+      `getComponentSeqWhenStmt`
+
+    proc component*[T](`iworld`: var `worldType`,
+                       `ientity`: `entityType`): lent T =
+      ## Returns an entity's component.
+
+      result = `iworld`.getComponentSeq[:T][`ientity`.EntityBase]
+
+    proc mcomponent*[T](`iworld`: var `worldType`,
+                        `ientity`: `entityType`): var T =
+      ## Returns a mutable reference to an entity's component.
+
+      result = `iworld`.getComponentSeq[:T][`ientity`.EntityBase]
+
+    proc hasComponent*[T](`iworld`: var `worldType`,
+                          `ientity`: `entityType`): bool =
+      ## Returns whether the given entity has a component of the given type.
+
+      result = T.toHasEnum in world.entityComponents[entity.EntityBase]
+
+    proc addComponent*[T](`iworld`: var `worldType`, `ientity`: `entityType`,
+                          `icomponent`: T) =
+      ## Adds a component to an entity. Raises an error if the entity already
+      ## has the given component.
+
+      assert not `iworld`.hasComponent[:T](`ientity`),
+        "entity already has the given component"
+
+      let id = `ientity`.EntityBase
+      `iworld`.getComponentSeq[:T][id] = `icomponent`
+      `iworld`.entityComponents[id].incl(T.toHasEnum)
+
+    proc delComponent*[T](`iworld`: var `worldType`, `ientity`: `entityType`) =
+      ## Deletes the given component from an entity. Raises an error if the
+      ## entity doesn't have the given component.
+
+      assert `iworld`.hasComponent[:T](`ientity`),
+        "entity doesn't have the given component"
+
+      let id = `ientity`.EntityBase
+      `iworld`.entityComponents[id].excl(T.toHasEnum)
 
 proc genBaseSysInterface(sysInterface: NimNode,
                          worldType: NimNode): Table[string, seq[Endpoint]] =
@@ -241,9 +356,16 @@ proc genEntityLoop(sys: SystemInfo, endpoint: Endpoint,
   ## endpoint implementation.
 
   var body = newStmtList()
-  result = newTree(nnkForStmt, ident"index", ident"hasSet",
-                   newDotExpr(ident"world", ident"entityComponents"),
+  result = newTree(nnkForStmt, ident"entity",
+                   newDotExpr(ident"world", ident"aliveEntitiesDense"),
                    body)
+
+  let hasSetVar =
+    newLetStmt(ident"hasSet",
+               newTree(nnkBracketExpr,
+                       newDotExpr(ident"world", ident"entityComponents"),
+                       newCall(bindSym"EntityBase", ident"entity")))
+  body.add(hasSetVar)
 
   var requireHasSet = newNimNode(nnkCurly)
   for req in sys.requires:
@@ -256,7 +378,6 @@ proc genEntityLoop(sys: SystemInfo, endpoint: Endpoint,
   for defs in endpoint.signature.params[1..^1]:
     for name in defs[0..^3]:
       call.add(name)
-  let entity = newCall(entityType, ident"index")
   for req in sys.requires:
     let
       isVar = req[^2].kind == nnkVarTy
@@ -265,7 +386,7 @@ proc genEntityLoop(sys: SystemInfo, endpoint: Endpoint,
         if isVar: ident"mcomponent"
         else: ident"component"
       componentInst = newTree(nnkBracketExpr, componentProc, ty)
-      componentCall = newCall(componentInst, ident"world", entity)
+      componentCall = newCall(componentInst, ident"world", ident"entity")
     call.add(componentCall)
 
   let
@@ -395,10 +516,13 @@ macro ecs*(body: untyped{nkStmtList}) =
   let
     entityHasName = ident(entityType.strVal & "Has")
     entityHasEnum = genHasEnum(entityType, componentList)
-    worldObject = genWorldObject(worldType, componentList, entityHasName)
+    worldObject = genWorldObject(worldType, componentList,
+                                 entityType, entityHasName)
     typeToHasEnumProc = genTypeToHasEnumProc(entityHasName, componentList)
-    getComponentProcs = genGetComponentProcs(worldType, entityType,
-                                             componentList)
+    entityManagerProcs = genEntityManagerProcs(worldType, entityType,
+                                               entityHasName, componentList)
+    componentManagerProcs = genComponentManagerProcs(worldType, entityType,
+                                                     componentList)
 
   result.add quote do:
     type
@@ -407,7 +531,8 @@ macro ecs*(body: untyped{nkStmtList}) =
       `worldTypeName` = `worldObject`
 
     `typeToHasEnumProc`
-    `getComponentProcs`
+    `entityManagerProcs`
+    `componentManagerProcs`
 
   checkRequiredComponents(systemList, componentList)
   var endpointTable = genBaseSysInterface(systemInterfaceList, worldType)
@@ -433,7 +558,7 @@ when isMainModule:
       World* = @world
 
     components:
-      Position
+      Position2D
       Size
       PhysicsBody
       Gravity
@@ -445,3 +570,15 @@ when isMainModule:
     systems:
       applyGravity
       tickPhysics
+
+  var
+    world: World
+    ents: array[10, Entity]
+  for entity in mitems(ents):
+    entity = world.addEntity()
+    world.addComponent(entity, Position2D(position: vec2f(32, 32)))
+    echo entity.int
+
+  world.delEntity(ents[4])
+  ents[4] = world.addEntity()
+  assert ents[4].int == 4
