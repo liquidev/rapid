@@ -200,5 +200,14 @@ when isMainModule:
                          acceleration: acceleration)
     result.autoImplement()
 
-  var player = Player(physics: physics(position = vec2f(32, 32)))
+  var player = Player(physics: physics(position = vec2f(32, 32),
+                                       velocity = vec2f(1, 0)))
   player.registerComponents()
+
+  let initialPosition = player.physics.position
+  const tickCount = 100
+  for tick in 1..tickCount:
+    player.update()
+  block:
+    let physics = player.physics
+    assert physics.position == initialPosition + physics.velocity * tickCount
