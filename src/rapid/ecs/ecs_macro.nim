@@ -558,7 +558,7 @@ when isMainModule:
       World* = @world
 
     components:
-      Position2D
+      Position
       Size
       PhysicsBody
       Gravity
@@ -576,7 +576,7 @@ when isMainModule:
     ents: array[10, Entity]
   for entity in mitems(ents):
     entity = world.addEntity()
-    world.addComponent(entity, Position2D(position: vec2f(32, 32)))
+    world.addComponent(entity, Position(position: vec2f(32, 32)))
     echo entity.int
 
   world.addComponent(ents[1], Size(size: vec2f(64, 64)))

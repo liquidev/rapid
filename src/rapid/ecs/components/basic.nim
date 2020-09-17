@@ -7,9 +7,9 @@
 import aglet
 
 type
-  Position2D* = object
+  Position* = object
     ## 2D position component.
     position*: Vec2f
   Size* = object
-    ## Size component.
+    ## 2D size component.
     size*: Vec2f
