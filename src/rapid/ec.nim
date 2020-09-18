@@ -12,45 +12,46 @@ import graphics/context
 type
   RootComponent* {.byref.} = object of RootObj
     ## Empty component, base for inheriting from.
-    ## Every component **must** implement an ``impl`` proc which fills out the
-    ## ``impl`` field. This proc is later called by ``registerComponent``.
 
     impl*: ComponentImpl  ## interface implementation
 
   ComponentUpdate*[C: RootComponent] =
     proc (comp: var C) {.nimcall.}
+    ## Component tick callback.
 
   ComponentDraw*[C: RootComponent] =
     proc (comp: var C, target: Target, step: float32) {.nimcall.}
+    ## Component aglet-draw callback.
 
   ComponentRender*[C: RootComponent] =
     proc (comp: var C, target: Target, graphics: Graphics,
           step: float32) {.nimcall.}
+    ## Component rapid-render callback.
 
   ComponentShape*[C: RootComponent] =
     proc (comp: var C, graphics: Graphics, step: float32) {.nimcall.}
+    ## Component shape-render callback.
 
-  RC = RootComponent
   ComponentImpl* = object
     ## An object holding all the callbacks a component can implement.
 
-    update*: ComponentUpdate[RC]
+    update*: ComponentUpdate[RootComponent]
       ## Ticks the component once. This runs a fixed amount of times per second
       ## (60 by default, but this can change depending on the game).
 
-    draw*: ComponentDraw[RC]
-    render*: ComponentRender[RC]
-    shape*: ComponentShape[RC]
+    draw*: ComponentDraw[RootComponent]
+    render*: ComponentRender[RootComponent]
+    shape*: ComponentShape[RootComponent]
       ## Components can implement either draw, render or shape,
       ## depending on the need. These endpoints are triggered by the respective
       ## Entity procs, and have the following semantics:
       ##
       ## - draw should be used when drawing raw aglet objects, eg. Meshes.
-      ##   This is later called "aglet-drawing"
+      ##   This is called "aglet-drawing"
       ## - render should be used when you need a Graphics context but also need
-      ##   to invoke a draw call. This is later called "rapid-rendering"
+      ##   to invoke a draw call. This is called "rapid-rendering"
       ## - shape should be used when rendering using a Graphics context only.
-      ##   This is later called "shape-rendering"
+      ##   This is called "shape-rendering"
 
   RootEntity* = ref object of RootObj
     ## Empty entity, base for inheriting from.
@@ -68,14 +69,17 @@ iterator components*(entity: RootEntity): var RootComponent =
   for comp in entity.components:
     yield comp[]
 
-proc registerComponent*[T: RootComponent](entity: RootEntity, comp: ptr T) =
+proc registerComponent*[T: RootComponent](entity: RootEntity,
+                                          comp: ptr T) {.inline.} =
   ## Registers an entity's component. You usually don't need to use this,
   ## as this is handled by registerComponents.
 
   entity.components.add(comp)
 
-proc registerComponents*[T: RootEntity](entity: T) =
+proc registerComponents*[T: RootEntity](entity: T) {.inline.} =
   ## Initializes an entity by registering all of its components.
+  ## This **must** always be done after constructing an entity, otherwise
+  ## component callbacks won't run.
 
   for name, value in fieldPairs(entity[]):
     when value is RootComponent:
@@ -84,41 +88,54 @@ proc registerComponents*[T: RootEntity](entity: T) =
 
 # callbacks
 
+{.push inline.}
+
 proc onUpdate*[T: RootComponent](comp: var T, impl: ComponentUpdate[T]) =
-  comp.impl.update = cast[ComponentUpdate[RC]](impl)
+  comp.impl.update = cast[ComponentUpdate[RootComponent]](impl)
 
 proc onDraw*[T: RootComponent](comp: var T, impl: ComponentDraw[T]) =
-  comp.impl.draw = cast[ComponentDraw[RC]](impl)
+  comp.impl.draw = cast[ComponentDraw[RootComponent]](impl)
 
 proc onRender*[T: RootComponent](comp: var T, impl: ComponentRender[T]) =
-  comp.impl.render = cast[ComponentRender[RC]](impl)
+  comp.impl.render = cast[ComponentRender[RootComponent]](impl)
 
 proc onShape*[T: RootComponent](comp: var T, impl: ComponentShape[T]) =
   ## Shortcuts for setting ``comp.impl`` fields manually, for use with either
   ## the ``do`` notation or overload resolution.
-  comp.impl.shape = cast[ComponentShape[RC]](impl)
+  comp.impl.shape = cast[ComponentShape[RootComponent]](impl)
 
 proc autoImplement*[T: RootComponent](comp: var T) =
   ## Automagically implement any callbacks, depending on what procs have been
   ## declared at callsite, eg. if ``proc update(comp: var T)`` is declared, it
   ## will automatically be implemented for the given component instance.
+  ##
+  ## **Debugging:** If you ever need to debug which procs were implemented, pass
+  ## ``-d:rapidECDebugAutoImplement`` to the compiler.
 
   template attempt(stmt) =
     when compiles(stmt):
       stmt
 
+  template report(callbackName) =
+    when defined(rapidECDebugAutoImplement):
+      {.hint: "rapid/ec autoImplement: found " & callbackName.}
+
   attempt:
     mixin update
     comp.onUpdate update
+    report "update"
   attempt:
     mixin draw
     comp.onDraw draw
+    report "draw"
   attempt:
     mixin render
     comp.onRender render
+    report "render"
   attempt:
     mixin shape
     comp.onShape shape
+    report "shape"
 
 proc update*(entity: RootEntity) =
   ## Tick all of the entity's components update routines once.
@@ -177,6 +194,8 @@ proc shape*(entities: seq[RootEntity], graphics: Graphics, step: float32) =
   for entity in entities:
     entity.shape(graphics, step)
 
+{.pop.}
+
 
 # tests
 
@@ -211,3 +230,4 @@ when isMainModule:
   block:
     let physics = player.physics
     assert physics.position == initialPosition + physics.velocity * tickCount
+    echo "test passed! position = ", physics.position
