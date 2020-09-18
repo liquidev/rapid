@@ -7,7 +7,9 @@ import glm/vec
 import ../physics/aabb
 
 type
-  Tilemap*[T] = object
+  TilemapTile* = concept tile
+    tile.isSolid is bool
+  Tilemap*[T: TilemapTile] = object
     fSize: Vec2i
     tiles: seq[T]
     fGridSize: Vec2f
@@ -68,6 +70,13 @@ proc unsafeGet*[T](tilemap: Tilemap[T], position: Vec2i): lent T =
 
   tilemap.tiles[position.x + position.y * tilemap.width]
 
+proc unsafeSet*[T](tilemap: var Tilemap[T], position: Vec2i, tile: sink T) =
+  ## Sets the tile at the given position.
+  ##
+  ## **Warning:** This does not perform bounds checking. Prefer `[]` instead.
+
+  tilemap.tiles[position.x + position.y * tilemap.width] = tile
+
 proc `[]`*[T](tilemap: var Tilemap[T], position: Vec2i): var T =
   ## Returns a mutable view into the tile at the given position.
   ## Raises an error if the position lies out of bounds.
@@ -82,15 +91,21 @@ proc `[]`*[T](tilemap: Tilemap[T], position: Vec2i): lent T =
   assert tilemap.isInbounds(position), "position must lie inbounds"
   tilemap.unsafeGet(position)
 
-proc `[]`*[T](tilemap: Tilemap[T], position: Vec2i,
-              default: T): lent T =
-  ## Returns a _safe_ immutable view into a tile at the given position, or
-  ## ``default`` if the position is out of bounds.
+proc `[]=`*[T](tilemap: var Tilemap[T], position: Vec2i, tile: sink T) =
+  ## Returns an immutable view into the tile at the given position.
+  ## Raises an error if the position lies out of bounds.
+
+  assert tilemap.isInbounds(position), "position must lie inbounds"
+  tilemap.unsafeSet(position, tile)
+
+proc `[]`*[T](tilemap: Tilemap[T], position: Vec2i, outOfBounds: T): T =
+  ## Returns the tile at the given position, or ``outOfBounds`` if the position
+  ## is out of bounds.
 
   if tilemap.isInbounds(position):
     tilemap.unsafeGet(position)
   else:
-    default
+    outOfBounds
 
 proc `{}`*[T](tilemap: var Tilemap[T], position: Vec2i): var T =
   ## Returns a _safe_ mutable view into a tile at the given position,
@@ -102,12 +117,19 @@ proc `{}`*[T](tilemap: var Tilemap[T], position: Vec2i): var T =
   let wrapped = position mod tilemap.size
   tilemap.unsafeGet(wrapped)
 
-proc `{}`*[T](tilemap: Tilemap[T], position: Vec2i): lent T =
+proc `{}=`*[T](tilemap: var Tilemap[T], position: Vec2i, tile: sink T) =
   ## Returns a _safe_ mutable view into a tile at the given position,
   ## wrapping the position around if it lies out of bounds.
 
   # this is a little slow since it uses ``mod``,
   # a fast if-based version would be nice
+
+  let wrapped = position mod tilemap.size
+  tilemap.unsafeSet(wrapped, tile)
+
+proc `{}`*[T](tilemap: Tilemap[T], position: Vec2i): lent T =
+  ## Returns a _safe_ mutable view into a tile at the given position,
+  ## wrapping the position around if it lies out of bounds.
 
   let wrapped = position mod tilemap.size
   tilemap.unsafeGet(wrapped)
@@ -126,7 +148,7 @@ iterator tiles*[T](tilemap: var Tilemap[T]): (Vec2i, var T) =
       let position = vec2i(x, y)
       yield (position, tilemap.unsafeGet(position))
 
-iterator tiles*[T](tilemap: Tilemap[T]): (Vec2i, T) =
+iterator tiles*[T](tilemap: Tilemap[T]): (Vec2i, lent T) =
   ## Iterates through all tiles in the given tilemap, and returns a mutable
   ## reference to each one along with its position on the map.
 
@@ -136,7 +158,7 @@ iterator tiles*[T](tilemap: Tilemap[T]): (Vec2i, T) =
       yield (position, tilemap.unsafeGet(position))
 
 iterator area*[T](tilemap: Tilemap[T], rect: Recti,
-                  outOfBounds: T = T.default): (Vec2i, T) =
+                  outOfBounds: T = T.default): (Vec2i, lent T) =
   ## Iterates through all tiles lying in the given rectangle, and returns a
   ## reference to each one along with its position on the map.
   ## Returns ``default`` if a tile lies out of bounds.
@@ -161,7 +183,7 @@ iterator areaWrap*[T](tilemap: var Tilemap[T],
       yield (position, tilemap{position})
 
 iterator areaWrap*[T](tilemap: Tilemap[T],
-                      rect: Recti): (Vec2i, T) =
+                      rect: Recti): (Vec2i, lent T) =
   ## Iterates through all tiles lying in the given rectangle, and returns an
   ## immutable reference to each one along with its position on the map.
   ## The yielded position follows the same rules as in the ``var`` version of
@@ -191,45 +213,72 @@ proc alignToGrid*(tilemap: Tilemap, rect: Rectf): Recti =
   ## Returns grid coordinates of the given rectangle.
 
   let
-    left = round(rect.left / tilemap.gridWidth).int32
-    top = round(rect.top / tilemap.gridHeight).int32
-    right = round(rect.right / tilemap.gridWidth).int32
-    bottom = round(rect.bottom / tilemap.gridHeight).int32
+    left = floor(rect.left / tilemap.gridWidth).int32
+    top = floor(rect.top / tilemap.gridHeight).int32
+    right = floor(rect.right / tilemap.gridWidth).int32
+    bottom = floor(rect.bottom / tilemap.gridHeight).int32
   result = recti(left, top, right - left, bottom - top)
 
-template resolveCollisionXIt*[T](subject: var Rectf, tilemap: Tilemap[T],
-                                 direction: XCheckDirection,
-                                 isSolidExpr: untyped,
-                                 outOfBounds: T = default(T)): untyped =
+# god damnit this doesn't work and i have to do this with procs
+# template resolveCollisionXIt*[T](subject: var Rectf, tilemap: Tilemap[T],
+#                                  direction: XCheckDirection,
+#                                  isSolidExpr: untyped,
+#                                  outOfBounds: T = default(T)): untyped =
+#   ## Resolves collisions between the subject and the tilemap on the X axis.
+#   ## ``direction`` signifies the movement direction of the subject.
+#   ## ``isSolidExpr`` is a bool expression which should return whether a tile
+#   ## (``it``) is solid or not. ``defaultTile`` is the tile used when the subject
+#   ## is out of bounds.
+#
+#   var result = false
+#   let tiles = tilemap.alignToGrid(subject)
+#   for x in area(tilemap, tiles, outOfBounds):
+#     echo x
+#     if isSolidExpr:
+#       let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
+#       result = subject.resolveCollisionX(hitbox, direction) or result
+#   result
+#
+# template resolveCollisionYIt*[T](subject: var Rectf, tilemap: Tilemap[T],
+#                                  direction: YCheckDirection,
+#                                  isSolidExpr: untyped,
+#                                  defaultTile = default(T)): bool =
+#   ## Resolves collisions between the subject and the tilemap on the Y axis.
+#   ## ``direction`` signifies the movement direction of the subject.
+#   ## ``isSolidExpr`` is a bool expression which should return whether a tile
+#   ## (``it``) is solid or not. ``defaultTile`` is the tile used when the subject
+#   ## is out of bounds.
+#
+#   var result = false
+#   let area = tilemap.alignToGrid(subject)
+#   for position, tile in tilemap.area(area, defaultTile):
+#     if (let it {.inject.} = tile; isSolidExpr):
+#       let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
+#       result = subject.resolveCollisionY(hitbox, direction) or result
+#   result
+
+proc resolveCollisionX*[T](subject: var Rectf, tilemap: Tilemap[T],
+                           direction: XCheckDirection,
+                           outOfBounds: T = default(T)): bool =
   ## Resolves collisions between the subject and the tilemap on the X axis.
   ## ``direction`` signifies the movement direction of the subject.
-  ## ``isSolidExpr`` is a bool expression which should return whether a tile
-  ## (``it``) is solid or not. ``defaultTile`` is the tile used when the subject
-  ## is out of bounds.
+  ## ``outOfBounds`` is the tile used when the subject is out of bounds.
 
-  var result = false
   let tiles = tilemap.alignToGrid(subject)
-  for x in area(tilemap, tiles, outOfBounds):
-    echo x
-    if isSolidExpr:
+  for position, tile in area(tilemap, tiles, outOfBounds):
+    if tile.isSolid:
       let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
       result = subject.resolveCollisionX(hitbox, direction) or result
-  result
 
-template resolveCollisionYIt*[T](subject: var Rectf, tilemap: Tilemap[T],
-                                 direction: YCheckDirection,
-                                 isSolidExpr: untyped,
-                                 defaultTile = default(T)): bool =
+proc resolveCollisionY*[T](subject: var Rectf, tilemap: Tilemap[T],
+                           direction: YCheckDirection,
+                           outOfBounds: T = default(T)): bool =
   ## Resolves collisions between the subject and the tilemap on the Y axis.
   ## ``direction`` signifies the movement direction of the subject.
-  ## ``isSolidExpr`` is a bool expression which should return whether a tile
-  ## (``it``) is solid or not. ``defaultTile`` is the tile used when the subject
-  ## is out of bounds.
+  ## ``outOfBounds`` is the tile used when the subject is out of bounds.
 
-  var result = false
-  let area = tilemap.alignToGrid(subject)
-  for position, tile in tilemap.area(area, defaultTile):
-    if (let it {.inject.} = tile; isSolidExpr):
+  let tiles = tilemap.alignToGrid(subject)
+  for position, tile in area(tilemap, tiles, outOfBounds):
+    if tile.isSolid:
       let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
       result = subject.resolveCollisionY(hitbox, direction) or result
-  result

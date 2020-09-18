@@ -3,6 +3,7 @@
 import std/sugar
 
 import aglet/rect
+import glm/vec
 
 export rect
 
@@ -17,19 +18,13 @@ func orderLowToHigh*[T](slice: var Slice[T]) {.inline.} =
   if slice.b > slice.a:
     swap slice.a, slice.b
 
-func intersects*[T](x, y: Slice[T]): bool {.inline.} =
-  ## Returns whether two 1D slices intersect.
-
-  let (x, y) = (dup(x, orderLowToHigh), dup(y, orderLowToHigh))
-  result = x.a < y.b and y.a < x.b
-
 func xIntersects*[T](a, b: Rect[T]): bool {.inline.} =
   ## Returns whether two rectangles intersect on the X axis.
-  (a.left..a.right).intersects(b.left..b.right)
+  a.left < b.right and b.left < a.right
 
 func yIntersects*[T](a, b: Rect[T]): bool {.inline.} =
   ## Returns whether two rectangles intersect on the Y axis.
-  (a.top..a.bottom).intersects(b.top..b.bottom)
+  a.top < b.bottom and b.top < a.bottom
 
 func intersects*[T](a, b: Rect[T]): bool {.inline.} =
   ## Returns whether two rectangles intersect on both X and Y axes.
