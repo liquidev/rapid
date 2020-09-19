@@ -1,8 +1,10 @@
 import aglet
 import aglet/window/glfw
 import rapid/ec
+import rapid/ec/physics_aabb
 import rapid/game
 import rapid/game/tilemap
+import rapid/game/tilemap_collider
 import rapid/graphics
 import rapid/physics/aabb
 
@@ -16,64 +18,24 @@ type
 proc isSolid(tile: Tile): bool = tile != tileAir
 
 type
-  Tiles = ref Tilemap[Tile]
+  Tiles = Tilemap[Tile]
 
-  Physics = object of RootComponent
-    position, velocity, acceleration: Vec2f
-    size: Vec2f
-    tilemap: Tiles
   PlayerController = object of RootComponent
     window: Window  # for input
-    physics: ptr Physics
+    physics: ptr AabbPhysics
     speed: float32
   PlayerGraphics = object of RootComponent
-    physics: ptr Physics
+    physics: ptr AabbPhysics
     color: Rgba32f
 
   Player = ref object of RootEntity
     controller: PlayerController
-    physics: Physics
+    physics: AabbPhysics
     graphics: PlayerGraphics
 
   World = object
     tilemap: Tiles
     entities: seq[RootEntity]
-
-proc update(physics: var Physics) =
-  physics.velocity += physics.acceleration
-  physics.acceleration *= 0
-
-  let
-    velocity = physics.velocity
-    movingX = not velocity.x.closeTo(0.001)
-    movingY = not velocity.y.closeTo(0.001)
-    # did somebody say: "branchless programming"?
-    directionX = cdLeft.succ(ord(velocity.x > 0))
-    directionY = cdUp.succ(ord(velocity.y > 0))
-  var
-    hitbox: Rectf
-
-  physics.position.x += physics.velocity.x
-  hitbox = rectf(physics.position, physics.size)
-
-  # ha, let's just throw that out the window.
-  if movingX:
-    let collides = hitbox.resolveCollisionX(physics.tilemap[], directionX)
-    physics.position.x = hitbox.x
-    physics.velocity.x *= float32(not collides)
-
-  physics.position.y += physics.velocity.y
-  hitbox = rectf(physics.position, physics.size)
-
-  if movingY:
-    let collides = hitbox.resolveCollisionY(physics.tilemap[], directionY)
-    physics.position.y = hitbox.y
-    physics.velocity.y *= float32(not collides)
-
-
-proc physics(position, size: Vec2f, tilemap: Tiles): Physics =
-  result = Physics(position: position, size: size, tilemap: tilemap)
-  result.autoImplement()
 
 proc update(controller: var PlayerController) =
   let
@@ -92,7 +54,7 @@ proc update(controller: var PlayerController) =
 
   physics.velocity *= 0.8
 
-proc playerController(window: Window, physics: ptr Physics,
+proc playerController(window: Window, physics: ptr AabbPhysics,
                       speed: float32): PlayerController =
   result = PlayerController(window: window, physics: physics, speed: speed)
   result.autoImplement()
@@ -101,7 +63,7 @@ proc shape(pgfx: var PlayerGraphics, graphics: Graphics, step: float32) =
   let position = pgfx.physics.position + pgfx.physics.velocity * step
   graphics.rectangle(position, pgfx.physics.size, color = pgfx.color)
 
-proc playerGraphics(physics: ptr Physics, color: Rgba32f): PlayerGraphics =
+proc playerGraphics(physics: ptr AabbPhysics, color: Rgba32f): PlayerGraphics =
   result = PlayerGraphics(physics: physics, color: color)
   result.autoImplement()
 
@@ -135,12 +97,12 @@ proc main() =
   world.tilemap.init(window.size div vec2i(32),
                      vec2f(32, 32))
   for x in 1..5:
-    world.tilemap[][vec2i(x.int32, 3)] = tileBlock
+    world.tilemap[vec2i(x.int32, 3)] = tileBlock
   for y in 3..3+5:
-    world.tilemap[][vec2i(5, y.int32)] = tileBlock
+    world.tilemap[vec2i(5, y.int32)] = tileBlock
 
-  player.physics = physics(position = vec2f(32, 32), size = vec2f(32, 32),
-                           world.tilemap)
+  player.physics = aabbPhysics(position = vec2f(32, 32), size = vec2f(32, 32),
+                               world.tilemap.collider)
   player.controller = playerController(window, addr player.physics, speed = 1.0)
   player.graphics = playerGraphics(addr player.physics, colWhite)
   player.registerComponents()
