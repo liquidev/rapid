@@ -3,7 +3,7 @@
 #~~
 
 version =
-  "0.1.0"
+  "2020.1"
 author =
   "iLiquid"
 description =
@@ -18,5 +18,4 @@ srcDir =
 #~~
 
 requires "nim >= 0.20.0"
-requires "aglet >= 0.3.0"
-requires "nimterop"
+requires "aglet >= 0.4.2"
