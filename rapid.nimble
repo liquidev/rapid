@@ -18,6 +18,5 @@ srcDir =
 #~~
 
 requires "nim >= 0.20.0"
-requires "glm >= 1.1.1"
+requires "aglet >= 0.3.0"
 requires "nimterop"
-requires "nimPNG"
