@@ -156,7 +156,7 @@ iterator areaWrap*[T](tilemap: Tilemap[T],
 # init
 
 proc init*[T](tilemap: Tilemap[T], size: Vec2i, gridSize: Vec2f,
-              defaultTile = default(T)) =
+              defaultTile: T = default(T)) =
   ## Initializes a new tilemap with the given size, grid size, and default tile.
 
   tilemap.fSize = size
@@ -166,7 +166,7 @@ proc init*[T](tilemap: Tilemap[T], size: Vec2i, gridSize: Vec2f,
     tile = defaultTile
 
 proc newTilemap*[T](size: Vec2i, gridSize: Vec2f,
-                    defaultTile = default(T)): Tilemap[T] =
+                    defaultTile: T = default(T)): Tilemap[T] =
   ## Creates a new tilemap with the given size, grid size, and default tile.
 
   new(result)
