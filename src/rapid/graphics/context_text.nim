@@ -294,7 +294,7 @@ proc newFont*(graphics: Graphics, data: string,
 
   new(result) do (font: Font):
     check font.face.destroy()
-  check newMemoryFace(graphics.freetype, data[0].unsafeAddr, data.len.culong,
+  check newMemoryFace(graphics.freetype, data[0].unsafeAddr, data.len.clong,
                       face_index = 0, result.face)
 
   template getFlag(freetypeFlag, rapidFlag) =
