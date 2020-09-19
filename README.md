@@ -25,7 +25,7 @@ rapid should work fine on Windows out of the box, no outside dependencies.
 
 On Linux, the development headers for the following libraries must be installed:
 
-- for `rapid/gfx`:
+- for `rapid/graphics`:
   - GL
   - X11
   - Xrandr
