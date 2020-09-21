@@ -1,17 +1,32 @@
 ## Tilemap with collision detection.
 
 import std/options
+import std/tables
 
 import glm/vec
 
 import ../physics/aabb
 
 type
-  TilemapTile* = concept tile
+  TilemapTile* = concept tile {.explain.}
     tile.isSolid is bool
-  Tilemap*[T: TilemapTile] = ref object
-    fSize: Vec2i
-    tiles: seq[T]
+
+  TileContainer* = concept c, var mc, type T {.explain.}
+    T is TilemapTile
+
+    mc.init(Vec2i)
+
+    c.size is Vec2i
+
+    mc[Vec2i] is var T
+    mc[Vec2i] = T
+
+    for position, tile in tiles(mc):
+      position is Vec2i
+      tile is T
+
+  Tilemap*[T: TilemapTile, C: TileContainer] = ref object
+    container*: C
     fGridSize: Vec2f
 
 
@@ -21,15 +36,15 @@ type
 
 proc size*(tilemap: Tilemap): Vec2i =
   ## Returns the size of the tilemap, as a vector.
-  tilemap.fSize
+  tilemap.container.size
 
 proc width*(tilemap: Tilemap): int32 =
   ## Returns the width of the tilemap.
-  tilemap.size.x
+  tilemap.container.size.x
 
 proc height*(tilemap: Tilemap): int32 =
   ## Returns the height of the tilemap.
-  tilemap.size.y
+  tilemap.container.size.y
 
 proc gridSize*(tilemap: Tilemap): Vec2f =
   ## Returns the size of the tilemap's grid, as a vector.
@@ -37,140 +52,62 @@ proc gridSize*(tilemap: Tilemap): Vec2f =
 
 proc gridWidth*(tilemap: Tilemap): float32 =
   ## Returns the width of the tilemap.
-  tilemap.gridSize.x
+  tilemap.fGridSize.x
 
 proc gridHeight*(tilemap: Tilemap): float32 =
   ## Returns the height of the tilemap.
-  tilemap.gridSize.y
-
-proc isInbounds*(tilemap: Tilemap, position: Vec2i): bool =
-  ## Returns whether the given position lies inside of the tilemap's boundaries.
-  position.x >= 0 and position.x < tilemap.width and
-  position.y >= 0 and position.y < tilemap.height
-
-proc isOutOfBounds*(tilemap: Tilemap, position: Vec2i): bool =
-  ## Returns whether the given position lies out of the tilemap's boundaries.
-  not tilemap.isInbounds(position)
+  tilemap.fGridSize.y
 
 
-# tile getters
+# tile getters/setters
 
-proc unsafeGet*[T](tilemap: Tilemap[T],
-                   position: Vec2i): var T =
-  ## Returns a mutable view into the tile at the given position.
-  ##
-  ## **Warning:** This does not perform bounds checking. Prefer `[]` instead.
+proc `[]`*[T, C](tilemap: Tilemap[T, C], position: Vec2i): T =
+  ## Retrieves a tile at the given position.
+  ## Out of bounds behavior is container-specific.
+  tilemap.container[position]
 
-  tilemap.tiles[position.x + position.y * tilemap.width]
-
-proc unsafeSet*[T](tilemap: Tilemap[T], position: Vec2i, tile: sink T) =
-  ## Sets the tile at the given position.
-  ##
-  ## **Warning:** This does not perform bounds checking. Prefer `[]` instead.
-
-  tilemap.tiles[position.x + position.y * tilemap.width] = tile
-
-proc `[]`*[T](tilemap: Tilemap[T], position: Vec2i): var T =
-  ## Returns a mutable view into the tile at the given position.
-  ## Raises an error if the position lies out of bounds.
-
-  assert tilemap.isInbounds(position), "position must lie inbounds"
-  tilemap.unsafeGet(position)
-
-proc `[]=`*[T](tilemap: Tilemap[T], position: Vec2i, tile: sink T) =
-  ## Returns an immutable view into the tile at the given position.
-  ## Raises an error if the position lies out of bounds.
-
-  assert tilemap.isInbounds(position), "position must lie inbounds"
-  tilemap.unsafeSet(position, tile)
-
-proc `[]`*[T](tilemap: Tilemap[T], position: Vec2i, outOfBounds: T): T =
-  ## Returns the tile at the given position, or ``outOfBounds`` if the position
-  ## is out of bounds.
-
-  if tilemap.isInbounds(position):
-    tilemap.unsafeGet(position)
-  else:
-    outOfBounds
-
-proc `{}`*[T](tilemap: Tilemap[T], position: Vec2i): var T =
-  ## Returns a _safe_ mutable view into a tile at the given position,
-  ## wrapping the position around if it lies out of bounds.
-
-  # this is a little slow since it uses ``mod``,
-  # a fast if-based version would be nice
-
-  let wrapped = position mod tilemap.size
-  tilemap.unsafeGet(wrapped)
-
-proc `{}=`*[T](tilemap: Tilemap[T], position: Vec2i, tile: sink T) =
-  ## Returns a _safe_ mutable view into a tile at the given position,
-  ## wrapping the position around if it lies out of bounds.
-
-  # this is a little slow since it uses ``mod``,
-  # a fast if-based version would be nice
-
-  let wrapped = position mod tilemap.size
-  tilemap.unsafeSet(wrapped, tile)
+proc `[]=`*[T, C](tilemap: Tilemap[T, C], position: Vec2i, tile: T) =
+  ## Sets a tile at the given position.
+  ## Out of bounds behavior is container-specific.
+  tilemap.container[position] = tile
 
 {.pop.}
 
 
 # iterators
 
-iterator tiles*[T](tilemap: Tilemap[T]): (Vec2i, var T) =
-  ## Iterates through all tiles in the given tilemap, and returns a mutable
-  ## reference to each one along with its position on the map.
+iterator tiles*[T, C](tilemap: Tilemap[T, C]): (Vec2i, var T) =
+  ## Yields all the tiles on the map.
+  ## Depending on the tile container, this can be more efficient than
+  ## iterating over the whole area of the map (eg. `ChunkTileContainer` will not
+  ## iterate over non-existent chunks).
 
-  for y in 0..<tilemap.height:
-    for x in 0..<tilemap.width:
+  for position, tile in tiles(tilemap.container):
+    yield (position, tile)
+
+iterator area*[T, C](tilemap: Tilemap[T, C], area: Recti): (Vec2i, var T) =
+  ## Yields all tiles that lie in the given area. Iteration order is
+  ## top-to-bottom, left-to-right.
+  ## Out of bounds behavior is container-specific.
+
+  for y in area.top..area.bottom:
+    for x in area.left..area.right:
       let position = vec2i(x, y)
-      yield (position, tilemap.unsafeGet(position))
-
-iterator area*[T](tilemap: Tilemap[T], rect: Recti,
-                  outOfBounds: T = T.default): (Vec2i, T) =
-  ## Iterates through all tiles lying in the given rectangle, and returns a
-  ## reference to each one along with its position on the map.
-  ## Returns ``default`` if a tile lies out of bounds.
-
-  for y in rect.top..rect.bottom:
-    for x in rect.left..rect.right:
-      let position = vec2i(x, y)
-      yield (position, tilemap[position, outOfBounds])
-
-iterator areaWrap*[T](tilemap: Tilemap[T],
-                      rect: Recti): (Vec2i, var T) =
-  ## Iterates through all tiles lying in the given rectangle, and returns a
-  ## mutable reference to each one along with its position on the map.
-  ## If the position is out of bounds, it is wrapped around to the other side.
-  ## The yielded position is _not_ wrapped around to make rendering easy.
-  ## Looking up tiles with this position will work correctly, as long as the
-  ## ``{}`` operator is used.
-
-  for y in rect.top..rect.bottom:
-    for x in rect.left..rect.right:
-      let position = vec2i(x, y)
-      yield (position, tilemap{position})
+      yield (position, tilemap.container[position])
 
 
-# init
+# initializers
 
-proc init*[T](tilemap: Tilemap[T], size: Vec2i, gridSize: Vec2f,
-              defaultTile: T = default(T)) =
-  ## Initializes a new tilemap with the given size, grid size, and default tile.
+proc newTilemap*[T, C](container: C, gridSize: Vec2f): Tilemap[T, C] =
+  ## Creates a tilemap from an existing container.
 
-  tilemap.fSize = size
-  tilemap.fGridSize = gridSize
-  tilemap.tiles.setLen(size.x * size.y)
-  for position, tile in tiles(tilemap):
-    tile = defaultTile
+  result = Tilemap[T, C](container: container, fGridSize: gridSize)
 
-proc newTilemap*[T](size: Vec2i, gridSize: Vec2f,
-                    defaultTile: T = default(T)): Tilemap[T] =
-  ## Creates a new tilemap with the given size, grid size, and default tile.
+proc newTilemap*[T, C](size: Vec2i, gridSize: Vec2f): Tilemap[T, C] =
+  ## Creates a tilemap from an empty container with the given size.
 
-  new(result)
-  result.init(size, gridSize, defaultTile)
+  result = Tilemap[T, C](fGridSize: gridSize)
+  result.container.init(size)
 
 
 # physics
@@ -185,28 +122,98 @@ proc alignToGrid*(tilemap: Tilemap, rect: Rectf): Recti =
     bottom = floor(rect.bottom / tilemap.gridHeight).int32
   result = recti(left, top, right - left, bottom - top)
 
-proc resolveCollisionX*[T](subject: var Rectf, tilemap: Tilemap[T],
-                           direction: XCheckDirection,
-                           outOfBounds: T = default(T)): bool =
+proc resolveCollisionX*[T, C](subject: var Rectf, tilemap: Tilemap[T, C],
+                              direction: XCheckDirection,
+                              outOfBounds: T = default(T)): bool =
   ## Resolves collisions between the subject and the tilemap on the X axis.
   ## ``direction`` signifies the movement direction of the subject.
   ## ``outOfBounds`` is the tile used when the subject is out of bounds.
 
   let tiles = tilemap.alignToGrid(subject)
-  for position, tile in area(tilemap, tiles, outOfBounds):
+  for position, tile in area(tilemap, tiles):
     if tile.isSolid:
       let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
       result = subject.resolveCollisionX(hitbox, direction) or result
 
-proc resolveCollisionY*[T](subject: var Rectf, tilemap: Tilemap[T],
-                           direction: YCheckDirection,
-                           outOfBounds: T = default(T)): bool =
+proc resolveCollisionY*[T, C](subject: var Rectf, tilemap: Tilemap[T, C],
+                              direction: YCheckDirection,
+                              outOfBounds: T = default(T)): bool =
   ## Resolves collisions between the subject and the tilemap on the Y axis.
   ## ``direction`` signifies the movement direction of the subject.
   ## ``outOfBounds`` is the tile used when the subject is out of bounds.
 
   let tiles = tilemap.alignToGrid(subject)
-  for position, tile in area(tilemap, tiles, outOfBounds):
+  for position, tile in area(tilemap, tiles):
     if tile.isSolid:
       let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
       result = subject.resolveCollisionY(hitbox, direction) or result
+
+
+# tile container: flat (finite size)
+
+type
+  FlatTileContainer*[T: TilemapTile] = object
+    tiles*: seq[T]
+    size: Vec2i
+    outOfBounds: T
+
+{.push inline.}
+
+proc size*[T](c: FlatTileContainer[T]): Vec2i =
+  ## Returns the size of the container.
+  c.size
+
+proc outOfBounds*[T](c: FlatTileContainer[T]): T =
+  ## Returns the out of bounds tile for the container.
+  c.outOfBounds
+
+proc `outOfBounds=`*[T](c: var FlatTileContainer[T], tile: T) =
+  ## Sets the out of bounds tile for the container.
+  c.outOfBounds = tile
+
+proc isInbounds*(c: FlatTileContainer, position: Vec2i): bool =
+  ## Returns whether the given position lies inside the container's bounds.
+
+  position.x >= 0 and position.x < c.size.x and
+  position.y >= 0 and position.y < c.size.y
+
+proc `[]`*[T](c: var FlatTileContainer[T], position: Vec2i): var T =
+  ## Returns the tile at the given position, or ``c.outOfBounds`` if the
+  ## position lies out of bounds.
+
+  if c.isInbounds(position):
+    c.tiles[position.x + position.y * c.size.x]
+  else:
+    c.outOfBounds
+
+proc `[]=`*[T](c: var FlatTileContainer[T], position: Vec2i, tile: sink T) =
+  ## Sets the tile at the given position, if the position lies inbounds.
+
+  if c.isInbounds(position):
+    c.tiles[position.x + position.y * c.size.x] = tile
+
+iterator tiles*[T](c: var FlatTileContainer[T]): (Vec2i, var T) =
+  ## Iterates over all tiles in the container.
+  ## This iterator doesn't have any special optimizations, as there is no way in
+  ## which you can iterate over a fixed-size tilemap in a more efficient manner.
+
+  for y in 0..<c.size.y:
+    for x in 0..<c.size.x:
+      yield (vec2i(x, y), c.tiles[x + y * c.size.x])
+
+type
+  FlatTilemap*[T: TilemapTile] {.explain.} = Tilemap[T, FlatTileContainer[T]]
+
+{.pop.}
+
+
+# tile container: chunk-based (infinite size)
+
+type
+  Chunk*[T: TilemapTile, W, H: static int] = object
+    tiles*: array[W * H, T]
+
+  ChunkTileContainer*[T: TilemapTile, CW, CH: static int] = object
+    chunks*: Table[Vec2i, Chunk[T, CW, CH]]
+    size: Vec2i
+    outOfBounds: T

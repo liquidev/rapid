@@ -12,6 +12,9 @@ type
   AabbCollider* = ref object of RootObj
     ## General interface for colliders.
 
+    offset*: Vec2f
+      ## Offset of the collider relative to the subject hitbox.
+
     resolveCollisionXImpl*: proc (collider: AabbCollider, subject: var Rectf,
                                   direction: XCheckDirection): bool
                                  {.nimcall.}
@@ -43,6 +46,19 @@ proc collidingWithWall*(physics: AabbPhysics, wall: AabbWall): bool =
   ## Returns whether the physics body collides with the given wall.
   physics.collidingWithWalls[wall]
 
+proc force*(physics: var AabbPhysics, force: Vec2f) =
+  ## Applies a force to the physics body.
+  physics.acceleration += force
+
+import rapid/graphics
+var gDebug*: seq[proc (graphics: Graphics)]
+var gDebugLines*: seq[(Vec2f, Vec2f)]
+template debug(loc: varargs[typed], body: untyped) {.dirty.} =
+  closureScope:
+    gDebug.add(proc (graphics: Graphics) =
+        body)
+template dline(a, b) = gDebugLines.add((a, b))
+
 proc update(p: var AabbPhysics) =
   ## Ticks physics: updates position/velocity/acceleration, and resolves
   ## collisions with all colliders.
@@ -71,12 +87,15 @@ proc update(p: var AabbPhysics) =
 
   if movingX:
     let directionX = cdLeft.succ(ord(p.velocity.x > 0))
-    for collider in p.collidesWith:
+    for i, collider in p.collidesWith:
+      var localHitbox = rectf(hitbox.position + collider.offset, hitbox.size)
+      dline(hitbox.position, localHitbox.position)
       let
         collides =
-          collider.resolveCollisionXImpl(collider, hitbox, directionX)
+          collider.resolveCollisionXImpl(collider, localHitbox, directionX)
         wall = wallLeft.succ(ord(directionX))
-      p.position.x = hitbox.x
+      localHitbox.position -= collider.offset
+      p.position.x = localHitbox.x
       if collides:
         p.velocity.x *= -p.elasticity
       p.collidingWithWalls[wall] = true
@@ -87,12 +106,14 @@ proc update(p: var AabbPhysics) =
 
   if movingY:
     let directionY = cdUp.succ(ord(p.velocity.y > 0))
-    for collider in p.collidesWith:
+    for i, collider in p.collidesWith:
+      var localHitbox = rectf(hitbox.position + collider.offset, hitbox.size)
       let
         collides =
-          collider.resolveCollisionYImpl(collider, hitbox, directionY)
+          collider.resolveCollisionYImpl(collider, localHitbox, directionY)
         wall = wallTop.succ(ord(directionY))
-      p.position.y = hitbox.y
+      localHitbox.position -= collider.offset
+      p.position.y = localHitbox.y
       if collides:
         p.velocity.y *= -p.elasticity
       p.collidingWithWalls[wall] = true

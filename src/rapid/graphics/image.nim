@@ -69,8 +69,8 @@ proc `[]`*(image: Image, rect: Recti): Image =
   ## Copies a subsection of the given image and returns it.
 
   assert rect.x >= 0 and rect.y >= 0, "rect coordinates must be inbounds"
-  assert rect.x + rect.width < image.width and
-         rect.y + rect.height < image.height,
+  assert rect.x + rect.width <= image.width and
+         rect.y + rect.height <= image.height,
          "rect must not extend beyond the image's size"
 
   result.width = rect.width
