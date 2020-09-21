@@ -1,6 +1,5 @@
 ## Tilemap with collision detection.
 
-import std/options
 import std/tables
 
 import glm/vec
@@ -8,10 +7,10 @@ import glm/vec
 import ../physics/aabb
 
 type
-  TilemapTile* = concept tile {.explain.}
+  TilemapTile* {.explain.} = concept tile
     tile.isSolid is bool
 
-  TileContainer* = concept c, var mc, type T {.explain.}
+  TileContainer* {.explain.} = concept c, var mc, type T
     T is TilemapTile
 
     mc.init(Vec2i)
@@ -25,7 +24,7 @@ type
       position is Vec2i
       tile is T
 
-  Tilemap*[T: TilemapTile, C: TileContainer] = ref object
+  Tilemap*[C: TileContainer] = ref object
     container*: C
     fGridSize: Vec2f
 
@@ -61,12 +60,12 @@ proc gridHeight*(tilemap: Tilemap): float32 =
 
 # tile getters/setters
 
-proc `[]`*[T, C](tilemap: Tilemap[T, C], position: Vec2i): T =
+proc `[]`*[C](tilemap: Tilemap[C], position: Vec2i): C.T =
   ## Retrieves a tile at the given position.
   ## Out of bounds behavior is container-specific.
   tilemap.container[position]
 
-proc `[]=`*[T, C](tilemap: Tilemap[T, C], position: Vec2i, tile: T) =
+proc `[]=`*[C](tilemap: Tilemap[C], position: Vec2i, tile: C.T) =
   ## Sets a tile at the given position.
   ## Out of bounds behavior is container-specific.
   tilemap.container[position] = tile
@@ -76,7 +75,7 @@ proc `[]=`*[T, C](tilemap: Tilemap[T, C], position: Vec2i, tile: T) =
 
 # iterators
 
-iterator tiles*[T, C](tilemap: Tilemap[T, C]): (Vec2i, var T) =
+iterator tiles*[C](tilemap: Tilemap[C]): (Vec2i, var C.T) =
   ## Yields all the tiles on the map.
   ## Depending on the tile container, this can be more efficient than
   ## iterating over the whole area of the map (eg. `ChunkTileContainer` will not
@@ -85,7 +84,7 @@ iterator tiles*[T, C](tilemap: Tilemap[T, C]): (Vec2i, var T) =
   for position, tile in tiles(tilemap.container):
     yield (position, tile)
 
-iterator area*[T, C](tilemap: Tilemap[T, C], area: Recti): (Vec2i, var T) =
+iterator area*[C](tilemap: Tilemap[C], area: Recti): (Vec2i, var C.T) =
   ## Yields all tiles that lie in the given area. Iteration order is
   ## top-to-bottom, left-to-right.
   ## Out of bounds behavior is container-specific.
@@ -98,15 +97,15 @@ iterator area*[T, C](tilemap: Tilemap[T, C], area: Recti): (Vec2i, var T) =
 
 # initializers
 
-proc newTilemap*[T, C](container: C, gridSize: Vec2f): Tilemap[T, C] =
+proc newTilemap*[C](container: C, gridSize: Vec2f): Tilemap[C] =
   ## Creates a tilemap from an existing container.
 
-  result = Tilemap[T, C](container: container, fGridSize: gridSize)
+  result = Tilemap(container: container, fGridSize: gridSize)
 
-proc newTilemap*[T, C](size: Vec2i, gridSize: Vec2f): Tilemap[T, C] =
+proc newTilemap*[C](size: Vec2i, gridSize: Vec2f): Tilemap[C] =
   ## Creates a tilemap from an empty container with the given size.
 
-  result = Tilemap[T, C](fGridSize: gridSize)
+  result = Tilemap(fGridSize: gridSize)
   result.container.init(size)
 
 
@@ -122,9 +121,8 @@ proc alignToGrid*(tilemap: Tilemap, rect: Rectf): Recti =
     bottom = floor(rect.bottom / tilemap.gridHeight).int32
   result = recti(left, top, right - left, bottom - top)
 
-proc resolveCollisionX*[T, C](subject: var Rectf, tilemap: Tilemap[T, C],
-                              direction: XCheckDirection,
-                              outOfBounds: T = default(T)): bool =
+proc resolveCollisionX*[C](subject: var Rectf, tilemap: Tilemap[C],
+                           direction: XCheckDirection): bool =
   ## Resolves collisions between the subject and the tilemap on the X axis.
   ## ``direction`` signifies the movement direction of the subject.
   ## ``outOfBounds`` is the tile used when the subject is out of bounds.
@@ -135,9 +133,8 @@ proc resolveCollisionX*[T, C](subject: var Rectf, tilemap: Tilemap[T, C],
       let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
       result = subject.resolveCollisionX(hitbox, direction) or result
 
-proc resolveCollisionY*[T, C](subject: var Rectf, tilemap: Tilemap[T, C],
-                              direction: YCheckDirection,
-                              outOfBounds: T = default(T)): bool =
+proc resolveCollisionY*[C](subject: var Rectf, tilemap: Tilemap[C],
+                           direction: YCheckDirection): bool =
   ## Resolves collisions between the subject and the tilemap on the Y axis.
   ## ``direction`` signifies the movement direction of the subject.
   ## ``outOfBounds`` is the tile used when the subject is out of bounds.
@@ -202,7 +199,8 @@ iterator tiles*[T](c: var FlatTileContainer[T]): (Vec2i, var T) =
       yield (vec2i(x, y), c.tiles[x + y * c.size.x])
 
 type
-  FlatTilemap*[T: TilemapTile] {.explain.} = Tilemap[T, FlatTileContainer[T]]
+  FlatTilemap*[T: TilemapTile] {.explain.} =
+    Tilemap[FlatTileContainer[T]]
 
 {.pop.}
 
