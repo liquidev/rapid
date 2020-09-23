@@ -64,7 +64,7 @@ proc isInbounds*(tilemap: RootTilemap, position: Vec2i): bool =
 type
   FlatTilemap*[T: TilemapTile] {.final.} = ref object of RootTilemap
     tiles: seq[T]
-    fOutOfBounds: T
+    outOfBounds: T
 
 
 proc newFlatTilemap*[T](size: Vec2i,
@@ -80,20 +80,20 @@ proc newFlatTilemap*[T](size: Vec2i,
 proc outOfBounds*[T](tilemap: FlatTilemap[T]): lent T =
   ## Returns the out of bounds tile for this tilemap.
   ## By default, this is ``default(T)``.
-  tilemap.fOutOfBounds
+  tilemap.outOfBounds
 
 proc `outOfBounds=`*[T](tilemap: FlatTilemap[T], newOutOfBoundsTile: sink T) =
   ## Sets the out of bounds tile for this tilemap.
-  tilemap.fOutOfBounds = newOutOfBoundsTile
+  tilemap.outOfBounds = newOutOfBoundsTile
 
 proc `[]`*[T](tilemap: FlatTilemap[T], position: Vec2i): var T =
   ## Returns the tile at the given position, or ``tilemap.outOfBounds`` if the
   ## position lies out of bounds.
 
   if tilemap.isInbounds(position):
-    tilemap.tiles[position.x + position.y * tilemap.width]
+    result = tilemap.tiles[position.x + position.y * tilemap.width]
   else:
-    tilemap.fOutOfBounds
+    result = tilemap.outOfBounds
 
 proc `[]=`*[T](tilemap: FlatTilemap[T], position: Vec2i, tile: sink T) =
   ## Sets the tile at the given position, or does nothing if the position is out
@@ -115,7 +115,7 @@ iterator tiles*[T](tilemap: FlatTilemap[T]): (Vec2i, var T) =
 
 proc `size=`*(tilemap: FlatTilemap, _: Vec2i)
   {.error: "the size of a FlatTilemap is managed by its implementation".} =
-  ## The size of the tilemap is managed by the implementation.
+  ## The size of a fixed tilemap is managed by the implementation.
   ## Attempting to set it is an error.
 
 
@@ -128,6 +128,16 @@ type
   ChunkTilemap*[T: TilemapTile,
                 CW, CH: static int] {.final.} = ref object of RootTilemap
     chunks: Table[Vec2i, Chunk]
+    outOfBounds: T
+
+{.push inline.}
+
+{.pop.}
+
+proc `size=`*(tilemap: ChunkTilemap, _: Vec2i)
+  {.error: "the size of a ChunkTilemap is managed by its implementation".} =
+  ## The size of a chunk tilemap is managed by its implementation.
+  ## Attempting to set it is an error.
 
 
 # abstract
@@ -202,3 +212,4 @@ when isMainModule:
     aux(x) {.explain.}
 
   FlatTilemap[Tile].mustImplementAnyTilemap
+  ChunkTilemap[Tile, 4, 4].mustImplementAnyTilemap
