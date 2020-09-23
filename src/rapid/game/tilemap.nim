@@ -10,81 +10,137 @@ type
   TilemapTile* {.explain.} = concept tile
     tile.isSolid is bool
 
-  TileContainer* {.explain.} = concept c, var mc, type T
-    T is TilemapTile
-
-    mc.init(Vec2i)
-
-    c.size is Vec2i
-
-    mc[Vec2i] is var T
-    mc[Vec2i] = T
-
-    for position, tile in tiles(mc):
-      position is Vec2i
-      tile is T
-
-  Tilemap*[C: TileContainer] = ref object
-    container*: C
-    fGridSize: Vec2f
+  RootTilemap* = ref object of RootObj
+    fSize: Vec2i
+    fTileSize: Vec2f
 
 
 # property getters
 
 {.push inline.}
 
-proc size*(tilemap: Tilemap): Vec2i =
+proc size*(tilemap: RootTilemap): Vec2i =
   ## Returns the size of the tilemap, as a vector.
-  tilemap.container.size
+  tilemap.fSize
 
-proc width*(tilemap: Tilemap): int32 =
+proc `size=`*(tilemap: RootTilemap, newSize: Vec2i) =
+  ## Returns the size of the tilemap, as a vector.
+  tilemap.fSize = newSize
+
+proc width*(tilemap: RootTilemap): int32 =
   ## Returns the width of the tilemap.
-  tilemap.container.size.x
+  tilemap.fSize.x
 
-proc height*(tilemap: Tilemap): int32 =
+proc height*(tilemap: RootTilemap): int32 =
   ## Returns the height of the tilemap.
-  tilemap.container.size.y
+  tilemap.fSize.y
 
-proc gridSize*(tilemap: Tilemap): Vec2f =
+proc tileSize*(tilemap: RootTilemap): Vec2f =
   ## Returns the size of the tilemap's grid, as a vector.
-  tilemap.fGridSize
+  tilemap.fTileSize
 
-proc gridWidth*(tilemap: Tilemap): float32 =
-  ## Returns the width of the tilemap.
-  tilemap.fGridSize.x
+proc `tileSize=`*(tilemap: RootTilemap): Vec2f =
+  ## Returns the size of the tilemap's grid, as a vector.
+  tilemap.fTileSize
 
-proc gridHeight*(tilemap: Tilemap): float32 =
-  ## Returns the height of the tilemap.
-  tilemap.fGridSize.y
+proc tileWidth*(tilemap: RootTilemap): float32 =
+  ## Returns the width of tiles on the tilemap.
+  tilemap.fTileSize.x
 
+proc tileHeight*(tilemap: RootTilemap): float32 =
+  ## Returns the height of tiles the tilemap.
+  tilemap.fTileSize.y
 
-# tile getters/setters
-
-proc `[]`*[C](tilemap: Tilemap[C], position: Vec2i): C.T =
-  ## Retrieves a tile at the given position.
-  ## Out of bounds behavior is container-specific.
-  tilemap.container[position]
-
-proc `[]=`*[C](tilemap: Tilemap[C], position: Vec2i, tile: C.T) =
-  ## Sets a tile at the given position.
-  ## Out of bounds behavior is container-specific.
-  tilemap.container[position] = tile
+proc isInbounds*(tilemap: RootTilemap, position: Vec2i): bool =
+  ## Returns whether the given coordinates lie inside of the tilemap's bounds.
+  position.x >= 0 and position.x < tilemap.width and
+  position.y >= 0 and position.y < tilemap.height
 
 {.pop.}
 
 
-# iterators
+# flat tilemap (fixed size)
 
-iterator tiles*[C](tilemap: Tilemap[C]): (Vec2i, var C.T) =
-  ## Yields all the tiles on the map.
-  ## Depending on the tile container, this can be more efficient than
-  ## iterating over the whole area of the map (eg. `ChunkTileContainer` will not
-  ## iterate over non-existent chunks).
+type
+  FlatTilemap*[T: TilemapTile] {.final.} = ref object of RootTilemap
+    tiles: seq[T]
+    fOutOfBounds: T
 
-  for position, tile in tiles(tilemap.container):
-    yield (position, tile)
 
-iterator area*[C](tilemap: Tilemap[C], area: Recti): (Vec2i, var C.T) =
+proc newFlatTilemap*[T](size: Vec2i,
+                        outOfBounds: T = default(T)): FlatTilemap[T] =
+  ## Creates a new flat tilemap.
+
+  new(result)
+  result.size = size
+  result.outOfBounds = outOfBounds
+
+{.push inline.}
+
+proc outOfBounds*[T](tilemap: FlatTilemap[T]): lent T =
+  ## Returns the out of bounds tile for this tilemap.
+  ## By default, this is ``default(T)``.
+  tilemap.fOutOfBounds
+
+proc `outOfBounds=`*[T](tilemap: FlatTilemap[T], newOutOfBoundsTile: sink T) =
+  ## Sets the out of bounds tile for this tilemap.
+  tilemap.fOutOfBounds = newOutOfBoundsTile
+
+proc `[]`*[T](tilemap: FlatTilemap[T], position: Vec2i): var T =
+  ## Returns the tile at the given position, or ``tilemap.outOfBounds`` if the
+  ## position lies out of bounds.
+
+  if tilemap.isInbounds(position):
+    tilemap.tiles[position.x + position.y * tilemap.width]
+  else:
+    tilemap.fOutOfBounds
+
+proc `[]=`*[T](tilemap: FlatTilemap[T], position: Vec2i, tile: sink T) =
+  ## Sets the tile at the given position, or does nothing if the position is out
+  ## of bounds.
+
+  if tilemap.isInbounds(position):
+    tilemap.tiles[position.x + position.y * tilemap.width] = tile
+
+{.pop.}
+
+iterator tiles*[T](tilemap: FlatTilemap[T]): (Vec2i, var T) =
+  ## Yields all of the tilemap's tiles, in top-to-bottom, left-to-right order.
+  ## This can be used for serialization.
+
+  for y in 0..<tilemap.height:
+    for x in 0..<tilemap.width:
+      let position = vec2i(x, y)
+      yield (position, tilemap[position])
+
+proc `size=`*(tilemap: FlatTilemap, _: Vec2i)
+  {.error: "the size of a FlatTilemap is managed by its implementation".} =
+  ## The size of the tilemap is managed by the implementation.
+  ## Attempting to set it is an error.
+
+
+# chunk tilemap (infinite size)
+
+type
+  Chunk*[T: TilemapTile, W, H: static int] = object
+    tiles: array[W * H, T]
+
+  ChunkTilemap*[T: TilemapTile,
+                CW, CH: static int] {.final.} = ref object of RootTilemap
+    chunks: Table[Vec2i, Chunk]
+
+
+# abstract
+
+type
+  AnyTilemap*[T] = concept m
+    m[Vec2i] is var T
+    m[Vec2i] = T
+    for position, tile in tiles(m):
+      position is Vec2i
+      tile is var T
+
+iterator area*[T](tilemap: AnyTilemap, area: Recti): (Vec2i, var T) =
   ## Yields all tiles that lie in the given area. Iteration order is
   ## top-to-bottom, left-to-right.
   ## Out of bounds behavior is container-specific.
@@ -95,33 +151,19 @@ iterator area*[C](tilemap: Tilemap[C], area: Recti): (Vec2i, var C.T) =
       yield (position, tilemap.container[position])
 
 
-# initializers
-
-proc newTilemap*[C](container: C, gridSize: Vec2f): Tilemap[C] =
-  ## Creates a tilemap from an existing container.
-
-  result = Tilemap(container: container, fGridSize: gridSize)
-
-proc newTilemap*[C](size: Vec2i, gridSize: Vec2f): Tilemap[C] =
-  ## Creates a tilemap from an empty container with the given size.
-
-  result = Tilemap(fGridSize: gridSize)
-  result.container.init(size)
-
-
 # physics
 
-proc alignToGrid*(tilemap: Tilemap, rect: Rectf): Recti =
+proc alignToGrid*(tilemap: RootTilemap, rect: Rectf): Recti =
   ## Returns grid coordinates of the given rectangle.
 
   let
-    left = floor(rect.left / tilemap.gridWidth).int32
-    top = floor(rect.top / tilemap.gridHeight).int32
-    right = floor(rect.right / tilemap.gridWidth).int32
-    bottom = floor(rect.bottom / tilemap.gridHeight).int32
+    left = floor(rect.left / tilemap.tileWidth).int32
+    top = floor(rect.top / tilemap.tileHeight).int32
+    right = floor(rect.right / tilemap.tileWidth).int32
+    bottom = floor(rect.bottom / tilemap.tileHeight).int32
   result = recti(left, top, right - left, bottom - top)
 
-proc resolveCollisionX*[C](subject: var Rectf, tilemap: Tilemap[C],
+proc resolveCollisionX*[C](subject: var Rectf, tilemap: AnyTilemap,
                            direction: XCheckDirection): bool =
   ## Resolves collisions between the subject and the tilemap on the X axis.
   ## ``direction`` signifies the movement direction of the subject.
@@ -130,10 +172,10 @@ proc resolveCollisionX*[C](subject: var Rectf, tilemap: Tilemap[C],
   let tiles = tilemap.alignToGrid(subject)
   for position, tile in area(tilemap, tiles):
     if tile.isSolid:
-      let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
+      let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
       result = subject.resolveCollisionX(hitbox, direction) or result
 
-proc resolveCollisionY*[C](subject: var Rectf, tilemap: Tilemap[C],
+proc resolveCollisionY*[C](subject: var Rectf, tilemap: AnyTilemap,
                            direction: YCheckDirection): bool =
   ## Resolves collisions between the subject and the tilemap on the Y axis.
   ## ``direction`` signifies the movement direction of the subject.
@@ -142,76 +184,21 @@ proc resolveCollisionY*[C](subject: var Rectf, tilemap: Tilemap[C],
   let tiles = tilemap.alignToGrid(subject)
   for position, tile in area(tilemap, tiles):
     if tile.isSolid:
-      let hitbox = rectf(position.vec2f * tilemap.gridSize, tilemap.gridSize)
+      let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
       result = subject.resolveCollisionY(hitbox, direction) or result
 
 
-# tile container: flat (finite size)
+# testing
 
-type
-  FlatTileContainer*[T: TilemapTile] = object
-    tiles*: seq[T]
-    size: Vec2i
-    outOfBounds: T
+when isMainModule:
+  type
+    Tile = distinct int
 
-{.push inline.}
+  proc isSolid(tile: Tile): bool = int(tile) != 0
 
-proc size*[T](c: FlatTileContainer[T]): Vec2i =
-  ## Returns the size of the container.
-  c.size
+  proc mustImplementAnyTilemap(T: type) =
+    proc aux(m: AnyTilemap) = discard
+    var x: T
+    aux(x) {.explain.}
 
-proc outOfBounds*[T](c: FlatTileContainer[T]): T =
-  ## Returns the out of bounds tile for the container.
-  c.outOfBounds
-
-proc `outOfBounds=`*[T](c: var FlatTileContainer[T], tile: T) =
-  ## Sets the out of bounds tile for the container.
-  c.outOfBounds = tile
-
-proc isInbounds*(c: FlatTileContainer, position: Vec2i): bool =
-  ## Returns whether the given position lies inside the container's bounds.
-
-  position.x >= 0 and position.x < c.size.x and
-  position.y >= 0 and position.y < c.size.y
-
-proc `[]`*[T](c: var FlatTileContainer[T], position: Vec2i): var T =
-  ## Returns the tile at the given position, or ``c.outOfBounds`` if the
-  ## position lies out of bounds.
-
-  if c.isInbounds(position):
-    c.tiles[position.x + position.y * c.size.x]
-  else:
-    c.outOfBounds
-
-proc `[]=`*[T](c: var FlatTileContainer[T], position: Vec2i, tile: sink T) =
-  ## Sets the tile at the given position, if the position lies inbounds.
-
-  if c.isInbounds(position):
-    c.tiles[position.x + position.y * c.size.x] = tile
-
-iterator tiles*[T](c: var FlatTileContainer[T]): (Vec2i, var T) =
-  ## Iterates over all tiles in the container.
-  ## This iterator doesn't have any special optimizations, as there is no way in
-  ## which you can iterate over a fixed-size tilemap in a more efficient manner.
-
-  for y in 0..<c.size.y:
-    for x in 0..<c.size.x:
-      yield (vec2i(x, y), c.tiles[x + y * c.size.x])
-
-type
-  FlatTilemap*[T: TilemapTile] {.explain.} =
-    Tilemap[FlatTileContainer[T]]
-
-{.pop.}
-
-
-# tile container: chunk-based (infinite size)
-
-type
-  Chunk*[T: TilemapTile, W, H: static int] = object
-    tiles*: array[W * H, T]
-
-  ChunkTileContainer*[T: TilemapTile, CW, CH: static int] = object
-    chunks*: Table[Vec2i, Chunk[T, CW, CH]]
-    size: Vec2i
-    outOfBounds: T
+  FlatTilemap[Tile].mustImplementAnyTilemap
