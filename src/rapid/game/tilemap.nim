@@ -1,14 +1,17 @@
 ## Tilemap with collision detection.
 
+import std/options
 import std/tables
 
 import glm/vec
 
+import ../math/util
 import ../physics/aabb
 
 type
-  TilemapTile* {.explain.} = concept tile
-    tile.isSolid is bool
+  TilemapTile* {.explain.} = concept a
+    a == a is bool
+    a.isSolid is bool
 
   RootTilemap* = ref object of RootObj
     fSize: Vec2i
@@ -65,6 +68,8 @@ type
   FlatTilemap*[T: TilemapTile] {.final.} = ref object of RootTilemap
     tiles: seq[T]
     outOfBounds: T
+    mutableOutOfBounds: T  # safety first! don't modify the main outOfBounds
+                           # when returning a var reference to a tile
 
 
 proc newFlatTilemap*[T](size: Vec2i,
@@ -74,6 +79,7 @@ proc newFlatTilemap*[T](size: Vec2i,
   new(result)
   result.size = size
   result.outOfBounds = outOfBounds
+  result.mutableOutOfBounds = outOfBounds
 
 {.push inline.}
 
@@ -85,6 +91,7 @@ proc outOfBounds*[T](tilemap: FlatTilemap[T]): lent T =
 proc `outOfBounds=`*[T](tilemap: FlatTilemap[T], newOutOfBoundsTile: sink T) =
   ## Sets the out of bounds tile for this tilemap.
   tilemap.outOfBounds = newOutOfBoundsTile
+  tilemap.mutableOutOfBounds = newOutOfBoundsTile
 
 proc `[]`*[T](tilemap: FlatTilemap[T], position: Vec2i): var T =
   ## Returns the tile at the given position, or ``tilemap.outOfBounds`` if the
@@ -93,7 +100,8 @@ proc `[]`*[T](tilemap: FlatTilemap[T], position: Vec2i): var T =
   if tilemap.isInbounds(position):
     result = tilemap.tiles[position.x + position.y * tilemap.width]
   else:
-    result = tilemap.outOfBounds
+    result = tilemap.mutableOutOfBounds
+    tilemap.mutableOutOfBounds = tilemap.outOfBounds
 
 proc `[]=`*[T](tilemap: FlatTilemap[T], position: Vec2i, tile: sink T) =
   ## Sets the tile at the given position, or does nothing if the position is out
@@ -122,17 +130,137 @@ proc `size=`*(tilemap: FlatTilemap, _: Vec2i)
 # chunk tilemap (infinite size)
 
 type
-  Chunk*[T: TilemapTile, W, H: static int] = object
+  Chunk*[T: TilemapTile, W, H: static int] {.byref.} = object
     tiles: array[W * H, T]
+    filledTiles: uint32
 
   ChunkTilemap*[T: TilemapTile,
                 CW, CH: static int] {.final.} = ref object of RootTilemap
-    chunks: Table[Vec2i, Chunk]
+    chunks: Table[Vec2i, Chunk[T, CW, CH]]
     outOfBounds: T
+    mutableOutOfBounds: T  # again, safety first!
 
 {.push inline.}
 
+proc chunkPosition*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
+                                           position: Vec2i): Vec2i =
+  ## Returns the coordinates of the chunk which contains the given
+  ## global position.
+  position div vec2i(CW.int32, CH.int32)
+
+proc positionInChunk*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
+                                             position: Vec2i): Vec2i =
+  ## Wraps the given global position to chunk coordinates.
+  position mod vec2i(CW.int32, CH.int32)
+
+proc hasChunk*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
+                                      position: Vec2i): bool =
+  ## Returns whether the tilemap contains the given chunk.
+  position in tilemap.chunks
+
+proc chunk*[T; CW, CH: static int](
+  tilemap: ChunkTilemap[T, CW, CH],
+  position: Vec2i): Option[lent Chunk[T, CW, CH]] =
+  ## Returns an immutable reference to a chunk at the given position.
+
+  if tilemap.hasChunk(position):
+    result = some tilemap.chunks[position]
+
+proc `[]`*[T; CW, CH: static int](chunk: Chunk, position: Vec2i): lent T =
+  ## Returns an immutable reference to the given tile in the given chunk.
+  ##
+  ## **Warning:** The position is not out of bounds-checked for performance
+  ## reasons. The global coordinate [] should be preferred over this anyways.
+
+  chunk.tiles[position.x + position.y * CW]
+
+proc `[]`*[T; CW, CH: static int](chunk: var Chunk[T, CW, CH],
+                                  position: Vec2i): var T =
+  ## Returns a mutable reference to the given tile in the given chunk.
+  ##
+  ## **Warning:** The position is not out of bounds-checked for performance
+  ## reasons. The global coordinate [] should be preferred over this anyways.
+
+  chunk.tiles[position.x + position.y * CW]
+
+proc `[]=`*[T; CW, CH: static int](chunk: var Chunk[T, CW, CH], position: Vec2i,
+                                   tile: sink T)=
+  ## Sets the tile at the given position in the given chunk.
+  ##
+  ## **Warning:** The position is not out of bounds-checked for performance
+  ## reasons. The global coordinate [] should be preferred over this anyways.
+
+  chunk.tiles[position.x + position.y * CW] = tile
+
+proc `[]`*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
+                                  position: Vec2i): var T =
+  ## Returns a mutable reference to the tile at the given position.
+
+  let chunkPosition = tilemap.chunkPosition(position)
+  if tilemap.hasChunk(chunkPosition):
+    result = tilemap.chunks[chunkPosition][tilemap.positionInChunk(position)]
+  else:
+    result = tilemap.mutableOutOfBounds
+    tilemap.mutableOutOfBounds = tilemap.outOfBounds
+
 {.pop.}
+
+proc `[]=`*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
+                                   position: Vec2i, tile: sink T) =
+  ## Sets the tile at the given position.
+
+  # this is quite big so let's not inline it
+
+  let chunkPosition = tilemap.chunkPosition(position)
+
+  var chunk: ptr Chunk[T, CW, CH]
+  if not tilemap.hasChunk(chunkPosition):
+    var c = Chunk[T, CW, CH]()
+    for tile in mitems(c.tiles):
+      tile = tilemap.outOfBounds
+  else:
+    chunk = addr tilemap.chunks[chunkPosition]
+
+  let
+    positionInChunk = tilemap.positionInChunk(position)
+    diff =  # branchless programming™
+      # only diff if the tile changed
+      int(chunk[][positionInChunk] != tile) *
+      # diff -1 if the tile was OOB or 1 if it was IB
+      (2 * int(tile != tilemap.outOfBounds) - 1)
+  chunk.filledTiles.inc diff
+  if chunk.filledTiles == 0:
+    # delete empty chunks
+    tilemap.chunks.del(chunkPosition)
+  chunk[][positionInChunk] = tile
+
+iterator tiles*[T, CW, CH](chunk: Chunk[T, CW, CH]): (Vec2i, lent T) =
+  ## Iterates through the chunk's tiles and yields immutable references to them.
+  ## Iteration order is top-to-bottom, left-to-right.
+
+  for y in 0..<CH:
+    for x in 0..<CW:
+      yield (vec2i(x.int32, y.int32), chunk.tiles[x + y * CW])
+
+iterator tiles*[T, CW, CH](chunk: var Chunk[T, CW, CH]): (Vec2i, var T) =
+  ## Iterates through the chunk's tiles and yields mutable references to them.
+  ## Iteration order is top-to-bottom, left-to-right.
+
+  for y in 0..<CH:
+    for x in 0..<CW:
+      yield (vec2i(x.int32, y.int32), chunk.tiles[x + y * CW])
+
+iterator tiles*[T, CW, CH](tilemap: ChunkTilemap[T, CW, CH]): (Vec2i, var T) =
+  ## Iterates through all of the tilemap's chunks and yields their positions and
+  ## mutable tile references.
+  ## Chunk iteration order is undefined. Tile iteration order is top-to-bottom,
+  ## left-to-right per chunk.
+
+  for chunkPosition, chunk in tilemap.chunks:
+    let chunkOrigin = chunkPosition * vec2i(CW, CH)
+    for offset, tile in tiles(chunk):
+      let position = chunkOrigin + offset
+      yield (position, tile)
 
 proc `size=`*(tilemap: ChunkTilemap, _: Vec2i)
   {.error: "the size of a ChunkTilemap is managed by its implementation".} =
@@ -143,7 +271,7 @@ proc `size=`*(tilemap: ChunkTilemap, _: Vec2i)
 # abstract
 
 type
-  AnyTilemap*[T] = concept m
+  AnyTilemap*[T] {.explain.} = concept m
     m[Vec2i] is var T
     m[Vec2i] = T
     for position, tile in tiles(m):
@@ -204,6 +332,7 @@ when isMainModule:
   type
     Tile = distinct int
 
+  proc `==`(a, b: Tile): bool {.borrow.}
   proc isSolid(tile: Tile): bool = int(tile) != 0
 
   proc mustImplementAnyTilemap(T: type) =
@@ -211,5 +340,5 @@ when isMainModule:
     var x: T
     aux(x) {.explain.}
 
-  FlatTilemap[Tile].mustImplementAnyTilemap
-  ChunkTilemap[Tile, 4, 4].mustImplementAnyTilemap
+  FlatTilemap[Tile].mustImplementAnyTilemap {.explain.}
+  ChunkTilemap[Tile, 4, 4].mustImplementAnyTilemap {.explain.}

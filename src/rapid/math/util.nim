@@ -1,6 +1,9 @@
 ## Various assorted math utilities that don't fit into any other module.
 
 import std/math
+import std/hashes
+
+import glm/vec
 
 # ↓ I'd use slices here, but type conversions in Nim are rather funky when
 #   dealing with generic types, which leads to verbose code containing lots of
@@ -17,3 +20,9 @@ func closeTo*[T: SomeFloat](value, epsilon: T): bool {.inline.} =
 func quantize*[T: SomeFloat](value, step: T): T {.inline.} =
   ## Quantizes ``value`` to ``step``.
   step * floor(value / step + 0.5)
+
+proc hash*[N, T](u: Vec[N, T]): Hash =
+  var h: Hash
+  for i, v in u.arr:
+    h = h !& v
+  !$h
