@@ -77,10 +77,15 @@ proc newFlatTilemap*[T](size: Vec2i, tileSize: Vec2f,
   ## Creates a new flat tilemap.
 
   new(result)
+
   result.fSize = size
   result.tileSize = tileSize
   result.outOfBounds = outOfBounds
   result.mutableOutOfBounds = outOfBounds
+
+  result.tiles.setLen(size.x * size.y)
+  for tile in mitems(result.tiles):
+    tile = outOfBounds
 
 {.push inline.}
 
