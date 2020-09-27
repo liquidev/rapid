@@ -281,12 +281,12 @@ proc `size=`*(tilemap: ChunkTilemap, _: Vec2i)
 # abstract
 
 type
-  AnyTilemap*[T] {.explain.} = concept m
-    # m[Vec2i] is var T
-    # m[Vec2i] = T
-    # for position, tile in tiles(m):
-    #   position is Vec2i
-    #   tile is var T
+  AnyTilemap*[T] = concept m
+    m[Vec2i] is var T
+    m[Vec2i] = T
+    for position, tile in tiles(m):
+      position is Vec2i
+      tile is var T
 
 iterator area*[T](tilemap: AnyTilemap[T], area: Recti): (Vec2i, var T) =
   ## Yields all tiles that lie in the given area. Iteration order is
