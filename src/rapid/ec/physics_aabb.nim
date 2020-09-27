@@ -9,19 +9,24 @@ import ../physics/aabb
 {.experimental: "implicitDeref".}
 
 type
-  AabbCollider* = ref object of RootObj
+  RootAabbCollider* = ref object of RootObj
     ## General interface for colliders.
 
-    offset*: Vec2f
-      ## Offset of the collider relative to the subject hitbox.
-
-    resolveCollisionXImpl*: proc (collider: AabbCollider, subject: var Rectf,
+    resolveCollisionXImpl*: proc (collider: RootAabbCollider,
+                                  subject: var Rectf,
                                   direction: XCheckDirection): bool
                                  {.nimcall.}
-    resolveCollisionYImpl*: proc (collider: AabbCollider, subject: var Rectf,
+    resolveCollisionYImpl*: proc (collider: RootAabbCollider,
+                                  subject: var Rectf,
                                   direction: YCheckDirection): bool
                                  {.nimcall.}
       ## Implementations for collision detection on the X/Y axes.
+
+  AabbCollider*[T] = ref object of RootAabbCollider
+    ## Generic implementation for all collidable objects.
+    ## You should prefer this over implementing ``RootAabbCollider`` directly.
+
+    obj: T
 
   AabbWall* = enum
     wallLeft
@@ -35,8 +40,13 @@ type
     elasticity*: float32                       ## how much velocity is
                                                ## lost or gained on collision
                                                ## with walls
-    collidesWith: seq[AabbCollider]
+    collidesWith: seq[RootAabbCollider]
     collidingWithWalls: array[AabbWall, bool]
+
+  AabbCollidable* = concept o
+    ## Concept for matching objects that can be stored in an AabbCollider.
+    resolveCollisionX(var Rectf, o, XCheckDirection) is bool
+    resolveCollisionY(var Rectf, o, YCheckDirection) is bool
 
 proc hitbox*(physics: AabbPhysics): Rectf =
   ## Returns the physics body's hitbox.
@@ -49,15 +59,6 @@ proc collidingWithWall*(physics: AabbPhysics, wall: AabbWall): bool =
 proc force*(physics: var AabbPhysics, force: Vec2f) =
   ## Applies a force to the physics body.
   physics.acceleration += force
-
-import rapid/graphics
-var gDebug*: seq[proc (graphics: Graphics)]
-var gDebugLines*: seq[(Vec2f, Vec2f)]
-template debug(loc: varargs[typed], body: untyped) {.dirty.} =
-  closureScope:
-    gDebug.add(proc (graphics: Graphics) =
-        body)
-template dline(a, b) = gDebugLines.add((a, b))
 
 proc update(p: var AabbPhysics) =
   ## Ticks physics: updates position/velocity/acceleration, and resolves
@@ -88,14 +89,11 @@ proc update(p: var AabbPhysics) =
   if movingX:
     let directionX = cdLeft.succ(ord(p.velocity.x > 0))
     for i, collider in p.collidesWith:
-      var localHitbox = rectf(hitbox.position + collider.offset, hitbox.size)
-      dline(hitbox.position, localHitbox.position)
       let
         collides =
-          collider.resolveCollisionXImpl(collider, localHitbox, directionX)
+          collider.resolveCollisionXImpl(collider, hitbox, directionX)
         wall = wallLeft.succ(ord(directionX))
-      localHitbox.position -= collider.offset
-      p.position.x = localHitbox.x
+      p.position.x = hitbox.x
       if collides:
         p.velocity.x *= -p.elasticity
       p.collidingWithWalls[wall] = true
@@ -107,18 +105,16 @@ proc update(p: var AabbPhysics) =
   if movingY:
     let directionY = cdUp.succ(ord(p.velocity.y > 0))
     for i, collider in p.collidesWith:
-      var localHitbox = rectf(hitbox.position + collider.offset, hitbox.size)
       let
         collides =
-          collider.resolveCollisionYImpl(collider, localHitbox, directionY)
+          collider.resolveCollisionYImpl(collider, hitbox, directionY)
         wall = wallTop.succ(ord(directionY))
-      localHitbox.position -= collider.offset
-      p.position.y = localHitbox.y
+      p.position.y = hitbox.y
       if collides:
         p.velocity.y *= -p.elasticity
       p.collidingWithWalls[wall] = true
 
-proc aabbPhysics*(position, size: Vec2f, colliders: varargs[AabbCollider],
+proc aabbPhysics*(position, size: Vec2f, colliders: varargs[RootAabbCollider],
                   velocity, acceleration = vec2f(0),
                   elasticity: float32 = 0): AabbPhysics =
   ## Constructs a new AabbPhysics component.
@@ -129,3 +125,24 @@ proc aabbPhysics*(position, size: Vec2f, colliders: varargs[AabbCollider],
                        size: size,
                        collidesWith: @colliders)
   result.autoImplement()
+
+proc collider*[T: AabbCollidable](obj: T): AabbCollider[T] =
+  ## Creates a collider for the given AABB-collidable physics object.
+
+  new(result)
+
+  result.obj = obj
+
+  result.resolveCollisionXImpl = proc (collider: RootAabbCollider,
+                                       subject: var Rectf,
+                                       direction: XCheckDirection): bool =
+    mixin resolveCollisionX
+    result = resolveCollisionX(subject, AabbCollider[T](collider).obj,
+                               direction)
+
+  result.resolveCollisionYImpl = proc (collider: RootAabbCollider,
+                                       subject: var Rectf,
+                                       direction: YCheckDirection): bool =
+    mixin resolveCollisionY
+    result = resolveCollisionY(subject, AabbCollider[T](collider).obj,
+                               direction)

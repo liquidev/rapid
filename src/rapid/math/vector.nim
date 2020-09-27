@@ -90,7 +90,7 @@ func bisector*[T](anchor, a, b: Vec2[T]): Vec2[T] {.inline.} =
 
 func hash*[N, T](vec: Vec[N, T]): Hash =
   ## Returns the hash of the vector.
-  result = Hash(0)
-  for component in vec.arr:
-    result = result !& hash(component)
-  result = !$result
+  var h: Hash
+  for x in vec.arr:
+    h = h !& hash(x)
+  !$h

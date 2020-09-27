@@ -20,9 +20,3 @@ func closeTo*[T: SomeFloat](value, epsilon: T): bool {.inline.} =
 func quantize*[T: SomeFloat](value, step: T): T {.inline.} =
   ## Quantizes ``value`` to ``step``.
   step * floor(value / step + 0.5)
-
-proc hash*[N, T](u: Vec[N, T]): Hash =
-  var h: Hash
-  for i, v in u.arr:
-    h = h !& v
-  !$h

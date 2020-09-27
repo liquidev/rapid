@@ -4,11 +4,10 @@ import rapid/ec
 import rapid/ec/physics_aabb
 import rapid/game
 import rapid/game/tilemap
-import rapid/game/tilemap_collider
 import rapid/graphics
 import rapid/physics/aabb
 
-{.experimental: "implicitDeref".}  # why is this still experimental?
+{.experimental: "implicitDeref".}
 
 type
   Tile = enum
@@ -18,7 +17,7 @@ type
 proc isSolid(tile: Tile): bool = tile != tileAir
 
 type
-  Tiles = Tilemap[Tile]
+  Tiles = FlatTilemap[Tile]
 
   PlayerController = object of RootComponent
     window: Window  # for input
@@ -72,8 +71,8 @@ proc draw(world: var World, target: Target, graphics: Graphics, step: float32) =
 
   for position, tile in world.tilemap.tiles:
     if tile == tileAir: continue
-    graphics.rectangle(position.vec2f * world.tilemap.gridSize,
-                       world.tilemap.gridSize,
+    graphics.rectangle(position.vec2f * world.tilemap.tileSize,
+                       world.tilemap.tileSize,
                        color = colGray)
 
   world.entities.shape(graphics, step)
@@ -86,7 +85,7 @@ proc main() =
   agl.initWindow()
 
   var
-    window = agl.newWindowGlfw(vec2i(800, 600), "game",
+    window = agl.newWindowGlfw(800, 600, "game",
                                winHints(resizable = false))
     graphics = window.newGraphics()
 
@@ -94,8 +93,7 @@ proc main() =
     world = World(tilemap: Tiles())
     player = Player()
 
-  world.tilemap.init(window.size div vec2i(32),
-                     vec2f(32, 32))
+  world.tilemap = newFlatTilemap[Tile](window.size div vec2i(32), vec2f(32, 32))
   for x in 1..5:
     world.tilemap[vec2i(x.int32, 3)] = tileBlock
   for y in 3..3+5:

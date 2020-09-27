@@ -5,7 +5,7 @@ import std/tables
 
 import glm/vec
 
-import ../math/util
+import ../math/vector
 import ../physics/aabb
 
 type
@@ -13,7 +13,7 @@ type
     a == a is bool
     a.isSolid is bool
 
-  RootTilemap* = ref object of RootObj
+  RootTilemap*[T: TilemapTile] = ref object of RootObj
     fSize: Vec2i
     fTileSize: Vec2f
 
@@ -42,9 +42,9 @@ proc tileSize*(tilemap: RootTilemap): Vec2f =
   ## Returns the size of the tilemap's grid, as a vector.
   tilemap.fTileSize
 
-proc `tileSize=`*(tilemap: RootTilemap): Vec2f =
+proc `tileSize=`*(tilemap: RootTilemap, newTileSize: Vec2f) =
   ## Returns the size of the tilemap's grid, as a vector.
-  tilemap.fTileSize
+  tilemap.fTileSize = newTileSize
 
 proc tileWidth*(tilemap: RootTilemap): float32 =
   ## Returns the width of tiles on the tilemap.
@@ -65,19 +65,20 @@ proc isInbounds*(tilemap: RootTilemap, position: Vec2i): bool =
 # flat tilemap (fixed size)
 
 type
-  FlatTilemap*[T: TilemapTile] {.final.} = ref object of RootTilemap
+  FlatTilemap*[T: TilemapTile] {.final.} = ref object of RootTilemap[T]
     tiles: seq[T]
     outOfBounds: T
     mutableOutOfBounds: T  # safety first! don't modify the main outOfBounds
                            # when returning a var reference to a tile
 
 
-proc newFlatTilemap*[T](size: Vec2i,
+proc newFlatTilemap*[T](size: Vec2i, tileSize: Vec2f,
                         outOfBounds: T = default(T)): FlatTilemap[T] =
   ## Creates a new flat tilemap.
 
   new(result)
-  result.size = size
+  result.fSize = size
+  result.tileSize = tileSize
   result.outOfBounds = outOfBounds
   result.mutableOutOfBounds = outOfBounds
 
@@ -135,10 +136,19 @@ type
     filledTiles: uint32
 
   ChunkTilemap*[T: TilemapTile,
-                CW, CH: static int] {.final.} = ref object of RootTilemap
+                CW, CH: static int] {.final.} = ref object of RootTilemap[T]
     chunks: Table[Vec2i, Chunk[T, CW, CH]]
     outOfBounds: T
     mutableOutOfBounds: T  # again, safety first!
+
+proc newChunkTilemap*[T; CW, CH: static int](
+  tileSize: Vec2f, outOfBounds: T = default(T)): ChunkTilemap[T, CW, CH] =
+  ## Creates a new chunk tilemap.
+
+  new(result)
+  result.tileSize = tileSize
+  result.outOfBounds = outOfBounds
+  result.mutableOutOfBounds = outOfBounds
 
 {.push inline.}
 
@@ -272,13 +282,13 @@ proc `size=`*(tilemap: ChunkTilemap, _: Vec2i)
 
 type
   AnyTilemap*[T] {.explain.} = concept m
-    m[Vec2i] is var T
-    m[Vec2i] = T
-    for position, tile in tiles(m):
-      position is Vec2i
-      tile is var T
+    # m[Vec2i] is var T
+    # m[Vec2i] = T
+    # for position, tile in tiles(m):
+    #   position is Vec2i
+    #   tile is var T
 
-iterator area*[T](tilemap: AnyTilemap, area: Recti): (Vec2i, var T) =
+iterator area*[T](tilemap: AnyTilemap[T], area: Recti): (Vec2i, var T) =
   ## Yields all tiles that lie in the given area. Iteration order is
   ## top-to-bottom, left-to-right.
   ## Out of bounds behavior is container-specific.
@@ -286,7 +296,7 @@ iterator area*[T](tilemap: AnyTilemap, area: Recti): (Vec2i, var T) =
   for y in area.top..area.bottom:
     for x in area.left..area.right:
       let position = vec2i(x, y)
-      yield (position, tilemap.container[position])
+      yield (position, tilemap[position])
 
 
 # physics
@@ -301,7 +311,7 @@ proc alignToGrid*(tilemap: RootTilemap, rect: Rectf): Recti =
     bottom = floor(rect.bottom / tilemap.tileHeight).int32
   result = recti(left, top, right - left, bottom - top)
 
-proc resolveCollisionX*[C](subject: var Rectf, tilemap: AnyTilemap,
+proc resolveCollisionX*[T](subject: var Rectf, tilemap: AnyTilemap[T],
                            direction: XCheckDirection): bool =
   ## Resolves collisions between the subject and the tilemap on the X axis.
   ## ``direction`` signifies the movement direction of the subject.
@@ -313,7 +323,7 @@ proc resolveCollisionX*[C](subject: var Rectf, tilemap: AnyTilemap,
       let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
       result = subject.resolveCollisionX(hitbox, direction) or result
 
-proc resolveCollisionY*[C](subject: var Rectf, tilemap: AnyTilemap,
+proc resolveCollisionY*[T](subject: var Rectf, tilemap: AnyTilemap[T],
                            direction: YCheckDirection): bool =
   ## Resolves collisions between the subject and the tilemap on the Y axis.
   ## ``direction`` signifies the movement direction of the subject.
@@ -342,3 +352,7 @@ when isMainModule:
 
   FlatTilemap[Tile].mustImplementAnyTilemap {.explain.}
   ChunkTilemap[Tile, 4, 4].mustImplementAnyTilemap {.explain.}
+
+  type
+    MyTilemap = ChunkTilemap[Tile, 16, 16]
+  MyTilemap.mustImplementAnyTilemap
