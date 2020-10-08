@@ -322,7 +322,7 @@ proc loadFont*(graphics: Graphics, filename: string,
   graphics.newFont(readFile(filename), height, width,
                    lineSpacing, tabWidth, hinting, atlasSize)
 
-const FreeTypeLicense* = slurp("../wrappers/extern/freetype/FTL.TXT")
+const FreeTypeLicense* = slurp("../wrappers/extern/freetype/docs/FTL.TXT")
   ## The FreeType license. rapid uses this library for rendering glyphs, and
   ## you're legally required to credit FreeType somewhere in your application's
   ## credits if you're using rapid/graphics to draw text.
