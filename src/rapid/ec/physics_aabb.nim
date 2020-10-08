@@ -14,11 +14,13 @@ type
 
     resolveCollisionXImpl*: proc (collider: RootAabbCollider,
                                   subject: var Rectf,
-                                  direction: XCheckDirection): bool
+                                  direction: XCheckDirection,
+                                  speed: float32): bool
                                  {.nimcall.}
     resolveCollisionYImpl*: proc (collider: RootAabbCollider,
                                   subject: var Rectf,
-                                  direction: YCheckDirection): bool
+                                  direction: YCheckDirection,
+                                  speed: float32): bool
                                  {.nimcall.}
       ## Implementations for collision detection on the X/Y axes.
 
@@ -45,8 +47,8 @@ type
 
   AabbCollidable* = concept o
     ## Concept for matching objects that can be stored in an AabbCollider.
-    resolveCollisionX(var Rectf, o, XCheckDirection) is bool
-    resolveCollisionY(var Rectf, o, YCheckDirection) is bool
+    resolveCollisionX(var Rectf, o, XCheckDirection, float32) is bool
+    resolveCollisionY(var Rectf, o, YCheckDirection, float32) is bool
 
 proc hitbox*(physics: AabbPhysics): Rectf =
   ## Returns the physics body's hitbox.
@@ -91,7 +93,8 @@ proc update(p: var AabbPhysics) =
     for i, collider in p.collidesWith:
       let
         collides =
-          collider.resolveCollisionXImpl(collider, hitbox, directionX)
+          collider.resolveCollisionXImpl(collider, hitbox, directionX,
+                                         p.velocity.x)
         wall = wallLeft.succ(ord(directionX))
       p.position.x = hitbox.x
       if collides:
@@ -107,7 +110,8 @@ proc update(p: var AabbPhysics) =
     for i, collider in p.collidesWith:
       let
         collides =
-          collider.resolveCollisionYImpl(collider, hitbox, directionY)
+          collider.resolveCollisionYImpl(collider, hitbox, directionY,
+                                         p.velocity.y)
         wall = wallTop.succ(ord(directionY))
       p.position.y = hitbox.y
       if collides:
@@ -135,14 +139,16 @@ proc collider*[T: AabbCollidable](obj: T): AabbCollider[T] =
 
   result.resolveCollisionXImpl = proc (collider: RootAabbCollider,
                                        subject: var Rectf,
-                                       direction: XCheckDirection): bool =
+                                       direction: XCheckDirection,
+                                       speed: float32): bool =
     mixin resolveCollisionX
     result = resolveCollisionX(subject, AabbCollider[T](collider).obj,
-                               direction)
+                               direction, speed)
 
   result.resolveCollisionYImpl = proc (collider: RootAabbCollider,
                                        subject: var Rectf,
-                                       direction: YCheckDirection): bool =
+                                       direction: YCheckDirection,
+                                       speed: float32): bool =
     mixin resolveCollisionY
     result = resolveCollisionY(subject, AabbCollider[T](collider).obj,
-                               direction)
+                               direction, speed)

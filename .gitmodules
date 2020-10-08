@@ -1,0 +1,3 @@
+[submodule "src/rapid/wrappers/extern/rapid-freetype"]
+	path = src/rapid/wrappers/extern/freetype
+	url = https://github.com/liquid600pgm/rapid-freetype.git

@@ -1,6 +1,5 @@
 ## Tilemap with collision detection.
 
-import std/options
 import std/tables
 
 import glm/vec
@@ -166,20 +165,23 @@ proc chunkPosition*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
 proc positionInChunk*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
                                              position: Vec2i): Vec2i =
   ## Wraps the given global position to chunk coordinates.
-  position mod vec2i(CW.int32, CH.int32)
+  position.vec2f.floorMod(vec2f(CW, CH)).vec2i
 
 proc hasChunk*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
                                       position: Vec2i): bool =
   ## Returns whether the tilemap contains the given chunk.
   position in tilemap.chunks
 
-proc chunk*[T; CW, CH: static int](
-  tilemap: ChunkTilemap[T, CW, CH],
-  position: Vec2i): Option[lent Chunk[T, CW, CH]] =
-  ## Returns an immutable reference to a chunk at the given position.
+proc chunk*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
+                                   position: Vec2i,
+                                   outChunk: var Chunk[T, CW, CH]): bool =
+  ## Returns the chunk at the given position.
 
+  echo position
   if tilemap.hasChunk(position):
-    result = some tilemap.chunks[position]
+    echo "has chunk"
+    outChunk = tilemap.chunks[position]
+    result = true
 
 proc `[]`*[T; CW, CH: static int](chunk: Chunk, position: Vec2i): lent T =
   ## Returns an immutable reference to the given tile in the given chunk.
@@ -233,8 +235,8 @@ proc `[]=`*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
     var c = Chunk[T, CW, CH]()
     for tile in mitems(c.tiles):
       tile = tilemap.outOfBounds
-  else:
-    chunk = addr tilemap.chunks[chunkPosition]
+    tilemap.chunks[chunkPosition] = c
+  chunk = addr tilemap.chunks[chunkPosition]
 
   let
     positionInChunk = tilemap.positionInChunk(position)
@@ -277,10 +279,13 @@ iterator tiles*[T, CW, CH](tilemap: ChunkTilemap[T, CW, CH]): (Vec2i, var T) =
       let position = chunkOrigin + offset
       yield (position, tile)
 
+proc size*(tilemap: ChunkTilemap): Vec2i
+  {.error: "the size of a ChunkTilemap is infinite".}
+
 proc `size=`*(tilemap: ChunkTilemap, _: Vec2i)
-  {.error: "the size of a ChunkTilemap is managed by its implementation".} =
-  ## The size of a chunk tilemap is managed by its implementation.
-  ## Attempting to set it is an error.
+  {.error: "the size of a ChunkTilemap is infinite".} =
+  ## The size of a chunk tilemap is undefined at any given moment.
+  ## Attempting to access it is an error.
 
 
 # abstract
@@ -293,7 +298,7 @@ type
       position is Vec2i
       tile is var T
 
-iterator area*[T](tilemap: AnyTilemap[T], area: Recti): (Vec2i, var T) =
+iterator area*(tilemap: AnyTilemap, area: Recti): (Vec2i, var auto) =
   ## Yields all tiles that lie in the given area. Iteration order is
   ## top-to-bottom, left-to-right.
   ## Out of bounds behavior is container-specific.
@@ -306,30 +311,46 @@ iterator area*[T](tilemap: AnyTilemap[T], area: Recti): (Vec2i, var T) =
 
 # physics
 
+import ../graphics/context
+import ../graphics/tracers
+
 proc alignToGrid*(tilemap: RootTilemap, rect: Rectf): Recti =
   ## Returns grid coordinates of the given rectangle.
 
   let
     left = floor(rect.left / tilemap.tileWidth).int32
     top = floor(rect.top / tilemap.tileHeight).int32
-    right = floor(rect.right / tilemap.tileWidth).int32
-    bottom = floor(rect.bottom / tilemap.tileHeight).int32
+    right = ceil(rect.right / tilemap.tileWidth).int32
+    bottom = ceil(rect.bottom / tilemap.tileHeight).int32
   result = recti(left, top, right - left, bottom - top)
+  traceRectangle({ttCollision}, rect(result.position.vec2f * 8, result.size.vec2f * 8), color = colOrange)
 
 proc resolveCollisionX*[T](subject: var Rectf, tilemap: AnyTilemap[T],
-                           direction: XCheckDirection): bool =
+                           direction: XCheckDirection, speed: float32): bool =
   ## Resolves collisions between the subject and the tilemap on the X axis.
   ## ``direction`` signifies the movement direction of the subject.
   ## ``outOfBounds`` is the tile used when the subject is out of bounds.
+
+  for position, tile in tiles(tilemap):
+    if tile.isSolid:
+      let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
+      traceRectangle({ttCollision}, hitbox, color = colGreen)
 
   let tiles = tilemap.alignToGrid(subject)
   for position, tile in area(tilemap, tiles):
     if tile.isSolid:
       let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
-      result = subject.resolveCollisionX(hitbox, direction) or result
+      traceRectangle({ttCollision}, hitbox)
+      result = subject.resolveCollisionX(hitbox, direction, speed) or result
+
+  for position, tile in tiles(tilemap):
+    if tilemap.positionInChunk(position) == vec2i(0, 0):
+      let c = tilemap.chunkPosition(position)
+      traceText({ttCollision}, position.vec2f * tilemap.tileSize,
+                $c.x & "," & $c.y)
 
 proc resolveCollisionY*[T](subject: var Rectf, tilemap: AnyTilemap[T],
-                           direction: YCheckDirection): bool =
+                           direction: YCheckDirection, speed: float32): bool =
   ## Resolves collisions between the subject and the tilemap on the Y axis.
   ## ``direction`` signifies the movement direction of the subject.
   ## ``outOfBounds`` is the tile used when the subject is out of bounds.
@@ -338,7 +359,7 @@ proc resolveCollisionY*[T](subject: var Rectf, tilemap: AnyTilemap[T],
   for position, tile in area(tilemap, tiles):
     if tile.isSolid:
       let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
-      result = subject.resolveCollisionY(hitbox, direction) or result
+      result = subject.resolveCollisionY(hitbox, direction, speed) or result
 
 
 # testing

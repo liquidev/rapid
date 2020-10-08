@@ -1,7 +1,5 @@
 ## Simple AABB-based collision detection and response.
 
-import std/sugar
-
 import aglet/rect
 import glm/vec
 
@@ -13,53 +11,64 @@ type
   YCheckDirection* = enum
     cdUp, cdDown
 
-func orderLowToHigh*[T](slice: var Slice[T]) {.inline.} =
-  ## Orders a slice so that `a` is its lower bound and `b` is its higher bound.
-  if slice.b > slice.a:
-    swap slice.a, slice.b
+{.push inline.}
 
-func xIntersects*[T](a, b: Rect[T]): bool {.inline.} =
+func xIntersects*[T](a, b: Rect[T]): bool =
   ## Returns whether two rectangles intersect on the X axis.
   a.left < b.right and b.left < a.right
 
-func yIntersects*[T](a, b: Rect[T]): bool {.inline.} =
+func yIntersects*[T](a, b: Rect[T]): bool =
   ## Returns whether two rectangles intersect on the Y axis.
   a.top < b.bottom and b.top < a.bottom
 
-func intersects*[T](a, b: Rect[T]): bool {.inline.} =
+func intersects*[T](a, b: Rect[T]): bool =
   ## Returns whether two rectangles intersect on both X and Y axes.
   a.xIntersects(b) and a.yIntersects(b)
 
+func rectSides*[T](left, top, right, bottom: T): Rect[T] =
+  ## Constructs a rectangle from its sides.
+  rect(left, top, right - left, bottom - top)
+
+{.pop.}
+
 proc resolveCollisionX*[T](subject: var Rect[T], collider: Rect[T],
-                           direction: XCheckDirection): bool =
+                           direction: XCheckDirection, speed: float32): bool =
   ## Resolves collision on the X axis for the given moving subject and collider.
   ## ``direction`` signifies the movement direction of the subject.
   ## This doesn't need to be called if the subject is not moving.
 
-  if not subject.yIntersects(collider): return false
-
   case direction
   of cdLeft:
-    if subject.left < collider.right:
-      result = true
-      subject.position.x = collider.right
+    let wall = rectSides(
+      collider.right - speed, collider.top + 1,
+      collider.right, collider.bottom - 1,
+    )
+    result = subject.intersects(wall)
+    subject.position.x = collider.right
   of cdRight:
-    if subject.right > collider.left:
-      result = true
-      subject.position.x = collider.x - subject.width
+    let wall = rectSides(
+      collider.left, collider.top + 1,
+      collider.left + speed, collider.bottom - 1,
+    )
+    result = subject.intersects(wall)
+    subject.position.x = collider.left - subject.width
 
 proc resolveCollisionY*[T](subject: var Rect[T], collider: Rect[T],
-                           direction: YCheckDirection): bool =
+                           direction: YCheckDirection, speed: float32): bool =
   ## Resolves collision on the Y axis for the given moving subject and collider.
-
-  if not subject.xIntersects(collider): return false
 
   case direction
   of cdUp:
-    if subject.top < collider.bottom:
-      result = true
-      subject.position.y = collider.bottom
+    let wall = rectSides(
+      collider.left + 1, collider.bottom - speed,
+      collider.right - 1, collider.bottom,
+    )
+    result = subject.intersects(wall)
+    subject.position.y = collider.bottom
   of cdDown:
-    if subject.bottom > collider.top:
-      result = true
-      subject.position.y = collider.y - subject.height
+    let wall = rectSides(
+      collider.left + 1, collider.top,
+      collider.right - 1, collider.top + speed,
+    )
+    result = subject.intersects(wall)
+    subject.position.y = collider.top - subject.height
