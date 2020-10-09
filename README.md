@@ -57,15 +57,29 @@ sudo zypper in \
 
 ## Tips
 
- - Don't worry about using global variables. They are a very useful tool,
-   especially for game resource storage. You should only avoid them in
-   libraries, which should use objects for state.
  - Draw in batches whenever possible. This reduces the amount of time the CPU
-   has to spend sending data to the GPU, making your game run better.
- - Compile your game with `--opt:speed`. The performance vs compile time
-   tradeoff is not as terrible as you might think, especially when using
-   `nim c` instead of `nim cpp` (or something else).
+   has to spend sending draw calls to the GPU, making your game run better.
+   In general, whenever you have some object that doesn't change often, prefer
+   an aglet `Mesh` rather than rapid's `Graphics`.
+ - Compile your game with `--opt:speed`. Nim's rather primitive stack trace
+   system can slow programs down by quite a bit, so compiling with speed
+   optimizations enabled can be quite important to maintain playable
+   performance. Though if your game's so CPU-heavy that it becomes unplayable
+   without `--opt:speed`, you're doing something wrong. Go fix your code.
 
 ## Contributing
 
 When contributing code, please follow the [coding style guidelines](code_style.md).
+
+### Super Secret Messages hidden in plain sight
+
+#### A message to disruptek
+
+Incremental compilation when
+
+#### A message to future me reading this
+
+YOU should finish that darned X11/EGL backend in aglet too. GLFW init times
+are a pain because somebody thought it would be a good idea to parse the entire
+SDL game controller database every time on startup. That somebody should be
+fired, in my opinion.
