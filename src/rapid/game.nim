@@ -20,6 +20,7 @@ template runGameWhile*(cond: bool, body: untyped,
   ##
   ## - ``time: float64`` – time elapsed since the start of the loop, in seconds
   ## - ``delta: float64`` – time elapsed since the last frame, in seconds
+  ## - ``secondsPerUpdate: float32`` – time between updates
   ##
   ## **Example:**
   ##
@@ -52,14 +53,14 @@ template runGameWhile*(cond: bool, body: untyped,
       let
         currentTime = getMonoTime()
         delta {.inject.} =
-          float32(inMilliseconds(currentTime - previousTime).int / 1000)
+          float32(inMilliseconds(currentTime - previousTime).float64 * 0.001)
       previousTime = currentTime
       lag += delta
 
       let
         time {.inject.} =
-          inMilliseconds(currentTime - startTime).float64 / 1000
-        secondsPerUpdate = 1'f32 / updateFreq
+          inMilliseconds(currentTime - startTime).float64 * 0.001
+        secondsPerUpdate {.inject.} = 1'f32 / updateFreq
 
       template update(updateBody: untyped): untyped {.inject.} =
 
