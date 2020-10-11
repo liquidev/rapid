@@ -23,42 +23,42 @@
 ## / Check if a constraint is a pin joint.
 
 proc cpConstraintIsPinJoint*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsPinJoint", header: "cpPinJoint.h".}
+    importc: "cpConstraintIsPinJoint", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate a pin joint.
 
 proc cpPinJointAlloc*(): ptr cpPinJoint {.importc: "cpPinJointAlloc",
-                                      header: "cpPinJoint.h".}
+                                      header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a pin joint.
 
 proc cpPinJointInit*(joint: ptr cpPinJoint; a: ptr cpBody; b: ptr cpBody; anchorA: cpVect;
                     anchorB: cpVect): ptr cpPinJoint {.importc: "cpPinJointInit",
-    header: "cpPinJoint.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a pin joint.
 
 proc cpPinJointNew*(a: ptr cpBody; b: ptr cpBody; anchorA: cpVect; anchorB: cpVect): ptr cpConstraint {.
-    importc: "cpPinJointNew", header: "cpPinJoint.h".}
+    importc: "cpPinJointNew", header: "<chipmunk/chipmunk.h>".}
 ## / Get the location of the first anchor relative to the first body.
 
 proc cpPinJointGetAnchorA*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpPinJointGetAnchorA", header: "cpPinJoint.h".}
+    importc: "cpPinJointGetAnchorA", header: "<chipmunk/chipmunk.h>".}
 ## / Set the location of the first anchor relative to the first body.
 
 proc cpPinJointSetAnchorA*(constraint: ptr cpConstraint; anchorA: cpVect) {.
-    importc: "cpPinJointSetAnchorA", header: "cpPinJoint.h".}
+    importc: "cpPinJointSetAnchorA", header: "<chipmunk/chipmunk.h>".}
 ## / Get the location of the second anchor relative to the second body.
 
 proc cpPinJointGetAnchorB*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpPinJointGetAnchorB", header: "cpPinJoint.h".}
+    importc: "cpPinJointGetAnchorB", header: "<chipmunk/chipmunk.h>".}
 ## / Set the location of the second anchor relative to the second body.
 
 proc cpPinJointSetAnchorB*(constraint: ptr cpConstraint; anchorB: cpVect) {.
-    importc: "cpPinJointSetAnchorB", header: "cpPinJoint.h".}
+    importc: "cpPinJointSetAnchorB", header: "<chipmunk/chipmunk.h>".}
 ## / Get the distance the joint will maintain between the two anchors.
 
 proc cpPinJointGetDist*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpPinJointGetDist", header: "cpPinJoint.h".}
+    importc: "cpPinJointGetDist", header: "<chipmunk/chipmunk.h>".}
 ## / Set the distance the joint will maintain between the two anchors.
 
 proc cpPinJointSetDist*(constraint: ptr cpConstraint; dist: cpFloat) {.
-    importc: "cpPinJointSetDist", header: "cpPinJoint.h".}
+    importc: "cpPinJointSetDist", header: "<chipmunk/chipmunk.h>".}
 ## /@}

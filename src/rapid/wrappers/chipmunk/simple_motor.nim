@@ -28,26 +28,26 @@ type
 ## / Check if a constraint is a damped rotary springs.
 
 proc cpConstraintIsSimpleMotor*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsSimpleMotor", header: "cpSimpleMotor.h".}
+    importc: "cpConstraintIsSimpleMotor", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate a simple motor.
 
 proc cpSimpleMotorAlloc*(): ptr cpSimpleMotor {.importc: "cpSimpleMotorAlloc",
-    header: "cpSimpleMotor.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / initialize a simple motor.
 
 proc cpSimpleMotorInit*(joint: ptr cpSimpleMotor; a: ptr cpBody; b: ptr cpBody;
                        rate: cpFloat): ptr cpSimpleMotor {.
-    importc: "cpSimpleMotorInit", header: "cpSimpleMotor.h".}
+    importc: "cpSimpleMotorInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a simple motor.
 
 proc cpSimpleMotorNew*(a: ptr cpBody; b: ptr cpBody; rate: cpFloat): ptr cpConstraint {.
-    importc: "cpSimpleMotorNew", header: "cpSimpleMotor.h".}
+    importc: "cpSimpleMotorNew", header: "<chipmunk/chipmunk.h>".}
 ## / Get the rate of the motor.
 
 proc cpSimpleMotorGetRate*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpSimpleMotorGetRate", header: "cpSimpleMotor.h".}
+    importc: "cpSimpleMotorGetRate", header: "<chipmunk/chipmunk.h>".}
 ## / Set the rate of the motor.
 
 proc cpSimpleMotorSetRate*(constraint: ptr cpConstraint; rate: cpFloat) {.
-    importc: "cpSimpleMotorSetRate", header: "cpSimpleMotor.h".}
+    importc: "cpSimpleMotorSetRate", header: "<chipmunk/chipmunk.h>".}
 ## / @}

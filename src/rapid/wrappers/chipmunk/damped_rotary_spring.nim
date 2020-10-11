@@ -23,7 +23,7 @@
 ## / Check if a constraint is a damped rotary springs.
 
 proc cpConstraintIsDampedRotarySpring*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsDampedRotarySpring", header: "cpDampedRotarySpring.h".}
+    importc: "cpConstraintIsDampedRotarySpring", header: "<chipmunk/chipmunk.h>".}
 ## / Function type used for damped rotary spring force callbacks.
 
 type
@@ -33,53 +33,53 @@ type
 ## / Allocate a damped rotary spring.
 
 proc cpDampedRotarySpringAlloc*(): ptr cpDampedRotarySpring {.
-    importc: "cpDampedRotarySpringAlloc", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringAlloc", header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a damped rotary spring.
 
 proc cpDampedRotarySpringInit*(joint: ptr cpDampedRotarySpring; a: ptr cpBody;
                               b: ptr cpBody; restAngle: cpFloat; stiffness: cpFloat;
                               damping: cpFloat): ptr cpDampedRotarySpring {.
-    importc: "cpDampedRotarySpringInit", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a damped rotary spring.
 
 proc cpDampedRotarySpringNew*(a: ptr cpBody; b: ptr cpBody; restAngle: cpFloat;
                              stiffness: cpFloat; damping: cpFloat): ptr cpConstraint {.
-    importc: "cpDampedRotarySpringNew", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringNew", header: "<chipmunk/chipmunk.h>".}
 ## / Get the rest length of the spring.
 
 proc cpDampedRotarySpringGetRestAngle*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpDampedRotarySpringGetRestAngle", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringGetRestAngle", header: "<chipmunk/chipmunk.h>".}
 ## / Set the rest length of the spring.
 
 proc cpDampedRotarySpringSetRestAngle*(constraint: ptr cpConstraint;
                                       restAngle: cpFloat) {.
-    importc: "cpDampedRotarySpringSetRestAngle", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringSetRestAngle", header: "<chipmunk/chipmunk.h>".}
 ## / Get the stiffness of the spring in force/distance.
 
 proc cpDampedRotarySpringGetStiffness*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpDampedRotarySpringGetStiffness", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringGetStiffness", header: "<chipmunk/chipmunk.h>".}
 ## / Set the stiffness of the spring in force/distance.
 
 proc cpDampedRotarySpringSetStiffness*(constraint: ptr cpConstraint;
                                       stiffness: cpFloat) {.
-    importc: "cpDampedRotarySpringSetStiffness", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringSetStiffness", header: "<chipmunk/chipmunk.h>".}
 ## / Get the damping of the spring.
 
 proc cpDampedRotarySpringGetDamping*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpDampedRotarySpringGetDamping", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringGetDamping", header: "<chipmunk/chipmunk.h>".}
 ## / Set the damping of the spring.
 
 proc cpDampedRotarySpringSetDamping*(constraint: ptr cpConstraint; damping: cpFloat) {.
-    importc: "cpDampedRotarySpringSetDamping", header: "cpDampedRotarySpring.h".}
+    importc: "cpDampedRotarySpringSetDamping", header: "<chipmunk/chipmunk.h>".}
 ## / Get the damping of the spring.
 
 proc cpDampedRotarySpringGetSpringTorqueFunc*(constraint: ptr cpConstraint): cpDampedRotarySpringTorqueFunc {.
     importc: "cpDampedRotarySpringGetSpringTorqueFunc",
-    header: "cpDampedRotarySpring.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the damping of the spring.
 
 proc cpDampedRotarySpringSetSpringTorqueFunc*(constraint: ptr cpConstraint;
     springTorqueFunc: cpDampedRotarySpringTorqueFunc) {.
     importc: "cpDampedRotarySpringSetSpringTorqueFunc",
-    header: "cpDampedRotarySpring.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / @}

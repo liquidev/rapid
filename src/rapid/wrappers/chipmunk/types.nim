@@ -110,16 +110,18 @@ type
 type
   cpTimestamp* = cuint
 
+{.pragma: cpstruct, importc, header: "<chipmunk/chipmunk.h>".}
+
 ## / Chipmunk's 2D vector type.
 ## / @addtogroup cpVect
 type
-  cpVect* {.bycopy.} = object
+  cpVect* {.cpstruct.} = object
     x*: cpFloat
     y*: cpFloat
 
 ## / Column major affine transform.
 type
-  cpTransform* {.bycopy.} = object
+  cpTransform* {.cpstruct.} = object
     a*: cpFloat
     b*: cpFloat
     c*: cpFloat
@@ -130,28 +132,30 @@ type
 ##  NUKE
 
 type
-  cpMat2x2* {.bycopy.} = object
+  cpMat2x2* {.cpstruct.} = object
     a*: cpFloat                ##  Row major [[a, b][c d]]
     b*: cpFloat
     c*: cpFloat
     d*: cpFloat
 
+{.pragma: cpistruct, importc, incompleteStruct, header: "<chipmunk/chipmunk.h>".}
+
 type
-  cpShape* {.importc, incompleteStruct.} = object
-  cpCircleShape* {.importc, incompleteStruct.} = object
-  cpSegmentShape* {.importc, incompleteStruct.} = object
-  cpPolyShape* {.importc, incompleteStruct.} = object
-  cpArbiter* {.importc, incompleteStruct.} = object
-  cpSpace* {.importc, incompleteStruct.} = object
-  cpBody* {.importc, incompleteStruct.} = object
-  cpConstraint* {.importc, incompleteStruct.} = object
-  cpPinJoint* {.importc, incompleteStruct.} = object
-  cpSlideJoint* {.importc, incompleteStruct.} = object
-  cpPivotJoint* {.importc, incompleteStruct.} = object
-  cpGrooveJoint* {.importc, incompleteStruct.} = object
-  cpDampedSpring* {.importc, incompleteStruct.} = object
-  cpDampedRotarySpring* {.importc, incompleteStruct.} = object
-  cpRotaryLimitJoint* {.importc, incompleteStruct.} = object
-  cpRatchetJoint* {.importc, incompleteStruct.} = object
-  cpGearJoint* {.importc, incompleteStruct.} = object
-  cpSimpleMotorJoint* {.importc, incompleteStruct.} = object
+  cpShape* {.cpistruct.} = object
+  cpCircleShape* {.cpistruct.} = object
+  cpSegmentShape* {.cpistruct.} = object
+  cpPolyShape* {.cpistruct.} = object
+  cpArbiter* {.cpistruct.} = object
+  cpSpace* {.cpistruct.} = object
+  cpBody* {.cpistruct.} = object
+  cpConstraint* {.cpistruct.} = object
+  cpPinJoint* {.cpistruct.} = object
+  cpSlideJoint* {.cpistruct.} = object
+  cpPivotJoint* {.cpistruct.} = object
+  cpGrooveJoint* {.cpistruct.} = object
+  cpDampedSpring* {.cpistruct.} = object
+  cpDampedRotarySpring* {.cpistruct.} = object
+  cpRotaryLimitJoint* {.cpistruct.} = object
+  cpRatchetJoint* {.cpistruct.} = object
+  cpGearJoint* {.cpistruct.} = object
+  cpSimpleMotorJoint* {.cpistruct.} = object

@@ -52,197 +52,197 @@ type
 
 ## / Allocate a cpBody.
 
-proc cpBodyAlloc*(): ptr cpBody {.importc: "cpBodyAlloc", header: "cpBody.h".}
+proc cpBodyAlloc*(): ptr cpBody {.importc: "cpBodyAlloc", header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a cpBody.
 
 proc cpBodyInit*(body: ptr cpBody; mass: cpFloat; moment: cpFloat): ptr cpBody {.
-    importc: "cpBodyInit", header: "cpBody.h".}
+    importc: "cpBodyInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a cpBody.
 
 proc cpBodyNew*(mass: cpFloat; moment: cpFloat): ptr cpBody {.importc: "cpBodyNew",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a cpBody, and set it as a kinematic body.
 
 proc cpBodyNewKinematic*(): ptr cpBody {.importc: "cpBodyNewKinematic",
-                                     header: "cpBody.h".}
+                                     header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a cpBody, and set it as a static body.
 
-proc cpBodyNewStatic*(): ptr cpBody {.importc: "cpBodyNewStatic", header: "cpBody.h".}
+proc cpBodyNewStatic*(): ptr cpBody {.importc: "cpBodyNewStatic", header: "<chipmunk/chipmunk.h>".}
 ## / Destroy a cpBody.
 
-proc cpBodyDestroy*(body: ptr cpBody) {.importc: "cpBodyDestroy", header: "cpBody.h".}
+proc cpBodyDestroy*(body: ptr cpBody) {.importc: "cpBodyDestroy", header: "<chipmunk/chipmunk.h>".}
 ## / Destroy and free a cpBody.
 
-proc cpBodyFree*(body: ptr cpBody) {.importc: "cpBodyFree", header: "cpBody.h".}
+proc cpBodyFree*(body: ptr cpBody) {.importc: "cpBodyFree", header: "<chipmunk/chipmunk.h>".}
 ##  Defined in cpSpace.c
 ## / Wake up a sleeping or idle body.
 
-proc cpBodyActivate*(body: ptr cpBody) {.importc: "cpBodyActivate", header: "cpBody.h".}
+proc cpBodyActivate*(body: ptr cpBody) {.importc: "cpBodyActivate", header: "<chipmunk/chipmunk.h>".}
 ## / Wake up any sleeping or idle bodies touching a static body.
 
 proc cpBodyActivateStatic*(body: ptr cpBody; filter: ptr cpShape) {.
-    importc: "cpBodyActivateStatic", header: "cpBody.h".}
+    importc: "cpBodyActivateStatic", header: "<chipmunk/chipmunk.h>".}
 ## / Force a body to fall asleep immediately.
 
-proc cpBodySleep*(body: ptr cpBody) {.importc: "cpBodySleep", header: "cpBody.h".}
+proc cpBodySleep*(body: ptr cpBody) {.importc: "cpBodySleep", header: "<chipmunk/chipmunk.h>".}
 ## / Force a body to fall asleep immediately along with other bodies in a group.
 
 proc cpBodySleepWithGroup*(body: ptr cpBody; group: ptr cpBody) {.
-    importc: "cpBodySleepWithGroup", header: "cpBody.h".}
+    importc: "cpBodySleepWithGroup", header: "<chipmunk/chipmunk.h>".}
 ## / Returns true if the body is sleeping.
 
 proc cpBodyIsSleeping*(body: ptr cpBody): cpBool {.importc: "cpBodyIsSleeping",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the type of the body.
 
 proc cpBodyGetType*(body: ptr cpBody): cpBodyType {.importc: "cpBodyGetType",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the type of the body.
 
 proc cpBodySetType*(body: ptr cpBody; `type`: cpBodyType) {.importc: "cpBodySetType",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the space this body is added to.
 
 proc cpBodyGetSpace*(body: ptr cpBody): ptr cpSpace {.importc: "cpBodyGetSpace",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the mass of the body.
 
 proc cpBodyGetMass*(body: ptr cpBody): cpFloat {.importc: "cpBodyGetMass",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the mass of the body.
 
 proc cpBodySetMass*(body: ptr cpBody; m: cpFloat) {.importc: "cpBodySetMass",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the moment of inertia of the body.
 
 proc cpBodyGetMoment*(body: ptr cpBody): cpFloat {.importc: "cpBodyGetMoment",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the moment of inertia of the body.
 
 proc cpBodySetMoment*(body: ptr cpBody; i: cpFloat) {.importc: "cpBodySetMoment",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the position of a body.
 
 proc cpBodyGetPosition*(body: ptr cpBody): cpVect {.importc: "cpBodyGetPosition",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the position of the body.
 
 proc cpBodySetPosition*(body: ptr cpBody; pos: cpVect) {.importc: "cpBodySetPosition",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the offset of the center of gravity in body local coordinates.
 
 proc cpBodyGetCenterOfGravity*(body: ptr cpBody): cpVect {.
-    importc: "cpBodyGetCenterOfGravity", header: "cpBody.h".}
+    importc: "cpBodyGetCenterOfGravity", header: "<chipmunk/chipmunk.h>".}
 ## / Set the offset of the center of gravity in body local coordinates.
 
 proc cpBodySetCenterOfGravity*(body: ptr cpBody; cog: cpVect) {.
-    importc: "cpBodySetCenterOfGravity", header: "cpBody.h".}
+    importc: "cpBodySetCenterOfGravity", header: "<chipmunk/chipmunk.h>".}
 ## / Get the velocity of the body.
 
 proc cpBodyGetVelocity*(body: ptr cpBody): cpVect {.importc: "cpBodyGetVelocity",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the velocity of the body.
 
 proc cpBodySetVelocity*(body: ptr cpBody; velocity: cpVect) {.
-    importc: "cpBodySetVelocity", header: "cpBody.h".}
+    importc: "cpBodySetVelocity", header: "<chipmunk/chipmunk.h>".}
 ## / Get the force applied to the body for the next time step.
 
 proc cpBodyGetForce*(body: ptr cpBody): cpVect {.importc: "cpBodyGetForce",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the force applied to the body for the next time step.
 
 proc cpBodySetForce*(body: ptr cpBody; force: cpVect) {.importc: "cpBodySetForce",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the angle of the body.
 
 proc cpBodyGetAngle*(body: ptr cpBody): cpFloat {.importc: "cpBodyGetAngle",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the angle of a body.
 
 proc cpBodySetAngle*(body: ptr cpBody; a: cpFloat) {.importc: "cpBodySetAngle",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the angular velocity of the body.
 
 proc cpBodyGetAngularVelocity*(body: ptr cpBody): cpFloat {.
-    importc: "cpBodyGetAngularVelocity", header: "cpBody.h".}
+    importc: "cpBodyGetAngularVelocity", header: "<chipmunk/chipmunk.h>".}
 ## / Set the angular velocity of the body.
 
 proc cpBodySetAngularVelocity*(body: ptr cpBody; angularVelocity: cpFloat) {.
-    importc: "cpBodySetAngularVelocity", header: "cpBody.h".}
+    importc: "cpBodySetAngularVelocity", header: "<chipmunk/chipmunk.h>".}
 ## / Get the torque applied to the body for the next time step.
 
 proc cpBodyGetTorque*(body: ptr cpBody): cpFloat {.importc: "cpBodyGetTorque",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Set the torque applied to the body for the next time step.
 
 proc cpBodySetTorque*(body: ptr cpBody; torque: cpFloat) {.importc: "cpBodySetTorque",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the rotation vector of the body. (The x basis vector of it's transform.)
 
 proc cpBodyGetRotation*(body: ptr cpBody): cpVect {.importc: "cpBodyGetRotation",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the user data pointer assigned to the body.
 
 proc cpBodyGetUserData*(body: ptr cpBody): cpDataPointer {.
-    importc: "cpBodyGetUserData", header: "cpBody.h".}
+    importc: "cpBodyGetUserData", header: "<chipmunk/chipmunk.h>".}
 ## / Set the user data pointer assigned to the body.
 
 proc cpBodySetUserData*(body: ptr cpBody; userData: cpDataPointer) {.
-    importc: "cpBodySetUserData", header: "cpBody.h".}
+    importc: "cpBodySetUserData", header: "<chipmunk/chipmunk.h>".}
 ## / Set the callback used to update a body's velocity.
 
 proc cpBodySetVelocityUpdateFunc*(body: ptr cpBody; velocityFunc: cpBodyVelocityFunc) {.
-    importc: "cpBodySetVelocityUpdateFunc", header: "cpBody.h".}
+    importc: "cpBodySetVelocityUpdateFunc", header: "<chipmunk/chipmunk.h>".}
 ## / Set the callback used to update a body's position.
 ## / NOTE: It's not generally recommended to override this unless you call the default position update function.
 
 proc cpBodySetPositionUpdateFunc*(body: ptr cpBody; positionFunc: cpBodyPositionFunc) {.
-    importc: "cpBodySetPositionUpdateFunc", header: "cpBody.h".}
+    importc: "cpBodySetPositionUpdateFunc", header: "<chipmunk/chipmunk.h>".}
 ## / Default velocity integration function..
 
 proc cpBodyUpdateVelocity*(body: ptr cpBody; gravity: cpVect; damping: cpFloat;
                           dt: cpFloat) {.importc: "cpBodyUpdateVelocity",
-                                       header: "cpBody.h".}
+                                       header: "<chipmunk/chipmunk.h>".}
 ## / Default position integration function.
 
 proc cpBodyUpdatePosition*(body: ptr cpBody; dt: cpFloat) {.
-    importc: "cpBodyUpdatePosition", header: "cpBody.h".}
+    importc: "cpBodyUpdatePosition", header: "<chipmunk/chipmunk.h>".}
 ## / Convert body relative/local coordinates to absolute/world coordinates.
 
 proc cpBodyLocalToWorld*(body: ptr cpBody; point: cpVect): cpVect {.
-    importc: "cpBodyLocalToWorld", header: "cpBody.h".}
+    importc: "cpBodyLocalToWorld", header: "<chipmunk/chipmunk.h>".}
 ## / Convert body absolute/world coordinates to  relative/local coordinates.
 
 proc cpBodyWorldToLocal*(body: ptr cpBody; point: cpVect): cpVect {.
-    importc: "cpBodyWorldToLocal", header: "cpBody.h".}
+    importc: "cpBodyWorldToLocal", header: "<chipmunk/chipmunk.h>".}
 ## / Apply a force to a body. Both the force and point are expressed in world coordinates.
 
 proc cpBodyApplyForceAtWorldPoint*(body: ptr cpBody; force: cpVect; point: cpVect) {.
-    importc: "cpBodyApplyForceAtWorldPoint", header: "cpBody.h".}
+    importc: "cpBodyApplyForceAtWorldPoint", header: "<chipmunk/chipmunk.h>".}
 ## / Apply a force to a body. Both the force and point are expressed in body local coordinates.
 
 proc cpBodyApplyForceAtLocalPoint*(body: ptr cpBody; force: cpVect; point: cpVect) {.
-    importc: "cpBodyApplyForceAtLocalPoint", header: "cpBody.h".}
+    importc: "cpBodyApplyForceAtLocalPoint", header: "<chipmunk/chipmunk.h>".}
 ## / Apply an impulse to a body. Both the impulse and point are expressed in world coordinates.
 
 proc cpBodyApplyImpulseAtWorldPoint*(body: ptr cpBody; impulse: cpVect; point: cpVect) {.
-    importc: "cpBodyApplyImpulseAtWorldPoint", header: "cpBody.h".}
+    importc: "cpBodyApplyImpulseAtWorldPoint", header: "<chipmunk/chipmunk.h>".}
 ## / Apply an impulse to a body. Both the impulse and point are expressed in body local coordinates.
 
 proc cpBodyApplyImpulseAtLocalPoint*(body: ptr cpBody; impulse: cpVect; point: cpVect) {.
-    importc: "cpBodyApplyImpulseAtLocalPoint", header: "cpBody.h".}
+    importc: "cpBodyApplyImpulseAtLocalPoint", header: "<chipmunk/chipmunk.h>".}
 ## / Get the velocity on a body (in world units) at a point on the body in world coordinates.
 
 proc cpBodyGetVelocityAtWorldPoint*(body: ptr cpBody; point: cpVect): cpVect {.
-    importc: "cpBodyGetVelocityAtWorldPoint", header: "cpBody.h".}
+    importc: "cpBodyGetVelocityAtWorldPoint", header: "<chipmunk/chipmunk.h>".}
 ## / Get the velocity on a body (in world units) at a point on the body in local coordinates.
 
 proc cpBodyGetVelocityAtLocalPoint*(body: ptr cpBody; point: cpVect): cpVect {.
-    importc: "cpBodyGetVelocityAtLocalPoint", header: "cpBody.h".}
+    importc: "cpBodyGetVelocityAtLocalPoint", header: "<chipmunk/chipmunk.h>".}
 ## / Get the amount of kinetic energy contained by the body.
 
 proc cpBodyKineticEnergy*(body: ptr cpBody): cpFloat {.
-    importc: "cpBodyKineticEnergy", header: "cpBody.h".}
+    importc: "cpBodyKineticEnergy", header: "<chipmunk/chipmunk.h>".}
 ## / Body/shape iterator callback function type.
 
 type
@@ -251,7 +251,7 @@ type
 ## / Call @c func once for each shape attached to @c body and added to the space.
 
 proc cpBodyEachShape*(body: ptr cpBody; `func`: cpBodyShapeIteratorFunc; data: pointer) {.
-    importc: "cpBodyEachShape", header: "cpBody.h".}
+    importc: "cpBodyEachShape", header: "<chipmunk/chipmunk.h>".}
 ## / Body/constraint iterator callback function type.
 
 type
@@ -262,7 +262,7 @@ type
 
 proc cpBodyEachConstraint*(body: ptr cpBody; `func`: cpBodyConstraintIteratorFunc;
                           data: pointer) {.importc: "cpBodyEachConstraint",
-    header: "cpBody.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Body/arbiter iterator callback function type.
 
 type
@@ -273,5 +273,5 @@ type
 
 proc cpBodyEachArbiter*(body: ptr cpBody; `func`: cpBodyArbiterIteratorFunc;
                        data: pointer) {.importc: "cpBodyEachArbiter",
-                                      header: "cpBody.h".}
+                                      header: "<chipmunk/chipmunk.h>".}
 ## /@}

@@ -23,7 +23,7 @@ include compile_chipmunk
 
 proc cpMessage*(condition: cstring; file: cstring; line: cint; isError: cint;
                isHardError: cint; message: cstring) {.varargs, importc: "cpMessage",
-    header: "chipmunk.h".}
+    header: "<chipmunk/chipmunk.h>".}
 
 import types, vect, bb
 export types, vect, bb
@@ -46,52 +46,52 @@ const
 
 ## / Version string.
 
-var cpVersionString* {.importc: "cpVersionString", header: "chipmunk.h".}: cstring
+var cpVersionString* {.importc: "cpVersionString", header: "<chipmunk/chipmunk.h>".}: cstring
 
 ## / Calculate the moment of inertia for a circle.
 ## / @c r1 and @c r2 are the inner and outer diameters. A solid circle has an inner diameter of 0.
 
 proc cpMomentForCircle*(m: cpFloat; r1: cpFloat; r2: cpFloat; offset: cpVect): cpFloat {.
-    importc: "cpMomentForCircle", header: "chipmunk.h".}
+    importc: "cpMomentForCircle", header: "<chipmunk/chipmunk.h>".}
 ## / Calculate area of a hollow circle.
 ## / @c r1 and @c r2 are the inner and outer diameters. A solid circle has an inner diameter of 0.
 
 proc cpAreaForCircle*(r1: cpFloat; r2: cpFloat): cpFloat {.importc: "cpAreaForCircle",
-    header: "chipmunk.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Calculate the moment of inertia for a line segment.
 ## / Beveling radius is not supported.
 
 proc cpMomentForSegment*(m: cpFloat; a: cpVect; b: cpVect; radius: cpFloat): cpFloat {.
-    importc: "cpMomentForSegment", header: "chipmunk.h".}
+    importc: "cpMomentForSegment", header: "<chipmunk/chipmunk.h>".}
 ## / Calculate the area of a fattened (capsule shaped) line segment.
 
 proc cpAreaForSegment*(a: cpVect; b: cpVect; radius: cpFloat): cpFloat {.
-    importc: "cpAreaForSegment", header: "chipmunk.h".}
+    importc: "cpAreaForSegment", header: "<chipmunk/chipmunk.h>".}
 ## / Calculate the moment of inertia for a solid polygon shape assuming it's center of gravity is at it's centroid. The offset is added to each vertex.
 
 proc cpMomentForPoly*(m: cpFloat; count: cint; verts: ptr cpVect; offset: cpVect;
                      radius: cpFloat): cpFloat {.importc: "cpMomentForPoly",
-    header: "chipmunk.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Calculate the signed area of a polygon. A Clockwise winding gives positive area.
 ## / This is probably backwards from what you expect, but matches Chipmunk's the winding for poly shapes.
 
 proc cpAreaForPoly*(count: cint; verts: ptr cpVect; radius: cpFloat): cpFloat {.
-    importc: "cpAreaForPoly", header: "chipmunk.h".}
+    importc: "cpAreaForPoly", header: "<chipmunk/chipmunk.h>".}
 ## / Calculate the natural centroid of a polygon.
 
 proc cpCentroidForPoly*(count: cint; verts: ptr cpVect): cpVect {.
-    importc: "cpCentroidForPoly", header: "chipmunk.h".}
+    importc: "cpCentroidForPoly", header: "<chipmunk/chipmunk.h>".}
 ## / Calculate the moment of inertia for a solid box.
 
 proc cpMomentForBox*(m: cpFloat; width: cpFloat; height: cpFloat): cpFloat {.
-    importc: "cpMomentForBox", header: "chipmunk.h".}
+    importc: "cpMomentForBox", header: "<chipmunk/chipmunk.h>".}
 ## / Calculate the moment of inertia for a solid box.
 
 proc cpMomentForBox2*(m: cpFloat; box: cpBB): cpFloat {.importc: "cpMomentForBox2",
-    header: "chipmunk.h".}
+    header: "<chipmunk/chipmunk.h>".}
 
 proc cpConvexHull*(count: cint; verts: ptr cpVect; result: ptr cpVect; first: ptr cint;
-                  tol: cpFloat): cint {.importc: "cpConvexHull", header: "chipmunk.h".}
+                  tol: cpFloat): cint {.importc: "cpConvexHull", header: "<chipmunk/chipmunk.h>".}
 
 proc cpClosetPointOnSegment*(p: cpVect; a: cpVect; b: cpVect): cpVect {.inline.} =
   var delta: cpVect

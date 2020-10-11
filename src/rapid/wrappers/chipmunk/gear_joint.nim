@@ -23,34 +23,34 @@
 ## / Check if a constraint is a damped rotary springs.
 
 proc cpConstraintIsGearJoint*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsGearJoint", header: "cpGearJoint.h".}
+    importc: "cpConstraintIsGearJoint", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate a gear joint.
 
 proc cpGearJointAlloc*(): ptr cpGearJoint {.importc: "cpGearJointAlloc",
-                                        header: "cpGearJoint.h".}
+                                        header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a gear joint.
 
 proc cpGearJointInit*(joint: ptr cpGearJoint; a: ptr cpBody; b: ptr cpBody;
                      phase: cpFloat; ratio: cpFloat): ptr cpGearJoint {.
-    importc: "cpGearJointInit", header: "cpGearJoint.h".}
+    importc: "cpGearJointInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a gear joint.
 
 proc cpGearJointNew*(a: ptr cpBody; b: ptr cpBody; phase: cpFloat; ratio: cpFloat): ptr cpConstraint {.
-    importc: "cpGearJointNew", header: "cpGearJoint.h".}
+    importc: "cpGearJointNew", header: "<chipmunk/chipmunk.h>".}
 ## / Get the phase offset of the gears.
 
 proc cpGearJointGetPhase*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpGearJointGetPhase", header: "cpGearJoint.h".}
+    importc: "cpGearJointGetPhase", header: "<chipmunk/chipmunk.h>".}
 ## / Set the phase offset of the gears.
 
 proc cpGearJointSetPhase*(constraint: ptr cpConstraint; phase: cpFloat) {.
-    importc: "cpGearJointSetPhase", header: "cpGearJoint.h".}
+    importc: "cpGearJointSetPhase", header: "<chipmunk/chipmunk.h>".}
 ## / Get the angular distance of each ratchet.
 
 proc cpGearJointGetRatio*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpGearJointGetRatio", header: "cpGearJoint.h".}
+    importc: "cpGearJointGetRatio", header: "<chipmunk/chipmunk.h>".}
 ## / Set the ratio of a gear joint.
 
 proc cpGearJointSetRatio*(constraint: ptr cpConstraint; ratio: cpFloat) {.
-    importc: "cpGearJointSetRatio", header: "cpGearJoint.h".}
+    importc: "cpGearJointSetRatio", header: "<chipmunk/chipmunk.h>".}
 ## / @}

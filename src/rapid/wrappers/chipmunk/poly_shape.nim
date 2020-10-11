@@ -25,57 +25,57 @@
 import bb, types
 
 proc cpPolyShapeAlloc*(): ptr cpPolyShape {.importc: "cpPolyShapeAlloc",
-                                        header: "cpPolyShape.h".}
+                                        header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a polygon shape with rounded corners.
 ## / A convex hull will be created from the vertexes.
 
 proc cpPolyShapeInit*(poly: ptr cpPolyShape; body: ptr cpBody; count: cint;
                      verts: ptr cpVect; transform: cpTransform; radius: cpFloat): ptr cpPolyShape {.
-    importc: "cpPolyShapeInit", header: "cpPolyShape.h".}
+    importc: "cpPolyShapeInit", header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a polygon shape with rounded corners.
 ## / The vertexes must be convex with a counter-clockwise winding.
 
 proc cpPolyShapeInitRaw*(poly: ptr cpPolyShape; body: ptr cpBody; count: cint;
                         verts: ptr cpVect; radius: cpFloat): ptr cpPolyShape {.
-    importc: "cpPolyShapeInitRaw", header: "cpPolyShape.h".}
+    importc: "cpPolyShapeInitRaw", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a polygon shape with rounded corners.
 ## / A convex hull will be created from the vertexes.
 
 proc cpPolyShapeNew*(body: ptr cpBody; count: cint; verts: ptr cpVect;
                     transform: cpTransform; radius: cpFloat): ptr cpShape {.
-    importc: "cpPolyShapeNew", header: "cpPolyShape.h".}
+    importc: "cpPolyShapeNew", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a polygon shape with rounded corners.
 ## / The vertexes must be convex with a counter-clockwise winding.
 
 proc cpPolyShapeNewRaw*(body: ptr cpBody; count: cint; verts: ptr cpVect; radius: cpFloat): ptr cpShape {.
-    importc: "cpPolyShapeNewRaw", header: "cpPolyShape.h".}
+    importc: "cpPolyShapeNewRaw", header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a box shaped polygon shape with rounded corners.
 
 proc cpBoxShapeInit*(poly: ptr cpPolyShape; body: ptr cpBody; width: cpFloat;
                     height: cpFloat; radius: cpFloat): ptr cpPolyShape {.
-    importc: "cpBoxShapeInit", header: "cpPolyShape.h".}
+    importc: "cpBoxShapeInit", header: "<chipmunk/chipmunk.h>".}
 ## / Initialize an offset box shaped polygon shape with rounded corners.
 
 proc cpBoxShapeInit2*(poly: ptr cpPolyShape; body: ptr cpBody; box: cpBB; radius: cpFloat): ptr cpPolyShape {.
-    importc: "cpBoxShapeInit2", header: "cpPolyShape.h".}
+    importc: "cpBoxShapeInit2", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a box shaped polygon shape.
 
 proc cpBoxShapeNew*(body: ptr cpBody; width: cpFloat; height: cpFloat; radius: cpFloat): ptr cpShape {.
-    importc: "cpBoxShapeNew", header: "cpPolyShape.h".}
+    importc: "cpBoxShapeNew", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize an offset box shaped polygon shape.
 
 proc cpBoxShapeNew2*(body: ptr cpBody; box: cpBB; radius: cpFloat): ptr cpShape {.
-    importc: "cpBoxShapeNew2", header: "cpPolyShape.h".}
+    importc: "cpBoxShapeNew2", header: "<chipmunk/chipmunk.h>".}
 ## / Get the number of verts in a polygon shape.
 
 proc cpPolyShapeGetCount*(shape: ptr cpShape): cint {.importc: "cpPolyShapeGetCount",
-    header: "cpPolyShape.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Get the @c ith vertex of a polygon shape.
 
 proc cpPolyShapeGetVert*(shape: ptr cpShape; index: cint): cpVect {.
-    importc: "cpPolyShapeGetVert", header: "cpPolyShape.h".}
+    importc: "cpPolyShapeGetVert", header: "<chipmunk/chipmunk.h>".}
 ## / Get the radius of a polygon shape.
 
 proc cpPolyShapeGetRadius*(shape: ptr cpShape): cpFloat {.
-    importc: "cpPolyShapeGetRadius", header: "cpPolyShape.h".}
+    importc: "cpPolyShapeGetRadius", header: "<chipmunk/chipmunk.h>".}
 ## / @}

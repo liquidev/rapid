@@ -23,34 +23,34 @@
 ## / Check if a constraint is a damped rotary springs.
 
 proc cpConstraintIsRotaryLimitJoint*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsRotaryLimitJoint", header: "cpRotaryLimitJoint.h".}
+    importc: "cpConstraintIsRotaryLimitJoint", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate a damped rotary limit joint.
 
 proc cpRotaryLimitJointAlloc*(): ptr cpRotaryLimitJoint {.
-    importc: "cpRotaryLimitJointAlloc", header: "cpRotaryLimitJoint.h".}
+    importc: "cpRotaryLimitJointAlloc", header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a damped rotary limit joint.
 
 proc cpRotaryLimitJointInit*(joint: ptr cpRotaryLimitJoint; a: ptr cpBody;
                             b: ptr cpBody; min: cpFloat; max: cpFloat): ptr cpRotaryLimitJoint {.
-    importc: "cpRotaryLimitJointInit", header: "cpRotaryLimitJoint.h".}
+    importc: "cpRotaryLimitJointInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a damped rotary limit joint.
 
 proc cpRotaryLimitJointNew*(a: ptr cpBody; b: ptr cpBody; min: cpFloat; max: cpFloat): ptr cpConstraint {.
-    importc: "cpRotaryLimitJointNew", header: "cpRotaryLimitJoint.h".}
+    importc: "cpRotaryLimitJointNew", header: "<chipmunk/chipmunk.h>".}
 ## / Get the minimum distance the joint will maintain between the two anchors.
 
 proc cpRotaryLimitJointGetMin*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpRotaryLimitJointGetMin", header: "cpRotaryLimitJoint.h".}
+    importc: "cpRotaryLimitJointGetMin", header: "<chipmunk/chipmunk.h>".}
 ## / Set the minimum distance the joint will maintain between the two anchors.
 
 proc cpRotaryLimitJointSetMin*(constraint: ptr cpConstraint; min: cpFloat) {.
-    importc: "cpRotaryLimitJointSetMin", header: "cpRotaryLimitJoint.h".}
+    importc: "cpRotaryLimitJointSetMin", header: "<chipmunk/chipmunk.h>".}
 ## / Get the maximum distance the joint will maintain between the two anchors.
 
 proc cpRotaryLimitJointGetMax*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpRotaryLimitJointGetMax", header: "cpRotaryLimitJoint.h".}
+    importc: "cpRotaryLimitJointGetMax", header: "<chipmunk/chipmunk.h>".}
 ## / Set the maximum distance the joint will maintain between the two anchors.
 
 proc cpRotaryLimitJointSetMax*(constraint: ptr cpConstraint; max: cpFloat) {.
-    importc: "cpRotaryLimitJointSetMax", header: "cpRotaryLimitJoint.h".}
+    importc: "cpRotaryLimitJointSetMax", header: "<chipmunk/chipmunk.h>".}
 ## / @}

@@ -23,51 +23,51 @@
 ## / Check if a constraint is a slide joint.
 
 proc cpConstraintIsSlideJoint*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsSlideJoint", header: "cpSlideJoint.h".}
+    importc: "cpConstraintIsSlideJoint", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate a slide joint.
 
 proc cpSlideJointAlloc*(): ptr cpSlideJoint {.importc: "cpSlideJointAlloc",
-    header: "cpSlideJoint.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a slide joint.
 
 proc cpSlideJointInit*(joint: ptr cpSlideJoint; a: ptr cpBody; b: ptr cpBody;
                       anchorA: cpVect; anchorB: cpVect; min: cpFloat; max: cpFloat): ptr cpSlideJoint {.
-    importc: "cpSlideJointInit", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a slide joint.
 
 proc cpSlideJointNew*(a: ptr cpBody; b: ptr cpBody; anchorA: cpVect; anchorB: cpVect;
                      min: cpFloat; max: cpFloat): ptr cpConstraint {.
-    importc: "cpSlideJointNew", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointNew", header: "<chipmunk/chipmunk.h>".}
 ## / Get the location of the first anchor relative to the first body.
 
 proc cpSlideJointGetAnchorA*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpSlideJointGetAnchorA", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointGetAnchorA", header: "<chipmunk/chipmunk.h>".}
 ## / Set the location of the first anchor relative to the first body.
 
 proc cpSlideJointSetAnchorA*(constraint: ptr cpConstraint; anchorA: cpVect) {.
-    importc: "cpSlideJointSetAnchorA", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointSetAnchorA", header: "<chipmunk/chipmunk.h>".}
 ## / Get the location of the second anchor relative to the second body.
 
 proc cpSlideJointGetAnchorB*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpSlideJointGetAnchorB", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointGetAnchorB", header: "<chipmunk/chipmunk.h>".}
 ## / Set the location of the second anchor relative to the second body.
 
 proc cpSlideJointSetAnchorB*(constraint: ptr cpConstraint; anchorB: cpVect) {.
-    importc: "cpSlideJointSetAnchorB", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointSetAnchorB", header: "<chipmunk/chipmunk.h>".}
 ## / Get the minimum distance the joint will maintain between the two anchors.
 
 proc cpSlideJointGetMin*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpSlideJointGetMin", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointGetMin", header: "<chipmunk/chipmunk.h>".}
 ## / Set the minimum distance the joint will maintain between the two anchors.
 
 proc cpSlideJointSetMin*(constraint: ptr cpConstraint; min: cpFloat) {.
-    importc: "cpSlideJointSetMin", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointSetMin", header: "<chipmunk/chipmunk.h>".}
 ## / Get the maximum distance the joint will maintain between the two anchors.
 
 proc cpSlideJointGetMax*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpSlideJointGetMax", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointGetMax", header: "<chipmunk/chipmunk.h>".}
 ## / Set the maximum distance the joint will maintain between the two anchors.
 
 proc cpSlideJointSetMax*(constraint: ptr cpConstraint; max: cpFloat) {.
-    importc: "cpSlideJointSetMax", header: "cpSlideJoint.h".}
+    importc: "cpSlideJointSetMax", header: "<chipmunk/chipmunk.h>".}
 ## / @}

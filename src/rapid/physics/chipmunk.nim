@@ -653,6 +653,13 @@ proc contains*(space: Space, body: Body): bool =
   ## Returns whether the given space has the given body.
   cpSpaceContainsBody(space.raw, body.raw).bool
 
+proc addTo*(body: Body, space: Space): Body =
+  ## Convenience procedure for adding a body to a space right after its
+  ## creation.
+
+  space.addBody(body)
+  result = body
+
 proc update*(space: Space, deltaTime: float32) =
   ## Steps the space by ``deltaTime`` seconds. This should be called inside of
   ## your game's update loop; ``deltaTime`` is the time passed between the
@@ -726,39 +733,44 @@ proc toChipmunk[T](opts: SpaceDebugDrawOptions[T]): cpSpaceDebugDrawOptions =
     collisionPointColor: opts.collisionPointColor.debug,
 
     drawCircle: proc (pos: cpVect, angle, radius: cpFloat,
-                      outline, fill: cpSpaceDebugColor, data: pointer) =
-      var opts = cast[ptr SpaceDebugDrawOptions](data)
+                      outline, fill: cpSpaceDebugColor, data: pointer)
+                     {.cdecl.} =
+      var opts = cast[ptr SpaceDebugDrawOptions[T]](data)
       opts.drawCircle(opts.user, pos.vec2f, radius,
                       outline.rgba, fill.rgba),
 
-    drawSegment: proc (a, b: cpVect, color: cpSpaceDebugColor, data: pointer) =
-      var opts = cast[ptr SpaceDebugDrawOptions](data)
+    drawSegment: proc (a, b: cpVect, color: cpSpaceDebugColor, data: pointer)
+                      {.cdecl.} =
+      var opts = cast[ptr SpaceDebugDrawOptions[T]](data)
       opts.drawLine(opts.user, a.vec2f, b.vec2f, color.rgba),
 
     drawFatSegment: proc (a, b: cpVect, radius: float32,
-                          outline, fill: cpSpaceDebugColor, data: pointer) =
-      var opts = cast[ptr SpaceDebugDrawOptions](data)
+                          outline, fill: cpSpaceDebugColor, data: pointer)
+                         {.cdecl.} =
+      var opts = cast[ptr SpaceDebugDrawOptions[T]](data)
       opts.drawFatLine(opts.user, a.vec2f, b.vec2f, radius,
                        outline.rgba, fill.rgba),
 
     drawPolygon: proc (count: cint, firstVert: ptr cpVect, radius: float32,
-                       outline, fill: cpSpaceDebugColor, data: pointer) =
-      var opts = cast[ptr SpaceDebugDrawOptions](data)
+                       outline, fill: cpSpaceDebugColor, data: pointer)
+                      {.cdecl.} =
+      var opts = cast[ptr SpaceDebugDrawOptions[T]](data)
       opts.drawPolygon(opts.user,
                        cast[ptr UncheckedArray[Vec2f]](firstVert)
                          .toOpenArray(0, count - 1),
                        radius, outline.rgba, fill.rgba),
 
     drawDot: proc (size: float32, pos: cpVect,
-                   color: cpSpaceDebugColor, data: pointer) =
-      var opts = cast[ptr SpaceDebugDrawOptions](data)
-      opts.drawPoint(opts.data, pos.vec2f, size, color.rgba),
+                   color: cpSpaceDebugColor, data: pointer) {.cdecl.} =
+      var opts = cast[ptr SpaceDebugDrawOptions[T]](data)
+      opts.drawPoint(opts.user, pos.vec2f, size, color.rgba),
 
-    colorForShape: proc (shape: ptr cpShape, data: pointer): cpSpaceDebugColor =
+    colorForShape: proc (shape: ptr cpShape, data: pointer): cpSpaceDebugColor
+                        {.cdecl.} =
       var
         shape = cast[Shape](cpShapeGetUserData(shape))
-        opts = cast[ptr SpaceDebugDrawOptions](data)
-      result = opts.getColorForShape(opts.user, shape)
+        opts = cast[ptr SpaceDebugDrawOptions[T]](data)
+      result = opts.getColorForShape(opts.user, shape).debug
 
   )
 
@@ -770,7 +782,7 @@ proc debugDraw*(space: Space, opts: SpaceDebugDrawOptions) =
   var cpopts = opts.toChipmunk
   cpSpaceDebugDraw(space.raw, addr cpopts)
 
-when defined(nimcheck) or defined(nimdoc):
+when isMainModule or defined(nimdoc):
   # deprecated shmeprecated. 1.4 de-deprecates this pragma anyways
   {.define: rapidChipmunkGraphicsDebugDraw.}
 

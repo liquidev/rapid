@@ -23,38 +23,38 @@
 ## / Check if a constraint is a slide joint.
 
 proc cpConstraintIsPivotJoint*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsPivotJoint", header: "cpPivotJoint.h".}
+    importc: "cpConstraintIsPivotJoint", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate a pivot joint
 
 proc cpPivotJointAlloc*(): ptr cpPivotJoint {.importc: "cpPivotJointAlloc",
-    header: "cpPivotJoint.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a pivot joint.
 
 proc cpPivotJointInit*(joint: ptr cpPivotJoint; a: ptr cpBody; b: ptr cpBody;
                       anchorA: cpVect; anchorB: cpVect): ptr cpPivotJoint {.
-    importc: "cpPivotJointInit", header: "cpPivotJoint.h".}
+    importc: "cpPivotJointInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a pivot joint.
 
 proc cpPivotJointNew*(a: ptr cpBody; b: ptr cpBody; pivot: cpVect): ptr cpConstraint {.
-    importc: "cpPivotJointNew", header: "cpPivotJoint.h".}
+    importc: "cpPivotJointNew", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a pivot joint with specific anchors.
 
 proc cpPivotJointNew2*(a: ptr cpBody; b: ptr cpBody; anchorA: cpVect; anchorB: cpVect): ptr cpConstraint {.
-    importc: "cpPivotJointNew2", header: "cpPivotJoint.h".}
+    importc: "cpPivotJointNew2", header: "<chipmunk/chipmunk.h>".}
 ## / Get the location of the first anchor relative to the first body.
 
 proc cpPivotJointGetAnchorA*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpPivotJointGetAnchorA", header: "cpPivotJoint.h".}
+    importc: "cpPivotJointGetAnchorA", header: "<chipmunk/chipmunk.h>".}
 ## / Set the location of the first anchor relative to the first body.
 
 proc cpPivotJointSetAnchorA*(constraint: ptr cpConstraint; anchorA: cpVect) {.
-    importc: "cpPivotJointSetAnchorA", header: "cpPivotJoint.h".}
+    importc: "cpPivotJointSetAnchorA", header: "<chipmunk/chipmunk.h>".}
 ## / Get the location of the second anchor relative to the second body.
 
 proc cpPivotJointGetAnchorB*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpPivotJointGetAnchorB", header: "cpPivotJoint.h".}
+    importc: "cpPivotJointGetAnchorB", header: "<chipmunk/chipmunk.h>".}
 ## / Set the location of the second anchor relative to the second body.
 
 proc cpPivotJointSetAnchorB*(constraint: ptr cpConstraint; anchorB: cpVect) {.
-    importc: "cpPivotJointSetAnchorB", header: "cpPivotJoint.h".}
+    importc: "cpPivotJointSetAnchorB", header: "<chipmunk/chipmunk.h>".}
 ## / @}

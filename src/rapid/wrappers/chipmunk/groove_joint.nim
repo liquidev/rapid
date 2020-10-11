@@ -23,43 +23,43 @@
 ## / Check if a constraint is a slide joint.
 
 proc cpConstraintIsGrooveJoint*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsGrooveJoint", header: "cpGrooveJoint.h".}
+    importc: "cpConstraintIsGrooveJoint", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate a groove joint.
 
 proc cpGrooveJointAlloc*(): ptr cpGrooveJoint {.importc: "cpGrooveJointAlloc",
-    header: "cpGrooveJoint.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a groove joint.
 
 proc cpGrooveJointInit*(joint: ptr cpGrooveJoint; a: ptr cpBody; b: ptr cpBody;
                        groove_a: cpVect; groove_b: cpVect; anchorB: cpVect): ptr cpGrooveJoint {.
-    importc: "cpGrooveJointInit", header: "cpGrooveJoint.h".}
+    importc: "cpGrooveJointInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a groove joint.
 
 proc cpGrooveJointNew*(a: ptr cpBody; b: ptr cpBody; groove_a: cpVect; groove_b: cpVect;
                       anchorB: cpVect): ptr cpConstraint {.
-    importc: "cpGrooveJointNew", header: "cpGrooveJoint.h".}
+    importc: "cpGrooveJointNew", header: "<chipmunk/chipmunk.h>".}
 ## / Get the first endpoint of the groove relative to the first body.
 
 proc cpGrooveJointGetGrooveA*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpGrooveJointGetGrooveA", header: "cpGrooveJoint.h".}
+    importc: "cpGrooveJointGetGrooveA", header: "<chipmunk/chipmunk.h>".}
 ## / Set the first endpoint of the groove relative to the first body.
 
 proc cpGrooveJointSetGrooveA*(constraint: ptr cpConstraint; grooveA: cpVect) {.
-    importc: "cpGrooveJointSetGrooveA", header: "cpGrooveJoint.h".}
+    importc: "cpGrooveJointSetGrooveA", header: "<chipmunk/chipmunk.h>".}
 ## / Get the first endpoint of the groove relative to the first body.
 
 proc cpGrooveJointGetGrooveB*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpGrooveJointGetGrooveB", header: "cpGrooveJoint.h".}
+    importc: "cpGrooveJointGetGrooveB", header: "<chipmunk/chipmunk.h>".}
 ## / Set the first endpoint of the groove relative to the first body.
 
 proc cpGrooveJointSetGrooveB*(constraint: ptr cpConstraint; grooveB: cpVect) {.
-    importc: "cpGrooveJointSetGrooveB", header: "cpGrooveJoint.h".}
+    importc: "cpGrooveJointSetGrooveB", header: "<chipmunk/chipmunk.h>".}
 ## / Get the location of the second anchor relative to the second body.
 
 proc cpGrooveJointGetAnchorB*(constraint: ptr cpConstraint): cpVect {.
-    importc: "cpGrooveJointGetAnchorB", header: "cpGrooveJoint.h".}
+    importc: "cpGrooveJointGetAnchorB", header: "<chipmunk/chipmunk.h>".}
 ## / Set the location of the second anchor relative to the second body.
 
 proc cpGrooveJointSetAnchorB*(constraint: ptr cpConstraint; anchorB: cpVect) {.
-    importc: "cpGrooveJointSetAnchorB", header: "cpGrooveJoint.h".}
+    importc: "cpGrooveJointSetAnchorB", header: "<chipmunk/chipmunk.h>".}
 ## / @}

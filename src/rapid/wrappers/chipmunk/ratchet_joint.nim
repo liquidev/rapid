@@ -23,42 +23,42 @@
 ## / Check if a constraint is a damped rotary springs.
 
 proc cpConstraintIsRatchetJoint*(constraint: ptr cpConstraint): cpBool {.
-    importc: "cpConstraintIsRatchetJoint", header: "cpRatchetJoint.h".}
+    importc: "cpConstraintIsRatchetJoint", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate a ratchet joint.
 
 proc cpRatchetJointAlloc*(): ptr cpRatchetJoint {.importc: "cpRatchetJointAlloc",
-    header: "cpRatchetJoint.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a ratched joint.
 
 proc cpRatchetJointInit*(joint: ptr cpRatchetJoint; a: ptr cpBody; b: ptr cpBody;
                         phase: cpFloat; ratchet: cpFloat): ptr cpRatchetJoint {.
-    importc: "cpRatchetJointInit", header: "cpRatchetJoint.h".}
+    importc: "cpRatchetJointInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a ratchet joint.
 
 proc cpRatchetJointNew*(a: ptr cpBody; b: ptr cpBody; phase: cpFloat; ratchet: cpFloat): ptr cpConstraint {.
-    importc: "cpRatchetJointNew", header: "cpRatchetJoint.h".}
+    importc: "cpRatchetJointNew", header: "<chipmunk/chipmunk.h>".}
 ## / Get the angle of the current ratchet tooth.
 
 proc cpRatchetJointGetAngle*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpRatchetJointGetAngle", header: "cpRatchetJoint.h".}
+    importc: "cpRatchetJointGetAngle", header: "<chipmunk/chipmunk.h>".}
 ## / Set the angle of the current ratchet tooth.
 
 proc cpRatchetJointSetAngle*(constraint: ptr cpConstraint; angle: cpFloat) {.
-    importc: "cpRatchetJointSetAngle", header: "cpRatchetJoint.h".}
+    importc: "cpRatchetJointSetAngle", header: "<chipmunk/chipmunk.h>".}
 ## / Get the phase offset of the ratchet.
 
 proc cpRatchetJointGetPhase*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpRatchetJointGetPhase", header: "cpRatchetJoint.h".}
+    importc: "cpRatchetJointGetPhase", header: "<chipmunk/chipmunk.h>".}
 ## / Get the phase offset of the ratchet.
 
 proc cpRatchetJointSetPhase*(constraint: ptr cpConstraint; phase: cpFloat) {.
-    importc: "cpRatchetJointSetPhase", header: "cpRatchetJoint.h".}
+    importc: "cpRatchetJointSetPhase", header: "<chipmunk/chipmunk.h>".}
 ## / Get the angular distance of each ratchet.
 
 proc cpRatchetJointGetRatchet*(constraint: ptr cpConstraint): cpFloat {.
-    importc: "cpRatchetJointGetRatchet", header: "cpRatchetJoint.h".}
+    importc: "cpRatchetJointGetRatchet", header: "<chipmunk/chipmunk.h>".}
 ## / Set the angular distance of each ratchet.
 
 proc cpRatchetJointSetRatchet*(constraint: ptr cpConstraint; ratchet: cpFloat) {.
-    importc: "cpRatchetJointSetRatchet", header: "cpRatchetJoint.h".}
+    importc: "cpRatchetJointSetRatchet", header: "<chipmunk/chipmunk.h>".}
 ## / @}

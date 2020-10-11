@@ -88,7 +88,7 @@ type
                                        `func`: cpSpatialIndexSegmentQueryFunc;
                                        data: pointer)
   cpSpatialIndexClass* {.importc: "cpSpatialIndexClass",
-                        header: "cpSpatialIndex.h", bycopy.} = object
+                        header: "<chipmunk/chipmunk.h>", bycopy.} = object
     destroy* {.importc: "destroy".}: cpSpatialIndexDestroyImpl
     count* {.importc: "count".}: cpSpatialIndexCountImpl
     each* {.importc: "each".}: cpSpatialIndexEachImpl
@@ -100,7 +100,7 @@ type
     reindexQuery* {.importc: "reindexQuery".}: cpSpatialIndexReindexQueryImpl
     query* {.importc: "query".}: cpSpatialIndexQueryImpl
     segmentQuery* {.importc: "segmentQuery".}: cpSpatialIndexSegmentQueryImpl
-  cpSpatialIndex* {.importc: "cpSpatialIndex", header: "cpSpatialIndex.h", bycopy.} = object
+  cpSpatialIndex* {.importc: "cpSpatialIndex", header: "<chipmunk/chipmunk.h>", bycopy.} = object
     klass* {.importc: "klass".}: ptr cpSpatialIndexClass
     bbfunc* {.importc: "bbfunc".}: cpSpatialIndexBBFunc
     staticIndex* {.importc: "staticIndex".}: ptr cpSpatialIndex
@@ -115,24 +115,24 @@ type
 type cpSpaceHash* {.importc, incompleteStruct.} = object
 
 proc cpSpaceHashAlloc*(): ptr cpSpaceHash {.importc: "cpSpaceHashAlloc",
-                                        header: "cpSpatialIndex.h".}
+                                        header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a spatial hash.
 
 proc cpSpaceHashInit*(hash: ptr cpSpaceHash; celldim: cpFloat; numcells: cint;
                      bbfunc: cpSpatialIndexBBFunc; staticIndex: ptr cpSpatialIndex): ptr cpSpatialIndex {.
-    importc: "cpSpaceHashInit", header: "cpSpatialIndex.h".}
+    importc: "cpSpaceHashInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a spatial hash.
 
 proc cpSpaceHashNew*(celldim: cpFloat; cells: cint; bbfunc: cpSpatialIndexBBFunc;
                     staticIndex: ptr cpSpatialIndex): ptr cpSpatialIndex {.
-    importc: "cpSpaceHashNew", header: "cpSpatialIndex.h".}
+    importc: "cpSpaceHashNew", header: "<chipmunk/chipmunk.h>".}
 ## / Change the cell dimensions and table size of the spatial hash to tune it.
 ## / The cell dimensions should roughly match the average size of your objects
 ## / and the table size should be ~10 larger than the number of objects inserted.
 ## / Some trial and error is required to find the optimum numbers for efficiency.
 
 proc cpSpaceHashResize*(hash: ptr cpSpaceHash; celldim: cpFloat; numcells: cint) {.
-    importc: "cpSpaceHashResize", header: "cpSpatialIndex.h".}
+    importc: "cpSpaceHashResize", header: "<chipmunk/chipmunk.h>".}
 ## MARK: AABB Tree
 
 
@@ -141,20 +141,20 @@ proc cpSpaceHashResize*(hash: ptr cpSpaceHash; celldim: cpFloat; numcells: cint)
 type cpBBTree* {.importc, incompleteStruct.} = object
 
 proc cpBBTreeAlloc*(): ptr cpBBTree {.importc: "cpBBTreeAlloc",
-                                  header: "cpSpatialIndex.h".}
+                                  header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a bounding box tree.
 
 proc cpBBTreeInit*(tree: ptr cpBBTree; bbfunc: cpSpatialIndexBBFunc;
                   staticIndex: ptr cpSpatialIndex): ptr cpSpatialIndex {.
-    importc: "cpBBTreeInit", header: "cpSpatialIndex.h".}
+    importc: "cpBBTreeInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a bounding box tree.
 
 proc cpBBTreeNew*(bbfunc: cpSpatialIndexBBFunc; staticIndex: ptr cpSpatialIndex): ptr cpSpatialIndex {.
-    importc: "cpBBTreeNew", header: "cpSpatialIndex.h".}
+    importc: "cpBBTreeNew", header: "<chipmunk/chipmunk.h>".}
 ## / Perform a static top down optimization of the tree.
 
 proc cpBBTreeOptimize*(index: ptr cpSpatialIndex) {.importc: "cpBBTreeOptimize",
-    header: "cpSpatialIndex.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Bounding box tree velocity callback function.
 ## / This function should return an estimate for the object's velocity.
 
@@ -165,7 +165,7 @@ type
 
 proc cpBBTreeSetVelocityFunc*(index: ptr cpSpatialIndex;
                              `func`: cpBBTreeVelocityFunc) {.
-    importc: "cpBBTreeSetVelocityFunc", header: "cpSpatialIndex.h".}
+    importc: "cpBBTreeSetVelocityFunc", header: "<chipmunk/chipmunk.h>".}
 ## MARK: Single Axis Sweep
 
 
@@ -174,29 +174,29 @@ proc cpBBTreeSetVelocityFunc*(index: ptr cpSpatialIndex;
 type cpSweep1D* {.importc, incompleteStruct.} = object
 
 proc cpSweep1DAlloc*(): ptr cpSweep1D {.importc: "cpSweep1DAlloc",
-                                    header: "cpSpatialIndex.h".}
+                                    header: "<chipmunk/chipmunk.h>".}
 ## / Initialize a 1D sort and sweep broadphase.
 
 proc cpSweep1DInit*(sweep: ptr cpSweep1D; bbfunc: cpSpatialIndexBBFunc;
                    staticIndex: ptr cpSpatialIndex): ptr cpSpatialIndex {.
-    importc: "cpSweep1DInit", header: "cpSpatialIndex.h".}
+    importc: "cpSweep1DInit", header: "<chipmunk/chipmunk.h>".}
 ## / Allocate and initialize a 1D sort and sweep broadphase.
 
 proc cpSweep1DNew*(bbfunc: cpSpatialIndexBBFunc; staticIndex: ptr cpSpatialIndex): ptr cpSpatialIndex {.
-    importc: "cpSweep1DNew", header: "cpSpatialIndex.h".}
+    importc: "cpSweep1DNew", header: "<chipmunk/chipmunk.h>".}
 ## MARK: Spatial Index Implementation
 
 
 ## / Destroy and free a spatial index.
 
 proc cpSpatialIndexFree*(index: ptr cpSpatialIndex) {.importc: "cpSpatialIndexFree",
-    header: "cpSpatialIndex.h".}
+    header: "<chipmunk/chipmunk.h>".}
 ## / Collide the objects in @c dynamicIndex against the objects in @c staticIndex using the query callback function.
 
 proc cpSpatialIndexCollideStatic*(dynamicIndex: ptr cpSpatialIndex;
                                  staticIndex: ptr cpSpatialIndex;
                                  `func`: cpSpatialIndexQueryFunc; data: pointer) {.
-    importc: "cpSpatialIndexCollideStatic", header: "cpSpatialIndex.h".}
+    importc: "cpSpatialIndexCollideStatic", header: "<chipmunk/chipmunk.h>".}
 ## / Destroy a spatial index.
 
 proc cpSpatialIndexDestroy*(index: ptr cpSpatialIndex) {.inline.} =
