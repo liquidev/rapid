@@ -5,10 +5,10 @@ import std/macros
 import std/os
 
 const
-  Parent = currentSourcePath.splitPath().head.parentDir
-  Freetype = Parent/"extern"/"chipmunk"
-  Include = Freetype/"include"
-  Src = Freetype/"src"
+  Parent = currentSourcePath.splitPath().head & "/.."
+  Freetype = Parent & "/extern/chipmunk"
+  Include = Freetype & "/include"
+  Src = Freetype & "/src"
 {.passC: "-I" & Include.}
 
 # TODO: remove this passC bloat mess when nim 1.4 is released
@@ -71,6 +71,6 @@ macro genCompiles: untyped =
     compileList.add "cpHastySpace.c"
   var pragmas = newNimNode(nnkPragma)
   for file in compileList:
-    pragmas.add(newColonExpr(ident"compile", newLit(Src/file)))
+    pragmas.add(newColonExpr(ident"compile", newLit(Src & "/" & file)))
   result = newStmtList(pragmas)
 genCompiles

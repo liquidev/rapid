@@ -68,11 +68,13 @@ type
   BodyObj = object
     raw: ptr cpBody
     shapes: seq[Shape]
+    indexInSpace: int
   Body* = ref BodyObj
     ## A rigid body.
 
   SpaceObj = object
     raw: ptr cpSpace
+    bodies: seq[Body]
   Space* = ref SpaceObj
     ## Space for simulating physics.
 
@@ -275,8 +277,6 @@ proc new(body: var Body, raw: ptr cpBody) =
 
   new(body) do (body: Body):
     cpBodyFree(body.raw)
-    for shape in body.shapes:
-      cpSpaceRemoveShape(body.space.raw, shape.raw)
 
   body.raw = raw
   cpBodySetUserData(body.raw, cast[ptr BodyObj](body))
@@ -355,6 +355,23 @@ proc `isSensor=`*(shape: Shape, sensor: bool) =
   ## physics bodies, but still report collisions via callbacks.
   cpShapeSetSensor(shape.raw, sensor.cpBool)
 
+proc mass*(shape: Shape): float32 =
+  ## Returns the mass of the shape.
+  cpShapeGetMass(shape.raw)
+
+proc `mass=`*(shape: Shape, newMass: float32) =
+  ## Sets the mass of the shape.
+  cpShapeSetMass(shape.raw, newMass)
+
+proc density*(shape: Shape): float32 =
+  ## Returns the density of the shape.
+  cpShapeGetDensity(shape.raw)
+
+proc `density=`*(shape: Shape, newDensity: float32) =
+  ## This can be used to calculate mass automatically (and should generally be
+  ## preferred over setting the mass manually.)
+  cpShapeSetDensity(shape.raw, newDensity)
+
 proc elasticity*(shape: Shape): float32 =
   ## Returns the elasticity of the shape.
   cpShapeGetElasticity(shape.raw)
@@ -395,11 +412,11 @@ proc `collisionKind=`*(shape: Shape, newKind: CollisionKind) =
   cpShapeSetCollisionType(shape.raw, newKind.cpCollisionType)
 
 proc toRapid(f: cpShapeFilter): ShapeFilter =
-  (group: f.group,
+  (group: uint(f.group),
    categories: cast[set[CollisionCategory]](f.categories),
    mask: cast[set[CollisionCategory]](f.mask))
 proc toChipmunk(f: ShapeFilter): cpShapeFilter =
-  cpShapeFilter(group: f.group,
+  cpShapeFilter(group: f.group.cpGroup,
                 categories: cast[cpBitmask](f.categories),
                 mask: cast[cpBitmask](f.mask))
 
@@ -640,14 +657,20 @@ proc reindexShapesForBody*(space: Space, body: Body) =
 proc addBody*(space: Space, body: Body) =
   ## Adds the body to the space.
 
-  GC_ref(body)
   discard cpSpaceAddBody(space.raw, body.raw)
+  body.indexInSpace = space.bodies.len
+  space.bodies.add(body)
 
 proc delBody*(space: Space, body: Body) =
   ## Deletes the given body from the space.
 
+  for shape in body.shapes:
+    cpSpaceRemoveShape(space.raw, shape.raw)
   cpSpaceRemoveBody(space.raw, body.raw)
-  GC_unref(body)
+  space.bodies[body.indexInSpace] = space.bodies[^1]
+  space.bodies[body.indexInSpace].indexInSpace = body.indexInSpace
+  space.bodies.setLen(space.bodies.len - 1)
+  body.indexInSpace = 0
 
 proc contains*(space: Space, body: Body): bool =
   ## Returns whether the given space has the given body.
@@ -668,6 +691,23 @@ proc update*(space: Space, deltaTime: float32) =
   cpSpaceStep(space.raw, deltaTime)
 
 {.pop.}
+
+proc eachBody*(space: Space, callback: proc (body: Body)) =
+  ## Iterate over all bodies in the space and pass them to the given
+  ## ``callback``.
+
+  # unfortunately this is not a proper iterator because chipmunk sucks and only
+  # implements its iterators in callback form. so far i haven't been able to
+  # find a workaround, as yielding inside of a closure in an iterator
+  # is impossible
+
+  proc iterate(rawBody: ptr cpBody, data: pointer) {.cdecl.} =
+    let
+      callback = cast[ptr proc (body: Body)](data)[]
+      body = cast[Body](cpBodyGetUserData(rawBody))
+    callback(body)
+
+  cpSpaceEachBody(space.raw, iterate, unsafeAddr callback)
 
 proc newSpace*(gravity: Vec2f, iterations = 10.Natural): Space =
   ## Creates a new space with the given gravity and iteration count.
@@ -727,6 +767,8 @@ proc toChipmunk[T](opts: SpaceDebugDrawOptions[T]): cpSpaceDebugDrawOptions =
   cpSpaceDebugDrawOptions(
 
     data: opts.unsafeAddr,
+
+    flags: cast[cpSpaceDebugDrawFlags](opts.flags),
 
     shapeOutlineColor: opts.shapeOutlineColor.debug,
     constraintColor: opts.constraintColor.debug,
@@ -809,20 +851,28 @@ when defined(rapidChipmunkGraphicsDebugDraw):
       graphics.lineCircle(center, radius, thickness = 1, lineColor)
 
     proc drawLine(graphics: Graphics, a, b: Vec2f, color: Rgba32f) {.nimcall.} =
-      discard
+      graphics.line(a, b, colorA = color, colorB = color)
 
     proc drawFatLine(graphics: Graphics, a, b: Vec2f, radius: float32,
                      lineColor, fillColor: Rgba32f) {.nimcall.} =
-      discard
+      graphics.line(a, b, thickness = radius + 1, cap = lcRound,
+                    colorA = lineColor, colorB = lineColor)
+      graphics.line(a, b, thickness = radius, cap = lcRound,
+                    colorA = fillColor, colorB = fillColor)
 
     proc drawPolygon(graphics: Graphics, vertices: openArray[Vec2f],
                      radius: float32, lineColor, fillColor: Rgba32f)
                     {.nimcall.} =
-      discard
+      let a = vertices[0]
+      for index, b in vertices[0..<3]:
+        let c = vertices[index + 1]
+        graphics.triangle(a, b, c, fillColor)
+      graphics.polyline(vertices, thickness = 1, close = true,
+                        color = lineColor)
 
     proc drawPoint(graphics: Graphics, point: Vec2f, size: float32,
                    color: Rgba32f) {.nimcall.} =
-      discard
+      graphics.point(point, size, color)
 
     proc getColorForShape(_: Graphics, shape: Shape): Rgba32f {.nimcall.} =
       if shape of CircleShape:

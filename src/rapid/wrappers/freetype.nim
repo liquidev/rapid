@@ -3,11 +3,14 @@
 import std/macros
 import std/os
 
+static: echo currentSourcePath.splitPath
+
 const
   Here = currentSourcePath.splitPath().head
-  Freetype = Here/"extern"/"freetype"
-  Include = Freetype/"include"
-  Src = Freetype/"src"
+  # using concatenation because of windows®®®®®®®® crosscompilation
+  Freetype = Here & "/extern/freetype"
+  Include = Freetype & "/include"
+  Src = Freetype & "/src"
 {.passC: "-I" & Include.}
 {.passC: "-DFT2_BUILD_LIBRARY".}
 
@@ -33,7 +36,7 @@ macro genCompiles: untyped =
     ]
   var pragmas = newNimNode(nnkPragma)
   for file in CompileList:
-    pragmas.add(newColonExpr(ident"compile", newLit(Src/file)))
+    pragmas.add(newColonExpr(ident"compile", newLit(Src & "/" & file)))
   result = newStmtList(pragmas)
 genCompiles
 
