@@ -21,27 +21,6 @@ else:
 {.passC: "-DCP_COLLISION_TYPE_TYPE=uint16_t".}
 {.passC: "-DCP_BITMASK_TYPE=uint64_t".}
 
-# set up allocator
-# using nim's allocator is faster than the OS allocator as it can reuse memory
-# from the GC's pool. also complexity of allocation is O(1)
-
-proc nimcalloc(nmemb, size: uint): pointer
-              {.inline, exportc: "rapid_$1".} =
-  alloc(size * nmemb)
-
-proc nimrealloc(p: pointer, size: uint): pointer
-               {.inline, exportc: "rapid_$1".} =
-  realloc(p, size)
-
-proc nimfree(p: pointer) {.inline, exportc: "rapid_$1".} =
-  dealloc(p)
-
-{.emit: """
-#define cpcalloc `nimcalloc`
-#define cprealloc `nimrealloc`
-#define cpfree `nimfree`
-""".}
-
 macro genCompiles: untyped =
   var
     compileList = @[

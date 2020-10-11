@@ -435,6 +435,7 @@ proc new[T: Shape](shape: var T, body: Body, raw: ptr cpShape) =
   shape.raw = raw
   discard cpSpaceAddShape(body.space.raw, raw)
   body.shapes.add(shape)
+  cpShapeSetUserData(shape.raw, cast[ptr Shape](shape))
 
 proc newCircleShape*(body: Body, radius: float32,
                      offset = vec2f(0)): CircleShape =
@@ -672,3 +673,163 @@ proc newSpace*(gravity: Vec2f, iterations = 10.Natural): Space =
   result.iterations = iterations
 
   cpSpaceSetUserData(result.raw, cast[ptr SpaceObj](result))
+
+
+# debug draw
+
+import aglet/pixeltypes
+
+type
+  SpaceDebugDrawFlag* = enum
+    ## Defines what should be debug-drawn.
+    ddShapes
+    ddConstraints
+    ddCollisionPoints
+
+  SpaceDebugDrawOptions*[T] = tuple
+    ## Options for debug drawing. This contains callback implementations and
+    ## various other settings that can be tuned.
+
+    user: T  ## user-defined value, passed to all of the callbacks
+
+    drawCircle: proc (t: T, center: Vec2f, radius: float32,
+                      lineColor, fillColor: Rgba32f) {.nimcall.}
+    drawLine: proc (t: T, a, b: Vec2f, color: Rgba32f) {.nimcall.}
+    drawFatLine: proc (t: T, a, b: Vec2f, radius: float32,
+                       lineColor, fillColor: Rgba32f) {.nimcall.}
+    drawPolygon: proc (t: T, vertices: openArray[Vec2f], radius: float32,
+                       lineColor, fillColor: Rgba32f) {.nimcall.}
+    drawPoint: proc (t: T, position: Vec2f, size: float32, color: Rgba32f)
+                    {.nimcall.}
+    getColorForShape: proc (t: T, shape: Shape): Rgba32f {.nimcall.}
+    flags: set[SpaceDebugDrawFlag]
+    shapeOutlineColor, constraintColor, collisionPointColor: Rgba32f
+
+{.push inline.}
+
+const
+  ddAll* = {low(SpaceDebugDrawFlag)..high(SpaceDebugDrawFlag)}
+
+proc rgba(color: cpSpaceDebugColor): Rgba32f =
+  rgba(color.r, color.g, color.b, color.a)
+
+proc debug(rgba: Rgba32f): cpSpaceDebugColor =
+  cpSpaceDebugColor(r: rgba.r, g: rgba.g, b: rgba.b, a: rgba.a)
+
+proc toChipmunk[T](opts: SpaceDebugDrawOptions[T]): cpSpaceDebugDrawOptions =
+  cpSpaceDebugDrawOptions(
+
+    data: opts.unsafeAddr,
+
+    shapeOutlineColor: opts.shapeOutlineColor.debug,
+    constraintColor: opts.constraintColor.debug,
+    collisionPointColor: opts.collisionPointColor.debug,
+
+    drawCircle: proc (pos: cpVect, angle, radius: cpFloat,
+                      outline, fill: cpSpaceDebugColor, data: pointer) =
+      var opts = cast[ptr SpaceDebugDrawOptions](data)
+      opts.drawCircle(opts.user, pos.vec2f, radius,
+                      outline.rgba, fill.rgba),
+
+    drawSegment: proc (a, b: cpVect, color: cpSpaceDebugColor, data: pointer) =
+      var opts = cast[ptr SpaceDebugDrawOptions](data)
+      opts.drawLine(opts.user, a.vec2f, b.vec2f, color.rgba),
+
+    drawFatSegment: proc (a, b: cpVect, radius: float32,
+                          outline, fill: cpSpaceDebugColor, data: pointer) =
+      var opts = cast[ptr SpaceDebugDrawOptions](data)
+      opts.drawFatLine(opts.user, a.vec2f, b.vec2f, radius,
+                       outline.rgba, fill.rgba),
+
+    drawPolygon: proc (count: cint, firstVert: ptr cpVect, radius: float32,
+                       outline, fill: cpSpaceDebugColor, data: pointer) =
+      var opts = cast[ptr SpaceDebugDrawOptions](data)
+      opts.drawPolygon(opts.user,
+                       cast[ptr UncheckedArray[Vec2f]](firstVert)
+                         .toOpenArray(0, count - 1),
+                       radius, outline.rgba, fill.rgba),
+
+    drawDot: proc (size: float32, pos: cpVect,
+                   color: cpSpaceDebugColor, data: pointer) =
+      var opts = cast[ptr SpaceDebugDrawOptions](data)
+      opts.drawPoint(opts.data, pos.vec2f, size, color.rgba),
+
+    colorForShape: proc (shape: ptr cpShape, data: pointer): cpSpaceDebugColor =
+      var
+        shape = cast[Shape](cpShapeGetUserData(shape))
+        opts = cast[ptr SpaceDebugDrawOptions](data)
+      result = opts.getColorForShape(opts.user, shape)
+
+  )
+
+{.pop.}
+
+proc debugDraw*(space: Space, opts: SpaceDebugDrawOptions) =
+  ## Draws debug information using the given options.
+
+  var cpopts = opts.toChipmunk
+  cpSpaceDebugDraw(space.raw, addr cpopts)
+
+when defined(nimcheck) or defined(nimdoc):
+  # deprecated shmeprecated. 1.4 de-deprecates this pragma anyways
+  {.define: rapidChipmunkGraphicsDebugDraw.}
+
+when defined(rapidChipmunkGraphicsDebugDraw):
+
+  import ../graphics
+
+  proc debugDrawOptions*(
+    graphics: Graphics,
+    flags = ddAll,
+    shapeOutlineColor: Rgba32f = colBlack,
+    constraintColor: Rgba32f = colBlue,
+    collisionPointColor: Rgba32f = colRed,
+  ): SpaceDebugDrawOptions[Graphics] =
+    ## Implements debug drawing using rapid/graphics.
+    ##
+    ## This feature must be enabled using -d:rapidChipmunkGraphicsDebugDraw,
+    ## or alternatively, using ``{.define: rapidChipmunkGraphicsDebugDraw.}``
+    ## before importing this module.
+
+    proc drawCircle(graphics: Graphics, center: Vec2f, radius: float32,
+                    lineColor, fillColor: Rgba32f) {.nimcall.} =
+      graphics.circle(center, radius, fillColor)
+      graphics.lineCircle(center, radius, thickness = 1, lineColor)
+
+    proc drawLine(graphics: Graphics, a, b: Vec2f, color: Rgba32f) {.nimcall.} =
+      discard
+
+    proc drawFatLine(graphics: Graphics, a, b: Vec2f, radius: float32,
+                     lineColor, fillColor: Rgba32f) {.nimcall.} =
+      discard
+
+    proc drawPolygon(graphics: Graphics, vertices: openArray[Vec2f],
+                     radius: float32, lineColor, fillColor: Rgba32f)
+                    {.nimcall.} =
+      discard
+
+    proc drawPoint(graphics: Graphics, point: Vec2f, size: float32,
+                   color: Rgba32f) {.nimcall.} =
+      discard
+
+    proc getColorForShape(_: Graphics, shape: Shape): Rgba32f {.nimcall.} =
+      if shape of CircleShape:
+        result = rgba(0, 1, 0, 0.3)
+      elif shape of SegmentShape:
+        result = rgba(1, 0, 0, 0.3)
+      else:
+        result = rgba(0, 0, 1, 0.3)
+
+    result = (
+      user: graphics,
+      drawCircle: drawCircle,
+      drawLine: drawLine,
+      drawFatLine: drawFatLine,
+      drawPolygon: drawPolygon,
+      drawPoint: drawPoint,
+      getColorForShape: getColorForShape,
+      flags: flags,
+      shapeOutlineColor: shapeOutlineColor,
+      constraintColor: constraintColor,
+      collisionPointColor: collisionPointColor,
+    )
