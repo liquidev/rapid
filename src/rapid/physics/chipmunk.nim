@@ -934,3 +934,8 @@ when defined(rapidChipmunkGraphicsDebugDraw):
       constraintColor: constraintColor,
       collisionPointColor: collisionPointColor,
     )
+
+const ChipmunkLicense* = slurp("../wrappers/extern/chipmunk/LICENSE.txt")
+  ## The Chipmunk2D license. You're legally required to credit Chipmunk
+  ## somewhere in your application's credits if you're using it for simulating
+  ## physics.
