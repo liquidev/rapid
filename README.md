@@ -6,7 +6,7 @@ prototyping. Made for convenience while coding and decent performance.
 ## Goals
 
  - Be easy to understand,
- - Have an flexible API,
+ - Have a flexible API,
  - Compile all C libraries statically to avoid dependency hell/linker errors,
  - Make game development a fun task for everyone.
 
