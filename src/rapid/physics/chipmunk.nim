@@ -24,6 +24,8 @@ import ../wrappers/chipmunk
 proc cpv(v: Vec2f): cpVect = cpv(v.x, v.y)
 proc vec2f(v: cpVect): Vec2f = vec2f(v.x, v.y)
 proc rectf(bb: cpBB): Rectf = rectf(bb.l, bb.t, bb.r - bb.l, bb.b - bb.t)
+proc bb(rect: Rectf): cpBB =
+  cpBBNew(rect.left, rect.bottom, rect.right, rect.top)
 
 {.pop.}
 
@@ -74,9 +76,14 @@ type
     ##
     ## :gradient:
     ##   The gradient of the signed distance function.
+    shape: Shape
     point: Vec2f
     distance: float32
     gradient: Vec2f
+
+  PointQueryCallback* = proc (shape: Shape, point: Vec2f, distance: float32,
+                              alpha: Vec2f)
+    ## Callback for space point queries.
 
   SegmentQuery* = tuple
     ## Segment query information.
@@ -89,9 +96,14 @@ type
     ##
     ## :alpha:
     ##   The normalized distance along the query segment in the range ``0..1``.
+    shape: Shape
     point: Vec2f
     normal: Vec2f
     alpha: float32
+
+  SegmentQueryCallback* = proc (shape: Shape, point, normal: Vec2f,
+                                alpha: float32)
+    ## Callback for space line segment queries.
 
   BodyKind* = enum
     ## The kind of a physics body. Body kinds are explained below in their
@@ -577,7 +589,7 @@ proc pointQuery*(shape: Shape, point: Vec2f): PointQuery =
 
   var query: cpPointQueryInfo
   discard cpShapePointQuery(shape.raw, point.cpv, addr query)
-  result = (point: query.point.vec2f, distance: query.distance,
+  result = (shape: shape, point: query.point.vec2f, distance: query.distance,
             gradient: query.gradient.vec2f)
 
 proc segmentQuery*(shape: Shape, a, b: Vec2f,
@@ -586,8 +598,8 @@ proc segmentQuery*(shape: Shape, a, b: Vec2f,
 
   var query: cpSegmentQueryInfo
   if cpShapeSegmentQuery(shape.raw, a.cpv, b.cpv, radius, addr query).bool:
-    result = some (point: query.point.vec2f, normal: query.normal.vec2f,
-                   alpha: query.alpha)
+    result = some (shape: shape, point: query.point.vec2f,
+                   normal: query.normal.vec2f, alpha: query.alpha)
 
 
 {.pop.}
@@ -1043,6 +1055,82 @@ proc collisionHandler*(space: Space,
     space.pairCollisionHandlers[pair] = result
   else:
     result = space.pairCollisionHandlers[pair]
+
+proc pointQuery*(space: Space, point: Vec2f, maxDistance: float32,
+                 filter: ShapeFilter, callback: PointQueryCallback) =
+  ## Performs a point query on shapes in the space. ``point`` is the point to
+  ## query against, ``maxDistance`` is the maximum distance for shapes to be
+  ## checked, and ``filter`` is the filter for which shapes to pass to the
+  ## callback.
+
+  proc iterate(shape: ptr cpShape, point: cpVect, distance: cpFloat,
+               gradient: cpVect, data: pointer) {.cdecl.} =
+    var
+      shape = cast[Shape](cpShapeGetUserData(shape))
+      callback = cast[ptr PointQueryCallback](data)[]
+    callback(shape, point.vec2f, distance, gradient.vec2f)
+
+  cpSpacePointQuery(space.raw, point.cpv, maxDistance, filter.toChipmunk,
+                    iterate, callback.unsafeAddr)
+
+proc pointQueryNearest*(space: Space, point: Vec2f, maxDistance: float32,
+                        filter: ShapeFilter): Option[PointQuery] =
+  ## Performs a point query on shapes in the space, and returns the shape if a
+  ## shape is found, or ``None`` if a matching shape cannot be found.
+
+  var query: cpPointQueryInfo
+  let rawShape = cpSpacePointQueryNearest(space.raw, point.cpv, maxDistance,
+                                          filter.toChipmunk, addr query)
+  if rawShape != nil:
+    let shape = cast[Shape](cpShapeGetUserData(rawShape))
+    result = some (shape: shape, point: query.point.vec2f,
+                   distance: query.distance, gradient: query.gradient.vec2f)
+
+proc segmentQuery*(space: Space, start, fin: Vec2f, radius: float32,
+                   filter: ShapeFilter, callback: SegmentQueryCallback) =
+  ## Performs a directed line segment query on shapes in the space, calling the
+  ## given callback for each shape intersected. ``start`` and ``fin`` are the
+  ## start and end points of the segment, ``radius`` is the segment's bevel
+  ## radius, and ``filter`` is the filter for which shapes to pass to the
+  ## callback.
+
+  proc iterate(shape: ptr cpShape, point, normal: cpVect, alpha: cpFloat,
+               data: pointer) {.cdecl.} =
+    var
+      shape = cast[Shape](cpShapeGetUserData(shape))
+      callback = cast[ptr SegmentQueryCallback](data)[]
+    callback(shape, point.vec2f, normal.vec2f, alpha)
+
+  cpSpaceSegmentQuery(space.raw, start.cpv, fin.cpv, radius, filter.toChipmunk,
+                      iterate, callback.unsafeAddr)
+
+proc segmentQueryFirst*(space: Space, start, fin: Vec2f, radius: float32,
+                        filter: ShapeFilter): Option[SegmentQuery] =
+  ## Performs a directed line segment query on shapes in the space, and returns
+  ## the first shape falling along the given segment or ``None`` if no shape
+  ## lies on the segment.
+
+  var query: cpSegmentQueryInfo
+  let rawShape = cpSpaceSegmentQueryFirst(space.raw, start.cpv, fin.cpv,
+                                          radius, filter.toChipmunk,
+                                          addr query)
+  if rawShape != nil:
+    let shape = cast[Shape](cpShapeGetUserData(rawShape))
+    result = some (shape: shape, point: query.point.vec2f,
+                   normal: query.normal.vec2f, alpha: query.alpha)
+
+proc rectQuery*(space: Space, rect: Rectf, filter: ShapeFilter,
+                callback: proc (shape: Shape)) =
+  ## Performs a fast query for shapes lying in the given axis-aligned rectangle.
+
+  proc iterate(shape: ptr cpShape, data: pointer) {.cdecl.} =
+    var
+      shape = cast[Shape](cpShapeGetUserData(shape))
+      callback = cast[ptr proc (shape: Shape)](data)[]
+    callback(shape)
+
+  cpSpaceBBQuery(space.raw, rect.bb, filter.toChipmunk,
+                 iterate, callback.unsafeAddr)
 
 proc newSpace*(gravity: Vec2f, iterations = 10.Natural): Space =
   ## Creates a new space with the given gravity and iteration count.
