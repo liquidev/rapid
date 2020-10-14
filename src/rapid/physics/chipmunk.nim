@@ -65,12 +65,16 @@ type
     bkKinematic
     bkStatic
 
-  BodyObj = object
+  BodyObj = object of RootObj
     raw: ptr cpBody
     shapes: seq[Shape]
     indexInSpace: int
   Body* = ref BodyObj
     ## A rigid body.
+
+  UserBody*[T] {.final.} = ref object of Body
+    ## Convenience object for storing user data alongside bodies.
+    user*: T  ## user data. you're free to set this to whatever you want
 
   SpaceObj = object
     raw: ptr cpSpace
@@ -273,16 +277,18 @@ proc sleep*(body: Body) =
 
 {.pop.}
 
-proc new(body: var Body, raw: ptr cpBody) =
+proc deinit[T: Body](body: T) =
+  cpBodyFree(body.raw)
 
-  new(body) do (body: Body):
-    cpBodyFree(body.raw)
+proc new[T: Body](body: var T, raw: ptr cpBody) =
+
+  new(body, deinit[T])
 
   body.raw = raw
   cpBodySetUserData(body.raw, cast[ptr BodyObj](body))
 
-proc newDynamicBody*(mass, moment = 0.0f): Body =
-  ## Creates a new dynamic body with the given mass and moment of inertia.
+proc initDynamic*[T: Body](body: var T, mass, moment = 0.0f) =
+  ## Initializes a new dynamic body with the given mass and moment of inertia.
   ##
   ## Dynamic bodies are simulated and controlled by the physics engine.
   ##
@@ -295,10 +301,21 @@ proc newDynamicBody*(mass, moment = 0.0f): Body =
   ## - If the mass is non-zero, and the mass of all shapes is 0, the moment of
   ##   inertia will be calculated automatically from the attached shapes.
 
-  result.new(cpBodyNew(mass, moment))
+  body.new(cpBodyNew(mass, moment))
 
-proc newKinematicBody*(): Body =
-  ## Creates a new kinematic body.
+proc newDynamicBody*(mass, moment = 0.0f): Body =
+  ## Creates a new dynamic body.
+
+  result.initDynamic(mass, moment)
+
+proc newDynamicBody*[T](user: T, mass, moment = 0.0f): UserBody[T] =
+  ## Creates a new dynamic body with user data.
+
+  result.initDynamic(mass, moment)
+  result.user = user
+
+proc initKinematic*[T: Body](body: var T) =
+  ## Initializes a new kinematic body.
   ##
   ## Kinematic bodies are simulated by the game. They aren't affected by
   ## gravity, and have an infinite amount of mass, so they don't react to
@@ -307,10 +324,21 @@ proc newKinematicBody*(): Body =
   ## These bodies can be controlled by setting their velocity.
   ## Objects touching a kinematic body are never allowed to fall asleep.
 
-  result.new(cpBodyNewKinematic())
+  body.new(cpBodyNewKinematic())
 
-proc newStaticBody*(): Body =
-  ## Creates a new static body.
+proc newKinematicBody*(): Body =
+  ## Creates a new kinematic body.
+
+  result.initKinematic()
+
+proc newKinematicBody*[T](user: T): UserBody[T] =
+  ## Creates a new kinematic body with user data.
+
+  result.initKinematic()
+  result.user = user
+
+proc initStatic*[T: Body](body: var T) =
+  ## Initializes a new static body.
   ##
   ## Static bodies hardly ever move, aren't affected by gravity, and don't react
   ## to collisions. Using static bodies for things like level geometry has a big
@@ -319,7 +347,18 @@ proc newStaticBody*(): Body =
   ## There is, however, a performance penalty when a static object needs to
   ## be moved, as all the collision information has to be recalculated.
 
-  result.new(cpBodyNewStatic())
+  body.new(cpBodyNewStatic())
+
+proc newStaticBody*(): Body =
+  ## Creates a new static body.
+
+  result.initStatic()
+
+proc newStaticBody*[T](user: T): UserBody[T] =
+  ## Creates a new static body with user data.
+
+  result.initStatic()
+  result.user = user
 
 
 # shape

@@ -10,8 +10,10 @@ import context
 type
   EffectVertex = object
     position, uv: Vec2f
+
   PostProcess* = distinct Program[EffectVertex]
     ## Post-processing effect.
+
   EffectBuffer* = ref object
     ## Ping-pong framebuffer for post-processing effects.
     window: Window
@@ -22,6 +24,7 @@ type
     fullscreenRect: Mesh[EffectVertex]
     drawParams: DrawParams
     passthrough: Program[EffectVertex]
+
   EffectTarget* = object of Target
     ## Target for rendering to an effect buffer.
     buffer: EffectBuffer
@@ -133,7 +136,6 @@ proc resize*(buffer: EffectBuffer, size: Vec2i) =
   ## so be careful!
 
   buffer.size = size
-  echo "resizing to ", size
   buffer.a = createFramebuffer(buffer.window, buffer.size,
                                buffer.colorTargetCount, buffer.hdr)
   buffer.b = createFramebuffer(buffer.window, buffer.size,

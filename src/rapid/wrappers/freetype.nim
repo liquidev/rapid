@@ -3,8 +3,6 @@
 import std/macros
 import std/os
 
-static: echo currentSourcePath.splitPath
-
 const
   Here = currentSourcePath.splitPath().head
   # using concatenation because of windows®®®®®®®® crosscompilation
