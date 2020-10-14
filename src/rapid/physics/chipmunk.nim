@@ -4,6 +4,11 @@
 ## This wrapper doesn't aim for 100% coverage of the physics engine, but
 ## features may be added as needed.
 
+import std/hashes
+import std/options
+import std/tables
+import std/typetraits
+
 import aglet/rect
 import glm/mat
 import glm/vec
@@ -58,6 +63,36 @@ type
     group: uint
     categories, mask: set[CollisionCategory]
 
+  PointQuery* = tuple
+    ## Point query information.
+    ##
+    ## :point:
+    ##   The closest point on the shape's surface, in world coordinates.
+    ##
+    ## :distance:
+    ##   The distance to the point.
+    ##
+    ## :gradient:
+    ##   The gradient of the signed distance function.
+    point: Vec2f
+    distance: float32
+    gradient: Vec2f
+
+  SegmentQuery* = tuple
+    ## Segment query information.
+    ##
+    ## :point:
+    ##   The point of impact.
+    ##
+    ## :normal:
+    ##   The normal of the surface hit.
+    ##
+    ## :alpha:
+    ##   The normalized distance along the query segment in the range ``0..1``.
+    point: Vec2f
+    normal: Vec2f
+    alpha: float32
+
   BodyKind* = enum
     ## The kind of a physics body. Body kinds are explained below in their
     ## respective Body constructors.
@@ -72,6 +107,37 @@ type
   Body* = ref BodyObj
     ## A rigid body.
 
+  Arbiter* = object
+    ## A collision pair between two bodies.
+    raw: ptr cpArbiter
+
+  CollisionHandler* = ref object
+    ## A set of collision handling callbacks.
+
+    raw: ptr cpCollisionHandler
+
+    kindA, kindB: CollisionKind
+
+    begin: proc (space: Space, arbiter: Arbiter): bool
+      ## Called when two objects start touching.
+      ## Returning false will cancel the collision until the separate callback
+      ## is called when the objects stop colliding.
+
+    preSolve: proc (space: Space, arbiter: Arbiter): bool
+      ## Called when two shapes are already touching during the current step.
+      ## Returning false will make Chipmunk ignore this collision step.
+      ## It's possible to override some of the arbiter's values during this
+      ## callback.
+
+    postSolve: proc (space: Space, arbiter: Arbiter)
+      ## Called when two shapes are touching and their collision response has
+      ## been processed. The collision impulse or kinetic energy can be
+      ## retrieved during this callback.
+
+    separate: proc (space: Space, arbiter: Arbiter)
+      ## Called when two shapes stop touching, or one of the shapes is removed
+      ## during a collision.
+
   UserBody*[T] {.final.} = ref object of Body
     ## Convenience object for storing user data alongside bodies.
     user*: T  ## user data. you're free to set this to whatever you want
@@ -79,8 +145,16 @@ type
   SpaceObj = object
     raw: ptr cpSpace
     bodies: seq[Body]
+    defaultCollisionHandler: CollisionHandler
+    pairCollisionHandlers: Table[tuple[a, b: CollisionKind], CollisionHandler]
   Space* = ref SpaceObj
     ## Space for simulating physics.
+
+# common
+
+proc `==`*(a, b: CollisionKind): bool {.borrow.}
+
+proc hash*(kind: CollisionKind): Hash {.borrow.}
 
 
 # body
@@ -276,6 +350,25 @@ proc sleep*(body: Body) =
   cpBodySleep(body.raw)
 
 {.pop.}
+
+proc eachShape*(body: Body, callback: proc (shape: Shape)) =
+  ## Iterates over all of the body's shapes.
+
+  proc iterate(rawBody: ptr cpBody, rawShape: ptr cpShape, data: pointer)
+              {.cdecl.} =
+    var
+      shape = cast[Shape](cpShapeGetUserData(rawShape))
+      callback = cast[ptr proc (shape: Shape)](data)[]
+    callback(shape)
+
+  cpBodyEachShape(body.raw, iterate, callback.unsafeAddr)
+
+template wrap(a: ptr cpArbiter): Arbiter = Arbiter(raw: a)
+
+proc eachArbiter*(body: Body, callback: proc (arbiter: Arbiter)) =
+  ## Iterates over all collision pairs the body's currently in.
+
+  discard "TODO"
 
 proc deinit[T: Body](body: T) =
   cpBodyFree(body.raw)
@@ -479,6 +572,24 @@ proc `filter=`*(shape: Shape, newFilter: ShapeFilter) =
   ## Sets the shape filter of the shape.
   cpShapeSetFilter(shape.raw, newFilter.toChipmunk)
 
+proc pointQuery*(shape: Shape, point: Vec2f): PointQuery =
+  ## Perform a point query against the given shape.
+
+  var query: cpPointQueryInfo
+  discard cpShapePointQuery(shape.raw, point.cpv, addr query)
+  result = (point: query.point.vec2f, distance: query.distance,
+            gradient: query.gradient.vec2f)
+
+proc segmentQuery*(shape: Shape, a, b: Vec2f,
+                   radius: float32): Option[SegmentQuery] =
+  ## Perform a segment query against the given shape.
+
+  var query: cpSegmentQueryInfo
+  if cpShapeSegmentQuery(shape.raw, a.cpv, b.cpv, radius, addr query).bool:
+    result = some (point: query.point.vec2f, normal: query.normal.vec2f,
+                   alpha: query.alpha)
+
+
 {.pop.}
 
 proc new[T: Shape](shape: var T, body: Body, raw: ptr cpShape) =
@@ -504,6 +615,8 @@ proc newCircleShape*(body: Body, radius: float32,
 
   result.new(body, cpCircleShapeNew(body.raw, radius, offset.cpv))
 
+{.push inline.}
+
 proc offset*(shape: CircleShape): Vec2f =
   ## Returns the circle's offset from the body's center.
   cpCircleShapeGetOffset(shape.raw).vec2f
@@ -512,11 +625,15 @@ proc radius*(shape: CircleShape): float32 =
   ## Returns the circle's radius.
   cpCircleShapeGetRadius(shape.raw)
 
+{.pop.}
+
 proc newSegmentShape*(body: Body, a, b: Vec2f, radius = 0.0f): SegmentShape =
   ## Creates a new beveled segment shape with the given start and end points and
   ## bevel radius, and attaches it to the body.
 
   result.new(body, cpSegmentShapeNew(body.raw, a.cpv, b.cpv, radius))
+
+{.push inline.}
 
 proc a*(shape: SegmentShape): Vec2f =
   ## Returns the first endpoint of the segment.
@@ -551,6 +668,8 @@ proc transform(translation: Vec2f, mat: Mat2f): cpTransform =
               a: mat.arr[0][0], b: mat.arr[1][0],
               c: mat.arr[1][0], d: mat.arr[1][1])
 
+{.pop.}
+
 proc newPolygonShape*(body: Body,
                       vertices: openArray[Vec2f],
                       offset = vec2f(0),
@@ -567,6 +686,8 @@ proc newPolygonShape*(body: Body,
                                   transform(offset, transform),
                                   radius))
 
+{.push inline.}
+
 proc vertexCount*(shape: PolygonShape): int =
   ## Returns the amount of vertices the polygon has.
   cpPolyShapeGetCount(shape.raw).int
@@ -579,11 +700,122 @@ proc radius*(shape: PolygonShape): float32 =
   ## Returns the polygon shape's skin radius.
   cpPolyShapeGetRadius(shape.raw)
 
+{.pop.}
+
 proc newBoxShape*(body: Body, size: Vec2f, radius = 0.0f): PolygonShape =
   ## Shortcut for creating a box polygon centered at the body, with the given
   ## size and skin radius.
 
   result.new(body, cpBoxShapeNew(body.raw, size.x, size.y, radius))
+
+
+# arbiter
+
+proc `=`*(dest: var Arbiter, source: Arbiter) {.error.} =
+  ## Arbiters must not be copied as they're managed by Chipmunk.
+
+proc restitution*(arbiter: Arbiter): float32 =
+  ## Returns the restitution (elasticity) calculated for this collision pair.
+  cpArbiterGetRestitution(arbiter.raw)
+
+proc `restitution=`*(arbiter: Arbiter, newRestitution: float32) =
+  ## Sets the restitution for this collision pair.
+  ## Setting the value in a ``preSolve()`` callback will override the value
+  ## calculated by the space.
+  cpArbiterSetRestitution(arbiter.raw, newRestitution)
+
+proc friction*(arbiter: Arbiter): float32 =
+  ## Returns the friction calculated for this collision pair.
+  cpArbiterGetFriction(arbiter.raw)
+
+proc `friction=`*(arbiter: Arbiter, newFriction: float32) =
+  ## Sets the friction for this collision pair.
+  ## Setting the value in a ``preSolve()`` callback will override the value
+  ## calculated by the space.
+  cpArbiterSetFriction(arbiter.raw, newFriction)
+
+proc surfaceVelocity*(arbiter: Arbiter): Vec2f =
+  ## Returns the surface velocity calculated for this collision pair.
+  cpArbiterGetSurfaceVelocity(arbiter.raw).vec2f
+
+proc `surfaceVelocity=`*(arbiter: Arbiter, newVelocity: Vec2f) =
+  ## Sets the surface velocity for this collision pair.
+  ## Setting the value in a ``preSolve()`` callback will override the value
+  ## calculated by the space. The default calculation subtracts the surface
+  ## velocity of the second shape from the first, and then projects that onto
+  ## the tangent of the collision. This is so that only friction is affected by
+  ## the default calculation.
+  cpArbiterSetSurfaceVelocity(arbiter.raw, newVelocity.cpv)
+
+proc count*(arbiter: Arbiter): int =
+  ## Returns the number of contacts tracked by the arbiter. This is always 2.
+  cpArbiterGetCount(arbiter.raw).int
+
+proc normal*(arbiter: Arbiter): Vec2f =
+  ## Returns the normal of the collision.
+  cpArbiterGetNormal(arbiter.raw).vec2f
+
+proc pointA*(arbiter: Arbiter, n: int): Vec2f =
+  ## Returns the position of the ``n``-th contact point on the surface of the
+  ## first shape.
+  cpArbiterGetPointA(arbiter.raw, n.cint).vec2f
+
+proc pointB*(arbiter: Arbiter, n: int): Vec2f =
+  ## Returns the position of the ``n``-th contact point on the surface of the
+  ## second shape.
+  cpArbiterGetPointB(arbiter.raw, n.cint).vec2f
+
+proc depth*(arbiter: Arbiter, n: int): float32 =
+  ## Returns the depth of the ``n``-th contact point.
+  cpArbiterGetDepth(arbiter.raw, n.cint)
+
+proc isFirstContact*(arbiter: Arbiter): bool =
+  ## Returns ``true`` if this is the first step a pair of objects started
+  ## colliding.
+  cpArbiterIsFirstContact(arbiter.raw).bool
+
+proc isRemoval*(arbiter: Arbiter): bool =
+  ## Returns ``true`` if the separate callback is due to a shape being removed
+  ## from the space.
+  cpArbiterIsRemoval(arbiter.raw).bool
+
+proc ignore*(arbiter: Arbiter): bool =
+  ## Mark a collision pair to be ignored until the two objects separate.
+  ## ``preSolve()`` and ``postSolve()`` callbacks will not be called, but the
+  ## ``separate()`` callback will.
+  cpArbiterIgnore(arbiter.raw).bool
+
+proc shapes*(arbiter: Arbiter): tuple[a, b: Shape] =
+  ## Retrieves the shapes associated with this arbiter in the order they were
+  ## defined in the collision handler.
+
+  var rawA, rawB: ptr cpShape
+  cpArbiterGetShapes(arbiter.raw, addr rawA, addr rawB)
+  result = (a: cast[Shape](cpShapeGetUserData(rawA)),
+            b: cast[Shape](cpShapeGetUserData(rawB)))
+
+proc bodies*(arbiter: Arbiter): tuple[a, b: Body] =
+  ## Retrieves the bodies associated with this arbiter in the order they were
+  ## defined in the collision handler.
+
+  var rawA, rawB: ptr cpBody
+  cpArbiterGetBodies(arbiter.raw, addr rawA, addr rawB)
+  result = (a: cast[Body](cpBodyGetUserData(rawA)),
+            b: cast[Body](cpBodyGetUserData(rawB)))
+
+proc totalImpulse*(arbiter: Arbiter): Vec2f =
+  ## Returns the total impulse applied this step to resolve the collision,
+  ## including friction.
+  ## This should only be called from a ``postSolve()``, ``postStep()``, or
+  ## ``body.eachArbiter()`` callback, otherwise the result is undefined.
+  cpArbiterTotalImpulse(arbiter.raw).vec2f
+
+proc totalKE*(arbiter: Arbiter): float32 =
+  ## Calculates the amount of energy lost in a collision including static,
+  ## but not dynamic friction.
+  ## This should only be called from a ``postSolve()``, ``postStep()``, or
+  ## ``body.eachArbiter()`` callback, otherwise the result is undefined.
+  cpArbiterTotalKE(arbiter.raw)
 
 
 # space
@@ -748,6 +980,70 @@ proc eachBody*(space: Space, callback: proc (body: Body)) =
 
   cpSpaceEachBody(space.raw, iterate, unsafeAddr callback)
 
+proc implement(raw: ptr cpCollisionHandler, handler: CollisionHandler) =
+
+  handler.raw = raw
+  handler.kindA = raw.typeA.CollisionKind
+  handler.kindB = raw.typeB.CollisionKind
+  raw.userData = cast[pointer](handler)
+
+  raw.beginFunc = proc (rawArbiter: ptr cpArbiter, rawSpace: ptr cpSpace,
+                        data: pointer): cpBool {.cdecl.} =
+    var
+      handler = cast[CollisionHandler](data)
+      space = cast[Space](cpSpaceGetUserData(rawSpace))
+    result = handler.begin(space, rawArbiter.wrap).cpBool
+
+  raw.preSolveFunc = proc (rawArbiter: ptr cpArbiter, rawSpace: ptr cpSpace,
+                           data: pointer): cpBool {.cdecl.} =
+    var
+      handler = cast[CollisionHandler](data)
+      space = cast[Space](cpSpaceGetUserData(rawSpace))
+    result = handler.preSolve(space, rawArbiter.wrap).cpBool
+
+  raw.postSolveFunc = proc (rawArbiter: ptr cpArbiter, rawSpace: ptr cpSpace,
+                            data: pointer) {.cdecl.} =
+    var
+      handler = cast[CollisionHandler](data)
+      space = cast[Space](cpSpaceGetUserData(rawSpace))
+    handler.postSolve(space, rawArbiter.wrap)
+
+  raw.separateFunc = proc (rawArbiter: ptr cpArbiter, rawSpace: ptr cpSpace,
+                           data: pointer) {.cdecl.} =
+    var
+      handler = cast[CollisionHandler](data)
+      space = cast[Space](cpSpaceGetUserData(rawSpace))
+    handler.separate(space, rawArbiter.wrap)
+
+proc defaultCollisionHandler*(space: Space): CollisionHandler =
+  ## Returns (or, if necessary, creates) the default collision handler.
+
+  if space.defaultCollisionHandler == nil:
+    var raw = cpSpaceAddDefaultCollisionHandler(space.raw)
+    result = CollisionHandler()
+    implement(raw, result)
+    space.defaultCollisionHandler = result
+  else:
+    result = space.defaultCollisionHandler
+
+proc collisionHandler*(space: Space,
+                       kindA, kindB: CollisionKind): CollisionHandler =
+  ## Returns (or, if necessary, creates) the collision handler for the given
+  ## collision kind pair.
+
+  let pair = (a: kindA, b: kindB)
+  if pair notin space.pairCollisionHandlers:
+    var raw = cpSpaceAddCollisionHandler(
+      space.raw,
+      kindA.cpCollisionType,
+      kindB.cpCollisionType
+    )
+    result = CollisionHandler()
+    implement(raw, result)
+    space.pairCollisionHandlers[pair] = result
+  else:
+    result = space.pairCollisionHandlers[pair]
+
 proc newSpace*(gravity: Vec2f, iterations = 10.Natural): Space =
   ## Creates a new space with the given gravity and iteration count.
 
@@ -759,6 +1055,37 @@ proc newSpace*(gravity: Vec2f, iterations = 10.Natural): Space =
   result.iterations = iterations
 
   cpSpaceSetUserData(result.raw, cast[ptr SpaceObj](result))
+
+
+# collision handlers
+
+proc kindA*(handler: CollisionHandler): CollisionKind =
+  ## Returns the first kind of the collision handler.
+  handler.kindA
+
+proc kindB*(handler: CollisionHandler): CollisionKind =
+  ## Returns the second kind of the collision handler.
+  handler.kindB
+
+proc onBegin*(handler: CollisionHandler,
+              callback: proc (space: Space, arbiter: Arbiter): bool) =
+  ## Sets the ``begin()`` callback of the collision handler.
+  handler.begin = callback
+
+proc onPreSolve*(handler: CollisionHandler,
+                 callback: proc (space: Space, arbiter: Arbiter): bool) =
+  ## Sets the ``preSolve()`` callback of the collision handler.
+  handler.preSolve = callback
+
+proc onPostSolve*(handler: CollisionHandler,
+                  callback: proc (space: Space, arbiter: Arbiter)) =
+  ## Sets the ``postSOlve()`` callback of the collision handler.
+  handler.postSolve = callback
+
+proc onSeparate*(handler: CollisionHandler,
+                 callback: proc (space: Space, arbiter: Arbiter)) =
+  ## Sets the ``separate()`` callback of the collision handler.
+  handler.separate = callback
 
 
 # debug draw
@@ -778,18 +1105,24 @@ type
 
     user: T  ## user-defined value, passed to all of the callbacks
 
-    drawCircle: proc (t: T, center: Vec2f, radius: float32,
-                      lineColor, fillColor: Rgba32f) {.nimcall.}
-    drawLine: proc (t: T, a, b: Vec2f, color: Rgba32f) {.nimcall.}
-    drawFatLine: proc (t: T, a, b: Vec2f, radius: float32,
-                       lineColor, fillColor: Rgba32f) {.nimcall.}
-    drawPolygon: proc (t: T, vertices: openArray[Vec2f], radius: float32,
-                       lineColor, fillColor: Rgba32f) {.nimcall.}
-    drawPoint: proc (t: T, position: Vec2f, size: float32, color: Rgba32f)
-                    {.nimcall.}
-    getColorForShape: proc (t: T, shape: Shape): Rgba32f {.nimcall.}
     flags: set[SpaceDebugDrawFlag]
     shapeOutlineColor, constraintColor, collisionPointColor: Rgba32f
+
+    drawCircle: proc (t: T, center: Vec2f, radius: float32,
+                      lineColor, fillColor: Rgba32f) {.nimcall.}
+
+    drawLine: proc (t: T, a, b: Vec2f, color: Rgba32f) {.nimcall.}
+
+    drawFatLine: proc (t: T, a, b: Vec2f, radius: float32,
+                       lineColor, fillColor: Rgba32f) {.nimcall.}
+
+    drawPolygon: proc (t: T, vertices: openArray[Vec2f], radius: float32,
+                       lineColor, fillColor: Rgba32f) {.nimcall.}
+
+    drawPoint: proc (t: T, position: Vec2f, size: float32, color: Rgba32f)
+                    {.nimcall.}
+
+    getColorForShape: proc (t: T, shape: Shape): Rgba32f {.nimcall.}
 
 {.push inline.}
 
@@ -923,16 +1256,16 @@ when defined(rapidChipmunkGraphicsDebugDraw):
 
     result = (
       user: graphics,
+      flags: flags,
+      shapeOutlineColor: shapeOutlineColor,
+      constraintColor: constraintColor,
+      collisionPointColor: collisionPointColor,
       drawCircle: drawCircle,
       drawLine: drawLine,
       drawFatLine: drawFatLine,
       drawPolygon: drawPolygon,
       drawPoint: drawPoint,
       getColorForShape: getColorForShape,
-      flags: flags,
-      shapeOutlineColor: shapeOutlineColor,
-      constraintColor: constraintColor,
-      collisionPointColor: collisionPointColor,
     )
 
 const ChipmunkLicense* = slurp("../wrappers/extern/chipmunk/LICENSE.txt")

@@ -43,12 +43,12 @@ type ## / A dynamic body is one that is affected by gravity, forces, and collisi
 
 type
   cpBodyVelocityFunc* = proc (body: ptr cpBody; gravity: cpVect; damping: cpFloat;
-                           dt: cpFloat)
+                           dt: cpFloat) {.cdecl.}
 
 ## / Rigid body position update function type.
 
 type
-  cpBodyPositionFunc* = proc (body: ptr cpBody; dt: cpFloat)
+  cpBodyPositionFunc* = proc (body: ptr cpBody; dt: cpFloat) {.cdecl.}
 
 ## / Allocate a cpBody.
 
@@ -246,7 +246,7 @@ proc cpBodyKineticEnergy*(body: ptr cpBody): cpFloat {.
 ## / Body/shape iterator callback function type.
 
 type
-  cpBodyShapeIteratorFunc* = proc (body: ptr cpBody; shape: ptr cpShape; data: pointer)
+  cpBodyShapeIteratorFunc* = proc (body: ptr cpBody; shape: ptr cpShape; data: pointer) {.cdecl.}
 
 ## / Call @c func once for each shape attached to @c body and added to the space.
 
@@ -256,7 +256,7 @@ proc cpBodyEachShape*(body: ptr cpBody; `func`: cpBodyShapeIteratorFunc; data: p
 
 type
   cpBodyConstraintIteratorFunc* = proc (body: ptr cpBody;
-                                     constraint: ptr cpConstraint; data: pointer)
+                                     constraint: ptr cpConstraint; data: pointer) {.cdecl.}
 
 ## / Call @c func once for each constraint attached to @c body and added to the space.
 
@@ -267,7 +267,7 @@ proc cpBodyEachConstraint*(body: ptr cpBody; `func`: cpBodyConstraintIteratorFun
 
 type
   cpBodyArbiterIteratorFunc* = proc (body: ptr cpBody; arbiter: ptr cpArbiter;
-                                  data: pointer)
+                                  data: pointer) {.cdecl.}
 
 ## / Call @c func once for each arbiter that is currently active on the body.
 
