@@ -2,15 +2,42 @@
   <img src="logo-8x.png">
 </p>
 
-A game engine written in Nim, optimized for rapid game development and easy
-prototyping. Made for convenience while coding and decent performance.
+A game engine written in Nim, optimized for making cool games fast.
+Made for convenience while coding and better performance than all-in-one
+solutions like Godot.
 
 ## Goals
 
- - Be easy to understand,
- - Have a flexible API,
- - Compile all C libraries statically to avoid dependency hell/linker errors,
- - Make game development a fun task for everyone.
+- Be easy to understand,
+- Have a rich set of flexible APIs,
+- Compile all C libraries statically to avoid dependency hell/linker errors,
+- Make game development a fun task for everyone.
+
+## Features
+
+- `rapid/graphics`
+  - _Almost stateless_ graphics context API – the only state you ever have
+    to worry about is the shape buffer
+    - Supports text rendering using FreeType
+    - Has a built-in polyline renderer for drawing wires, graphs, etc.
+  - Post-processing effects with HDR rendering support
+  - Built in texture packer
+- `rapid/game`
+  - Fixed timestep game loop
+  - Fixed-size and infinite-size tilemaps
+- `rapid/ec`
+  - Minimal [entity-component][gpp component] decoupling pattern implementation
+- `rapid/physics`
+  - General-purpose physics engine, using [Chipmunk2D][chipmunk repo]
+
+  [gpp component]: https://gameprogrammingpatterns.com/component.html
+  [chipmunk repo]: https://github.com/slembcke/Chipmunk2D
+
+### Coming soon
+
+- `rapid/audio` – Sound mixer with real-time effect support
+- `rapid/ui` – [Fidget][fidget repo]-style UI framework for games
+  and applications
 
 ## Installing
 
