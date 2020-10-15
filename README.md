@@ -52,6 +52,8 @@ or if you're a Chad using [nimph][nimph repo]:
 $ nimph clone liquid600pgm/rapid
 ```
 
+  [nimph repo]: https://github.com/disruptek/nimph
+
 ### Linux
 
 On Linux, the development headers for the following libraries must be installed:
