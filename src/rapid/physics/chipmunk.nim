@@ -6,6 +6,7 @@
 
 import std/hashes
 import std/options
+import std/sets
 import std/tables
 import std/typetraits
 
@@ -17,7 +18,7 @@ import ../math/units
 import ../wrappers/chipmunk
 
 
-# convenience converters
+# stuff
 
 {.push inline.}
 
@@ -114,7 +115,7 @@ type
 
   BodyObj = object of RootObj
     raw: ptr cpBody
-    shapes: seq[Shape]
+    shapes: HashSet[Shape]
     indexInSpace: int
   Body* = ref BodyObj
     ## A rigid body.
@@ -168,6 +169,10 @@ proc `==`*(a, b: CollisionKind): bool {.borrow.}
 
 proc hash*(kind: CollisionKind): Hash {.borrow.}
 
+proc hash*(shape: Shape): Hash = hash(cast[pointer](shape))
+
+proc `=`*(dest: var Arbiter, source: Arbiter) {.error.} =
+  ## Arbiters must not be copied as they're managed by Chipmunk.
 
 # body
 
@@ -380,7 +385,12 @@ template wrap(a: ptr cpArbiter): Arbiter = Arbiter(raw: a)
 proc eachArbiter*(body: Body, callback: proc (arbiter: Arbiter)) =
   ## Iterates over all collision pairs the body's currently in.
 
-  discard "TODO"
+  proc iterate(rawBody: ptr cpBody, rawArbiter: ptr cpArbiter,
+               data: pointer) {.cdecl.} =
+    var callback = cast[ptr proc (arbiter: Arbiter)](data)[]
+    callback(rawArbiter.wrap)
+
+  cpBodyEachArbiter(body.raw, iterate, callback.unsafeAddr)
 
 proc deinit[T: Body](body: T) =
   cpBodyFree(body.raw)
@@ -613,7 +623,7 @@ proc new[T: Shape](shape: var T, body: Body, raw: ptr cpShape) =
 
   shape.raw = raw
   discard cpSpaceAddShape(body.space.raw, raw)
-  body.shapes.add(shape)
+  body.shapes.incl(shape)
   cpShapeSetUserData(shape.raw, cast[ptr Shape](shape))
 
 proc newCircleShape*(body: Body, radius: float32,
@@ -722,9 +732,6 @@ proc newBoxShape*(body: Body, size: Vec2f, radius = 0.0f): PolygonShape =
 
 
 # arbiter
-
-proc `=`*(dest: var Arbiter, source: Arbiter) {.error.} =
-  ## Arbiters must not be copied as they're managed by Chipmunk.
 
 proc restitution*(arbiter: Arbiter): float32 =
   ## Returns the restitution (elasticity) calculated for this collision pair.

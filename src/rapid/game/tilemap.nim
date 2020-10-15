@@ -2,10 +2,10 @@
 
 import std/tables
 
+import aglet/rect
 import glm/vec
 
 import ../math/vector
-import ../physics/aabb
 
 type
   TilemapTile* {.explain.} = concept a
@@ -307,59 +307,6 @@ iterator area*(tilemap: AnyTilemap, area: Recti): (Vec2i, var auto) =
     for x in area.left..area.right:
       let position = vec2i(x, y)
       yield (position, tilemap[position])
-
-
-# physics
-
-import ../graphics/context
-import ../graphics/tracers
-
-proc alignToGrid*(tilemap: RootTilemap, rect: Rectf): Recti =
-  ## Returns grid coordinates of the given rectangle.
-
-  let
-    left = floor(rect.left / tilemap.tileWidth).int32
-    top = floor(rect.top / tilemap.tileHeight).int32
-    right = ceil(rect.right / tilemap.tileWidth).int32
-    bottom = ceil(rect.bottom / tilemap.tileHeight).int32
-  result = recti(left, top, right - left, bottom - top)
-  traceRectangle({ttCollision}, rect(result.position.vec2f * 8, result.size.vec2f * 8), color = colOrange)
-
-proc resolveCollisionX*[T](subject: var Rectf, tilemap: AnyTilemap[T],
-                           direction: XCheckDirection, speed: float32): bool =
-  ## Resolves collisions between the subject and the tilemap on the X axis.
-  ## ``direction`` signifies the movement direction of the subject.
-  ## ``outOfBounds`` is the tile used when the subject is out of bounds.
-
-  for position, tile in tiles(tilemap):
-    if tile.isSolid:
-      let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
-      traceRectangle({ttCollision}, hitbox, color = colGreen)
-
-  let tiles = tilemap.alignToGrid(subject)
-  for position, tile in area(tilemap, tiles):
-    if tile.isSolid:
-      let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
-      traceRectangle({ttCollision}, hitbox)
-      result = subject.resolveCollisionX(hitbox, direction, speed) or result
-
-  for position, tile in tiles(tilemap):
-    if tilemap.positionInChunk(position) == vec2i(0, 0):
-      let c = tilemap.chunkPosition(position)
-      traceText({ttCollision}, position.vec2f * tilemap.tileSize,
-                $c.x & "," & $c.y)
-
-proc resolveCollisionY*[T](subject: var Rectf, tilemap: AnyTilemap[T],
-                           direction: YCheckDirection, speed: float32): bool =
-  ## Resolves collisions between the subject and the tilemap on the Y axis.
-  ## ``direction`` signifies the movement direction of the subject.
-  ## ``outOfBounds`` is the tile used when the subject is out of bounds.
-
-  let tiles = tilemap.alignToGrid(subject)
-  for position, tile in area(tilemap, tiles):
-    if tile.isSolid:
-      let hitbox = rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
-      result = subject.resolveCollisionY(hitbox, direction, speed) or result
 
 
 # testing
