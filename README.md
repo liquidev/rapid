@@ -47,10 +47,10 @@ To install rapid, use the following command:
 ```
 $ nimble install rapid
 ```
-
-### Windows
-
-rapid should work fine on Windows out of the box, no outside dependencies.
+or if you're a Chad using [nimph][nimph repo]:
+```
+$ nimph clone liquid600pgm/rapid
+```
 
 ### Linux
 
@@ -85,6 +85,10 @@ sudo zypper in \
   Mesa-libGL-devel libX11-devel libXrandr-devel libXxf86vm-devel \
   libXinerama-devel libXi-devel libXcursor-devel
 ```
+
+## Examples
+
+For examples, look in the `tests` directory.
 
 ## Tips
 
