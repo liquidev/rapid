@@ -39,6 +39,8 @@ solutions like Godot.
 - `rapid/ui` – [Fidget][fidget repo]-style UI framework for games
   and applications
 
+  [fidget repo]: https://github.com/treeform/fidget
+
 ## Installing
 
 To install rapid, use the following command:
