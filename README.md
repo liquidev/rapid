@@ -1,4 +1,6 @@
-# rapid
+<p align="center">
+  <img src="logo-8x.png">
+</p>
 
 A game engine written in Nim, optimized for rapid game development and easy
 prototyping. Made for convenience while coding and decent performance.
