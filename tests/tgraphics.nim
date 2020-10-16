@@ -65,6 +65,10 @@ proc shapes(graphics: Graphics, time: float32) =
     graphics.translate(32, 320)
     graphics.lineTriangle(vec2f(0, 0), vec2f(0, 64), vec2f(96, 64),
                           thickness = 16)
+  graphics.transform:
+    graphics.translate(32, 32)
+    graphics.rotate(radians(time * Pi))
+    graphics.lineRectangle(-16, -16, 32, 32, thickness = 3, color = colGray)
 
 proc tiles(graphics: Graphics) =
   graphics.transform:
