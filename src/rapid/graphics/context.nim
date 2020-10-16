@@ -193,7 +193,7 @@ proc rotate*(graphics: Graphics, angle: Radians) {.inline.} =
   ## Rotates the transform matrix by ``angle`` radians.
 
   graphics.transformEnabled = true
-  graphics.fTransformMatrix = mat3f(
+  graphics.fTransformMatrix *= mat3f(
     vec3f(cos(angle), sin(angle), 0.0),
     vec3f(-sin(angle), cos(angle), 0.0),
     vec3f(0.0, 0.0, 1.0),
