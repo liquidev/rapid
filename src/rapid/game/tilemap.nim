@@ -10,7 +10,6 @@ import ../math/vector
 type
   TilemapTile* {.explain.} = concept a
     a == a is bool
-    a.isSolid is bool
 
   RootTilemap*[T: TilemapTile] = ref object of RootObj
     fSize: Vec2i
@@ -267,7 +266,7 @@ iterator tiles*[T, CW, CH](chunk: var Chunk[T, CW, CH]): (Vec2i, var T) =
     for x in 0..<CW:
       yield (vec2i(x.int32, y.int32), chunk.tiles[x + y * CW])
 
-iterator tiles*[T, CW, CH](tilemap: ChunkTilemap[T, CW, CH]): (Vec2i, var T) =
+iterator tiles*[T, CW, CH](tilemap: ChunkTilemap[T, CW, CH]): (Vec2i, lent T) =
   ## Iterates through all of the tilemap's chunks and yields their positions and
   ## mutable tile references.
   ## Chunk iteration order is undefined. Tile iteration order is top-to-bottom,
@@ -316,7 +315,6 @@ when isMainModule:
     Tile = distinct int
 
   proc `==`(a, b: Tile): bool {.borrow.}
-  proc isSolid(tile: Tile): bool = int(tile) != 0
 
   proc mustImplementAnyTilemap(T: type) =
     proc aux(m: AnyTilemap) = discard

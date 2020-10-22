@@ -11,30 +11,30 @@
 import math
 
 type
-  InterpFunc* = proc (t: float): float
+  InterpFunc*[T] = proc (t: T): T
 
-func step*(step: float): InterpFunc =
+func step*[T](step: T): InterpFunc[T] =
   ## Creates a step function.
-  result = func (t: float): float =
-    if t < step: 0.0
-    else: 1.0
+  result = func (t: T): T =
+    if t < step: 0.0.T
+    else: 1.0.T
 
-func linear*(t: float): float =
+func linear*[T](t: T): T =
   ## Linear interpolation, with clamping from 0.0 to 1.0.
-  if t < 0: 0.0
-  elif t > 1: 1.0
+  if t < 0.T: 0.0.T
+  elif t > 1.T: 1.0.T
   else: t
 
-func hermite*(t: float): float =
+func hermite*[T](t: T): T =
   ## Cubic Hermite spline, with clamping from 0.0 to 1.0.
-  if t < 0: 0.0
-  elif t > 1: 1.0
-  else: t * t * (3 - 2 * t)
+  if t < 0.T: 0.0.T
+  elif t > 1.T: 1.0.T
+  else: t * t * (3.T - 2.T * t)
 
-func interp*(a, b, t: float, fn: InterpFunc): float {.inline.} =
+func interp*[T](a, b, t: T, fn: InterpFunc[T] = linear): T {.inline.} =
   ## Interpolate between the two values using the given interpolation function.
   let c = fn(t)
-  c * b + (1 - c) * a
+  c * b + (1.T - c) * a
 
 func interp*(vals: openarray[float], t: float,
              fn: InterpFunc): float {.inline.} =

@@ -5,22 +5,24 @@ import aglet/window/glfw
 import rapid/game
 import rapid/graphics
 import rapid/graphics/postprocess
+import rapid/math/interpolation
 {.define: rapidChipmunkGraphicsDebugDraw.}
 import rapid/physics/chipmunk
 
 type
-  FluidObj = object
+  Droplet = object
+    angle: Radians
 
 const
-  FluidTag = FluidObj()
   ParticleSize = 4
 
-proc spawnBox(space: Space, position: Vec2f) =
+proc spawnBox(space: Space, position, velocity: Vec2f) =
 
   var
-    body = newDynamicBody(FluidTag).addTo(space)
+    body = newDynamicBody(Droplet()).addTo(space)
     shape = body.newCircleShape(radius = ParticleSize)
   body.position = position
+  body.velocity = velocity
   shape.density = 100
   shape.elasticity = 0.5
   # shape.friction = 0.4
@@ -41,6 +43,7 @@ proc main() =
     space = newSpace(gravity = vec2f(0, 60 * 8), iterations = 10)
     placing = false
     debugDraw = false
+    lastMousePosition = vec2f(0, 0)
 
   var
     floor = newStaticBody().addTo(space)
@@ -98,10 +101,17 @@ proc main() =
 
     update:
       if placing:
-        space.spawnBox(window.mouse)
+        let velocity = window.mouse - lastMousePosition
+        space.spawnBox(window.mouse, velocity * 10)
+      lastMousePosition = window.mouse
+
       var oob: seq[Body]
       space.update(secondsPerUpdate)
       space.eachBody do (body: Body):
+        if body of UserBody[Droplet]:
+          var ubody = UserBody[Droplet](body)
+          ubody.user.angle = interp(ubody.user.angle, body.velocity.angle,
+                                    0.5.radians)
         if body.position.y > 500:
           oob.add(body)
       for body in oob:
@@ -116,10 +126,16 @@ proc main() =
 
       graphics.resetShape()
       space.eachBody do (body: Body):
-        if body of UserBody[FluidObj]:
-          const rs = vec2f(ParticleSize * 10)
-          graphics.sprite(blobSprite, body.position - rs / 2, size = rs,
-                          tint = colDarkTurquoise)
+        if body of UserBody[Droplet]:
+          var ubody = UserBody[Droplet](body)
+          graphics.transform:
+            const rs = vec2f(ParticleSize * 10)
+            let speed = max(1, body.velocity.length / 180)
+            graphics.translate(body.position)
+            graphics.rotate(ubody.user.angle)
+            graphics.scale(speed, 1)
+            graphics.sprite(blobSprite, -rs / 2, size = rs,
+                            tint = colDarkTurquoise)
       graphics.draw(effect)
       effectBuffer.apply(alphaThreshold, uniforms {
         threshold: 0.15f,
