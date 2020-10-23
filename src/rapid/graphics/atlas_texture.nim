@@ -73,7 +73,8 @@ proc add*[T: ColorPixelType,
   ## Safe, generic version of ``add`` that accepts a ``BinaryImageBuffer``.
   ## This can be used with ``rapid/graphics/image``.
 
-  result = atlas.add(vec2i(image.width, image.height), image.data[0].unsafeAddr)
+  result = atlas.add(vec2i(image.width, image.height),
+                     cast[ptr T](image.data[0].unsafeAddr))
 
 proc sampler*(atlas: AtlasTexture,
               minFilter: TextureMinFilter = fmNearestMipmapLinear,
