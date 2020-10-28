@@ -222,7 +222,7 @@ proc keyJustPressed*(input: Input, key: Key): bool =
   ## Returns whether the given key has been pressed in the current input tick.
   psJustPressed in input.keys[key.int]
 
-proc keyDown*(input: Input, key: Key): bool =
+proc keyIsDown*(input: Input, key: Key): bool =
   ## Returns whether the given key is being held down in the current input tick.
   psDown in input.keys[key.int]
 
@@ -236,7 +236,7 @@ proc mouseButtonJustPressed*(input: Input, button: MouseButton): bool =
   ## input tick.
   psJustPressed in input.mouseButtons[button]
 
-proc mouseButtonDown*(input: Input, button: MouseButton): bool =
+proc mouseButtonIsDown*(input: Input, button: MouseButton): bool =
   ## Returns whether the given mouse button is being held down in the current
   ## input tick.
   psDown in input.mouseButtons[button]

@@ -134,18 +134,31 @@ proc `size=`*(tilemap: FlatTilemap, _: Vec2i)
 # chunk tilemap (infinite size)
 
 type
-  Chunk*[T: TilemapTile, W, H: static int] {.byref.} = object
+  UserChunk*[T: TilemapTile, W, H: static int, U] {.byref.} = object
     tiles: array[W * H, T]
     filledTiles: uint32
+    user*: U
 
-  ChunkTilemap*[T: TilemapTile,
-                CW, CH: static int] {.final.} = ref object of RootTilemap[T]
-    chunks: Table[Vec2i, Chunk[T, CW, CH]]
+  Chunk*[T: TilemapTile, W, H: static int] = UserChunk[T, W, H, void]
+    ## Chunk with void user type, for situtions when you don't need to store any
+    ## extra data alongside chunks.
+
+  UserChunkTilemap*[T: TilemapTile,
+                    CW, CH: static int,
+                    U] {.final.} = ref object of RootTilemap[T]
+    chunks: Table[Vec2i, UserChunk[T, CW, CH, U]]
     outOfBounds: T
     mutableOutOfBounds: T  # again, safety first!
 
-proc newChunkTilemap*[T; CW, CH: static int](
-  tileSize: Vec2f, outOfBounds: T = default(T)): ChunkTilemap[T, CW, CH] =
+  ChunkTilemap*[T: TilemapTile, CW, CH: static int] =
+    UserChunkTilemap[T, CW, CH, void]
+    ## Chunk tilemap with void user type, for situations when you don't need to
+    ## store any extra data alongside chunks.
+
+proc newUserChunkTilemap*[T; CW, CH: static int, U](
+  tileSize: Vec2f,
+  outOfBounds: T = default(T)
+): UserChunkTilemap[T, CW, CH, U] =
   ## Creates a new chunk tilemap.
 
   new(result)
@@ -155,34 +168,67 @@ proc newChunkTilemap*[T; CW, CH: static int](
 
 {.push inline.}
 
-proc chunkPosition*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
-                                           position: Vec2i): Vec2i =
+proc newChunkTilemap*[T; CW, CH: static int](
+  tileSize: Vec2f,
+  outOfBounds: T = default(T)
+): ChunkTilemap[T, CW, CH] =
+  ## Creates a new chunk tilemap without user data.
+  newUserChunkTilemap[T, CW, CH, void](tileSize, outOfBounds)
+
+proc outOfBounds*[T; CW, CH: static int, U](
+  tilemap: UserChunkTilemap[T, CW, CH, U]
+): lent T =
+  ## Returns the out of bounds tile for this tilemap. This tile cannot be
+  ## changed for safety and efficiency reasons.
+  tilemap.outOfBounds
+
+proc chunkPosition*[T; CW, CH: static int, U](
+  tilemap: UserChunkTilemap[T, CW, CH, U],
+  position: Vec2i
+): Vec2i =
   ## Returns the coordinates of the chunk which contains the given
   ## global position.
   position div vec2i(CW.int32, CH.int32)
 
-proc positionInChunk*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
-                                             position: Vec2i): Vec2i =
+proc positionInChunk*[T; CW, CH: static int, U](
+  tilemap: UserChunkTilemap[T, CW, CH, U],
+  position: Vec2i
+): Vec2i =
   ## Wraps the given global position to chunk coordinates.
   position.vec2f.floorMod(vec2f(CW, CH)).vec2i
 
-proc hasChunk*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
-                                      position: Vec2i): bool =
+proc hasChunk*[T; CW, CH: static int, U](
+  tilemap: UserChunkTilemap[T, CW, CH, U],
+  position: Vec2i
+): bool =
   ## Returns whether the tilemap contains the given chunk.
   position in tilemap.chunks
 
-proc chunk*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
-                                   position: Vec2i,
-                                   outChunk: var Chunk[T, CW, CH]): bool =
+proc chunk*[T; CW, CH: static int, U](
+  tilemap: UserChunkTilemap[T, CW, CH, U],
+  position: Vec2i,
+  outChunk: var UserChunk[T, CW, CH, U]
+): bool =
   ## Returns the chunk at the given position.
 
-  echo position
   if tilemap.hasChunk(position):
-    echo "has chunk"
     outChunk = tilemap.chunks[position]
     result = true
 
-proc `[]`*[T; CW, CH: static int](chunk: Chunk, position: Vec2i): lent T =
+proc chunk*[T; CW, CH: static int, U](
+  tilemap: UserChunkTilemap[T, CW, CH, U],
+  position: Vec2i
+): var UserChunk[T, CW, CH, U] =
+  ## Returns a mutable reference to the chunk at the given position.
+  ## Raises an exception if the chunk doesn't exist.
+
+  if tilemap.hasChunk(position):
+    result = tilemap.chunks[position]
+  else:
+    raise newException(IndexDefect, "chunk " & $position & " doesn't exist")
+
+proc `[]`*[T; CW, CH: static int, U](chunk: UserChunk[T, CW, CH, U],
+                                     position: Vec2i): lent T =
   ## Returns an immutable reference to the given tile in the given chunk.
   ##
   ## **Warning:** The position is not out of bounds-checked for performance
@@ -190,8 +236,8 @@ proc `[]`*[T; CW, CH: static int](chunk: Chunk, position: Vec2i): lent T =
 
   chunk.tiles[position.x + position.y * CW]
 
-proc `[]`*[T; CW, CH: static int](chunk: var Chunk[T, CW, CH],
-                                  position: Vec2i): var T =
+proc `[]`*[T; CW, CH: static int, U](chunk: var UserChunk[T, CW, CH, U],
+                                     position: Vec2i): var T =
   ## Returns a mutable reference to the given tile in the given chunk.
   ##
   ## **Warning:** The position is not out of bounds-checked for performance
@@ -199,8 +245,8 @@ proc `[]`*[T; CW, CH: static int](chunk: var Chunk[T, CW, CH],
 
   chunk.tiles[position.x + position.y * CW]
 
-proc `[]=`*[T; CW, CH: static int](chunk: var Chunk[T, CW, CH], position: Vec2i,
-                                   tile: sink T)=
+proc `[]=`*[T; CW, CH: static int, U](chunk: var UserChunk[T, CW, CH, U],
+                                      position: Vec2i, tile: sink T)=
   ## Sets the tile at the given position in the given chunk.
   ##
   ## **Warning:** The position is not out of bounds-checked for performance
@@ -208,8 +254,8 @@ proc `[]=`*[T; CW, CH: static int](chunk: var Chunk[T, CW, CH], position: Vec2i,
 
   chunk.tiles[position.x + position.y * CW] = tile
 
-proc `[]`*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
-                                  position: Vec2i): var T =
+proc `[]`*[T; CW, CH: static int, U](tilemap: UserChunkTilemap[T, CW, CH, U],
+                                     position: Vec2i): var T =
   ## Returns a mutable reference to the tile at the given position.
 
   let chunkPosition = tilemap.chunkPosition(position)
@@ -221,17 +267,17 @@ proc `[]`*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
 
 {.pop.}
 
-proc `[]=`*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
-                                   position: Vec2i, tile: sink T) =
+proc `[]=`*[T; CW, CH: static int, U](tilemap: UserChunkTilemap[T, CW, CH, U],
+                                      position: Vec2i, tile: sink T) =
   ## Sets the tile at the given position.
 
   # this is quite big so let's not inline it
 
   let chunkPosition = tilemap.chunkPosition(position)
 
-  var chunk: ptr Chunk[T, CW, CH]
+  var chunk: ptr UserChunk[T, CW, CH, U]
   if not tilemap.hasChunk(chunkPosition):
-    var c = Chunk[T, CW, CH]()
+    var c = UserChunk[T, CW, CH, U]()
     for tile in mitems(c.tiles):
       tile = tilemap.outOfBounds
     tilemap.chunks[chunkPosition] = c
@@ -250,7 +296,7 @@ proc `[]=`*[T; CW, CH: static int](tilemap: ChunkTilemap[T, CW, CH],
     tilemap.chunks.del(chunkPosition)
   chunk[][positionInChunk] = tile
 
-iterator tiles*[T, CW, CH](chunk: Chunk[T, CW, CH]): (Vec2i, lent T) =
+iterator tiles*[T, CW, CH, U](chunk: UserChunk[T, CW, CH, U]): (Vec2i, lent T) =
   ## Iterates through the chunk's tiles and yields immutable references to them.
   ## Iteration order is top-to-bottom, left-to-right.
 
@@ -258,7 +304,8 @@ iterator tiles*[T, CW, CH](chunk: Chunk[T, CW, CH]): (Vec2i, lent T) =
     for x in 0..<CW:
       yield (vec2i(x.int32, y.int32), chunk.tiles[x + y * CW])
 
-iterator tiles*[T, CW, CH](chunk: var Chunk[T, CW, CH]): (Vec2i, var T) =
+iterator tiles*[T, CW, CH, U](chunk: var UserChunk[T, CW, CH, U]):
+                             (Vec2i, var T) =
   ## Iterates through the chunk's tiles and yields mutable references to them.
   ## Iteration order is top-to-bottom, left-to-right.
 
@@ -266,7 +313,8 @@ iterator tiles*[T, CW, CH](chunk: var Chunk[T, CW, CH]): (Vec2i, var T) =
     for x in 0..<CW:
       yield (vec2i(x.int32, y.int32), chunk.tiles[x + y * CW])
 
-iterator tiles*[T, CW, CH](tilemap: ChunkTilemap[T, CW, CH]): (Vec2i, lent T) =
+iterator tiles*[T, CW, CH, U](tilemap: UserChunkTilemap[T, CW, CH, U]):
+                             (Vec2i, lent T) =
   ## Iterates through all of the tilemap's chunks and yields their positions and
   ## mutable tile references.
   ## Chunk iteration order is undefined. Tile iteration order is top-to-bottom,
@@ -278,11 +326,11 @@ iterator tiles*[T, CW, CH](tilemap: ChunkTilemap[T, CW, CH]): (Vec2i, lent T) =
       let position = chunkOrigin + offset
       yield (position, tile)
 
-proc size*(tilemap: ChunkTilemap): Vec2i
-  {.error: "the size of a ChunkTilemap is infinite".}
+proc size*(tilemap: UserChunkTilemap): Vec2i
+  {.error: "the size of a UserChunkTilemap is infinite".}
 
-proc `size=`*(tilemap: ChunkTilemap, _: Vec2i)
-  {.error: "the size of a ChunkTilemap is infinite".} =
+proc `size=`*(tilemap: UserChunkTilemap, _: Vec2i)
+  {.error: "the size of a UserChunkTilemap is infinite".} =
   ## The size of a chunk tilemap is undefined at any given moment.
   ## Attempting to access it is an error.
 
