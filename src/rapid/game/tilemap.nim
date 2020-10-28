@@ -313,14 +313,24 @@ iterator tiles*[T, CW, CH, U](chunk: var UserChunk[T, CW, CH, U]):
     for x in 0..<CW:
       yield (vec2i(x.int32, y.int32), chunk.tiles[x + y * CW])
 
+iterator chunks*[T, CW, CH, U](tilemap: UserChunkTilemap[T, CW, CH, U]):
+                              (Vec2i, var UserChunk[T, CW, CH, U]) =
+  ## Iterates through all of the tilemap's chunks and returns their positions
+  ## and mutable references. Iteration order is undefined.
+
+  bind mpairs
+
+  for chunkPosition, chunk in mpairs(tilemap.chunks):
+    yield (chunkPosition, chunk)
+
 iterator tiles*[T, CW, CH, U](tilemap: UserChunkTilemap[T, CW, CH, U]):
-                             (Vec2i, lent T) =
-  ## Iterates through all of the tilemap's chunks and yields their positions and
-  ## mutable tile references.
+                             (Vec2i, var T) =
+  ## Iterates through all of the tilemap's chunks' tiles and yields their
+  ## positions and mutable references.
   ## Chunk iteration order is undefined. Tile iteration order is top-to-bottom,
   ## left-to-right per chunk.
 
-  for chunkPosition, chunk in tilemap.chunks:
+  for chunkPosition, chunk in chunks(tilemap):
     let chunkOrigin = chunkPosition * vec2i(CW, CH)
     for offset, tile in tiles(chunk):
       let position = chunkOrigin + offset
