@@ -368,6 +368,12 @@ proc sleep*(body: Body) =
 
 {.pop.}
 
+proc removeShape*(body: Body, shape: Shape) =
+  ## Removes a shape from a body.
+
+  body.shapes.excl(shape)
+  cpSpaceRemoveShape(body.space.raw, shape.raw)
+
 proc eachShape*(body: Body, callback: proc (shape: Shape)) =
   ## Iterates over all of the body's shapes.
 
@@ -1322,9 +1328,9 @@ when defined(rapidChipmunkGraphicsDebugDraw):
 
     proc drawFatLine(graphics: Graphics, a, b: Vec2f, radius: float32,
                      lineColor, fillColor: Rgba32f) {.nimcall.} =
-      graphics.line(a, b, thickness = radius + 1, cap = lcRound,
+      graphics.line(a, b, thickness = radius + 1, cap = lcButt,
                     colorA = lineColor, colorB = lineColor)
-      graphics.line(a, b, thickness = radius, cap = lcRound,
+      graphics.line(a, b, thickness = radius, cap = lcButt,
                     colorA = fillColor, colorB = fillColor)
 
     proc drawPolygon(graphics: Graphics, vertices: openArray[Vec2f],

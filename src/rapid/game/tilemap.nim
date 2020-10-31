@@ -204,6 +204,11 @@ proc hasChunk*[T; CW, CH: static int, U](
   ## Returns whether the tilemap contains the given chunk.
   position in tilemap.chunks
 
+proc isInbounds*(tilemap: UserChunkTilemap, position: Vec2i): bool =
+  ## Returns whether the given position lies inside of one of the tilemap's
+  ## existing chunks.
+  tilemap.hasChunk(tilemap.chunkPosition(position))
+
 proc chunk*[T; CW, CH: static int, U](
   tilemap: UserChunkTilemap[T, CW, CH, U],
   position: Vec2i,
@@ -262,8 +267,8 @@ proc `[]`*[T; CW, CH: static int, U](tilemap: UserChunkTilemap[T, CW, CH, U],
   if tilemap.hasChunk(chunkPosition):
     result = tilemap.chunks[chunkPosition][tilemap.positionInChunk(position)]
   else:
-    result = tilemap.mutableOutOfBounds
     tilemap.mutableOutOfBounds = tilemap.outOfBounds
+    result = tilemap.mutableOutOfBounds
 
 {.pop.}
 

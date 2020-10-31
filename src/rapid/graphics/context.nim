@@ -873,13 +873,14 @@ proc draw*[U: UniformSource](graphics: Graphics, target: Target,
 
   graphics.finalizeBatch()
   graphics.updateMesh()
-  var uniforms = aglet.uniforms {
-    ..uniforms,
-    ..graphics.uniforms(target),
-  }
+  let baseUniforms = graphics.uniforms(target)
   for batch in graphics.batches:
-    graphics.applyBatchSettings(batch, uniforms)
-    target.draw(program, graphics.mesh[batch.range], uniforms, drawParams)
+    var batchUniforms = aglet.uniforms {
+      ..uniforms,
+      ..baseUniforms,
+    }
+    graphics.applyBatchSettings(batch, batchUniforms)
+    target.draw(program, graphics.mesh[batch.range], batchUniforms, drawParams)
 
 proc draw*[U: UniformSource](graphics: Graphics, target: Target,
                              program: Program, uniforms: U) {.inline.} =
