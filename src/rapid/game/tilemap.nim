@@ -188,7 +188,7 @@ proc chunkPosition*[T; CW, CH: static int, U](
 ): Vec2i =
   ## Returns the coordinates of the chunk which contains the given
   ## global position.
-  position div vec2i(CW.int32, CH.int32)
+  floor(position.vec2f / vec2f(CW, CH)).vec2i
 
 proc positionInChunk*[T; CW, CH: static int, U](
   tilemap: UserChunkTilemap[T, CW, CH, U],

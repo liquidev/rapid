@@ -46,6 +46,7 @@ type
 
   ShapeObj = object of RootObj
     raw: ptr cpShape
+    indexInSpace: int
 
   CircleShapeObj {.final.} = object of ShapeObj
   SegmentShapeObj {.final.} = object of ShapeObj
@@ -115,7 +116,6 @@ type
 
   BodyObj = object of RootObj
     raw: ptr cpBody
-    shapes: HashSet[Shape]
     indexInSpace: int
   Body* = ref BodyObj
     ## A rigid body.
@@ -158,6 +158,7 @@ type
   SpaceObj = object
     raw: ptr cpSpace
     bodies: seq[Body]
+    shapes: seq[Shape]
     defaultCollisionHandler: CollisionHandler
     pairCollisionHandlers: Table[tuple[a, b: CollisionKind], CollisionHandler]
   Space* = ref SpaceObj
@@ -367,12 +368,6 @@ proc sleep*(body: Body) =
   cpBodySleep(body.raw)
 
 {.pop.}
-
-proc removeShape*(body: Body, shape: Shape) =
-  ## Removes a shape from a body.
-
-  body.shapes.excl(shape)
-  cpSpaceRemoveShape(body.space.raw, shape.raw)
 
 proc eachShape*(body: Body, callback: proc (shape: Shape)) =
   ## Iterates over all of the body's shapes.
@@ -621,25 +616,16 @@ proc segmentQuery*(shape: Shape, a, b: Vec2f,
 {.pop.}
 
 proc new[T: Shape](shape: var T, body: Body, raw: ptr cpShape) =
-  doAssert body.space != nil,
-           "body must be added to a space before creating any shapes"
-
   new(shape) do (shape: T):
     cpShapeFree(shape.raw)
 
   shape.raw = raw
-  discard cpSpaceAddShape(body.space.raw, raw)
-  body.shapes.incl(shape)
   cpShapeSetUserData(shape.raw, cast[ptr Shape](shape))
 
 proc newCircleShape*(body: Body, radius: float32,
                      offset = vec2f(0)): CircleShape =
   ## Creates a new circle shape with the given radius and offset from the body's
   ## center, and attaches it to the body.
-  ##
-  ## **Note:** By the time this, or any of the other shape constructors
-  ## is called, the body *must* have been added to a space. Otherwise an
-  ## assertion is triggered.
 
   result.new(body, cpCircleShapeNew(body.raw, radius, offset.cpv))
 
@@ -950,6 +936,22 @@ proc reindexShapesForBody*(space: Space, body: Body) =
   ## have its collision detection data updated.
   cpSpaceReindexShapesForBody(space.raw, body.raw)
 
+proc addShape*(space: Space, shape: Shape) =
+  ## Adds the shape to the space.
+
+  discard cpSpaceAddShape(space.raw, shape.raw)
+  shape.indexInSpace = space.shapes.len
+  space.shapes.add(shape)
+
+proc delShape*(space: Space, shape: Shape) =
+  ## Deletes the given shape from the space.
+
+  cpSpaceRemoveShape(space.raw, shape.raw)
+  space.shapes[shape.indexInSpace] = space.shapes[^1]
+  space.shapes[shape.indexInSpace].indexInSpace = shape.indexInSpace
+  space.shapes.setLen(space.shapes.len - 1)
+  shape.indexInSpace = 0
+
 proc addBody*(space: Space, body: Body) =
   ## Adds the body to the space.
 
@@ -960,8 +962,6 @@ proc addBody*(space: Space, body: Body) =
 proc delBody*(space: Space, body: Body) =
   ## Deletes the given body from the space.
 
-  for shape in body.shapes:
-    cpSpaceRemoveShape(space.raw, shape.raw)
   cpSpaceRemoveBody(space.raw, body.raw)
   space.bodies[body.indexInSpace] = space.bodies[^1]
   space.bodies[body.indexInSpace].indexInSpace = body.indexInSpace
@@ -978,6 +978,13 @@ proc addTo*(body: Body, space: Space): Body =
 
   space.addBody(body)
   result = body
+
+proc addTo*[T: Shape](shape: T, space: Space): T =
+  ## Convenience procedure for adding a shape to a space right after its
+  ## creation.
+
+  space.addShape(shape)
+  result = shape
 
 proc update*(space: Space, deltaTime: float32) =
   ## Steps the space by ``deltaTime`` seconds. This should be called inside of
