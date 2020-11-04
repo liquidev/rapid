@@ -38,11 +38,14 @@ type
     ## A physics body with user data.
     user*: U
 
+  UpdateBodyPositionCallback* = proc (body: Body)
+
   Space*[M] = ref object
     ## A space. This is what simulates physics on all bodies.
     tilemap: M
     bodies: seq[Body]
     gravity: Vec2f
+    updateBodyX, updateBodyY: UpdateBodyPositionCallback
 
 
 # body
@@ -151,6 +154,18 @@ iterator bodies*(space: Space): Body =
   for body in space.bodies:
     yield body
 
+proc onUpdateBodyX*(space: Space, callback: UpdateBodyPositionCallback) =
+  ## Sets the callback to be called when the X position of the body should
+  ## update. This callback is triggered *before* processing collisions on the
+  ## X axis.
+  space.updateBodyX = callback
+
+proc onUpdateBodyY*(space: Space, callback: UpdateBodyPositionCallback) =
+  ## Sets the callback to be called when the Y position of the body should
+  ## update. This callback is triggered *before* processing collisions on the
+  ## Y axis.
+  space.updateBodyY = callback
+
 proc newSpace*[M](tilemap: M, gravity: Vec2f): Space[M] =
   ## Creates and initializes a new space with the given tilemap and gravity.
 
@@ -158,13 +173,20 @@ proc newSpace*[M](tilemap: M, gravity: Vec2f): Space[M] =
   result.tilemap = tilemap
   result.gravity = gravity
 
+  result.onUpdateBodyX proc (body: Body) =
+    body.position.x += body.velocity.x
+
+  result.onUpdateBodyY proc (body: Body) =
+    body.position.y += body.velocity.y
+
 
 # collision resolution
 
 {.push inline.}
 
-proc snapToTiles[M: RootTilemap](tilemap: M, rect: Rectf): Recti =
+proc snapToTiles[M](tilemap: M, rect: Rectf): Recti =
   ## Snaps a hitbox to tiles.
+  mixin tileSize
   rectSides(
     floor(rect.left / tilemap.tileSize.x).int32,
     floor(rect.top / tilemap.tileSize.y).int32,
@@ -172,8 +194,9 @@ proc snapToTiles[M: RootTilemap](tilemap: M, rect: Rectf): Recti =
     ceil(rect.bottom / tilemap.tileSize.y).int32,
   )
 
-proc tileHitbox[M: RootTilemap](tilemap: M, position: Vec2i): Rectf =
+proc tileHitbox[M](tilemap: M, position: Vec2i): Rectf =
   ## Returns the hitbox of a tile at the given position.
+  mixin tileSize
   rectf(position.vec2f * tilemap.tileSize, tilemap.tileSize)
 
 # i really do not like how repetitive this code is.
@@ -196,8 +219,10 @@ template isNotCollidingWith(body: Body, side: RectangleSide) =
     body.collisionStates[side].incl(csJustSeparated)
   body.collisionStates[side].excl(csIsColliding)
 
-proc collideWithTilemapX[M](body: Body, tilemap: M, timestep: float32) =
+proc collideWithTilemapX[M](body: Body, tilemap: M) =
   ## Processes collisions with the tilemap on the X axis.
+
+  mixin tileSize
 
   let
     hitbox = body.hitbox
@@ -242,8 +267,10 @@ proc collideWithTilemapX[M](body: Body, tilemap: M, timestep: float32) =
   else:
     body.isNotCollidingWith(rsRight)
 
-proc collideWithTilemapY[M](body: Body, tilemap: M, timestep: float32) =
+proc collideWithTilemapY[M](body: Body, tilemap: M) =
   ## Processes collisions with the tilemap on the Y axis.
+
+  mixin tileSize
 
   let
     hitbox = body.hitbox
@@ -290,10 +317,9 @@ proc collideWithTilemapY[M](body: Body, tilemap: M, timestep: float32) =
 
 {.pop.}
 
-proc update*[T: CollidableTile; M: AnyTilemap[T]](space: Space[M],
-                                                  timestep: float32) =
-  ## Simulates the space for ``timestep`` seconds. This value should ideally be
-  ## constant, eg. 1/60th of a second, to improve simulation stability.
+proc update*[T: CollidableTile; M: AnyTilemap[T]](space: Space[M]) =
+  ## Simulates the space for one tick. Keep in mind that the simple space only
+  ## supports *fixed timestep.*
 
   for body in space.bodies:
     body.applyForce(space.gravity)
@@ -301,8 +327,10 @@ proc update*[T: CollidableTile; M: AnyTilemap[T]](space: Space[M],
     body.velocity += body.force
     body.force *= 0
 
-    body.position.x += body.velocity.x * timestep
-    body.collideWithTilemapX(space.tilemap, timestep)
+    space.updateBodyX(body)
+#     body.position.x += body.velocity.x * timestep
+    body.collideWithTilemapX(space.tilemap)
 
-    body.position.y += body.velocity.y * timestep
-    body.collideWithTilemapY(space.tilemap, timestep)
+    space.updateBodyY(body)
+#     body.position.y += body.velocity.y * timestep
+    body.collideWithTilemapY(space.tilemap)

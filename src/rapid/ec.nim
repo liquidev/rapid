@@ -106,8 +106,9 @@ proc onShape*[T: RootComponent](comp: var T, impl: ComponentShape[T]) =
 
 proc autoImplement*[T: RootComponent](comp: var T) =
   ## Automagically implement any callbacks, depending on what procs have been
-  ## declared at callsite, eg. if ``proc update(comp: var T)`` is declared, it
-  ## will automatically be implemented for the given component instance.
+  ## declared at callsite, eg. if ``proc componentUpdate(comp: var T)`` is
+  ## declared, it will automatically be implemented for the given component
+  ## instance.
   ##
   ## **Debugging:** If you ever need to debug which procs were implemented, pass
   ## ``-d:rapidECDebugAutoImplement`` to the compiler.
@@ -121,20 +122,20 @@ proc autoImplement*[T: RootComponent](comp: var T) =
       {.hint: "rapid/ec autoImplement: found " & callbackName.}
 
   attempt:
-    mixin update
-    comp.onUpdate update
+    mixin componentUpdate
+    comp.onUpdate componentUpdate
     report "update"
   attempt:
-    mixin draw
-    comp.onDraw draw
+    mixin componentDraw
+    comp.onDraw componentDraw
     report "draw"
   attempt:
-    mixin render
-    comp.onRender render
+    mixin componentRender
+    comp.onRender componentRender
     report "render"
   attempt:
-    mixin shape
-    comp.onShape shape
+    mixin componentShape
+    comp.onShape componentShape
     report "shape"
 
 proc update*(entity: RootEntity) =
