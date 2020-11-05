@@ -10,38 +10,69 @@
 
 import math
 
+
+# basics
+
+func lerp*[T](a, b: T, t: SomeFloat): T {.inline.} =
+  ## Fast linear interpolation. This is faster than ``interp``.
+  t * b + (1 - t) * a
+
+
+# interpolators
+
 type
-  InterpFunc*[T] = proc (t: T): T
+  Interpolated*[T] = object
+    prev, curr: T
 
-func step*[T](step: T): InterpFunc[T] =
-  ## Creates a step function.
-  result = func (t: T): T =
-    if t < step: 0.0.T
-    else: 1.0.T
+{.push inline.}
 
-func linear*[T](t: T): T =
-  ## Linear interpolation, with clamping from 0.0 to 1.0.
-  if t < 0.T: 0.0.T
-  elif t > 1.T: 1.0.T
-  else: t
+converter interpolated*[T](value: T): Interpolated[T] =
+  ## Converter from values to ``Interpolated[T]``.
+  Interpolated[T](prev: value, curr: value)
 
-func hermite*[T](t: T): T =
-  ## Cubic Hermite spline, with clamping from 0.0 to 1.0.
-  if t < 0.T: 0.0.T
-  elif t > 1.T: 1.0.T
-  else: t * t * (3.T - 2.T * t)
+converter value*[T](interp: Interpolated[T]): T =
+  ## Converter from ``Interpolated[T]`` to values.
+  interp.curr
 
-func interp*[T](a, b, t: T, fn: InterpFunc[T] = linear): T {.inline.} =
-  ## Interpolate between the two values using the given interpolation function.
-  let c = fn(t)
-  c * b + (1.T - c) * a
+converter mvalue*[T](interp: var Interpolated[T]): var T =
+  ## "Dereference" operator for ``Interpolated[T]``
+  interp.curr
 
-func interp*(vals: openarray[float], t: float,
-             fn: InterpFunc): float {.inline.} =
-  ## Interpolate between an array of values using the given interpolation
-  ## function.
-  let
-    t = clamp(t, 0, vals.len.float - 1)
-    i0 = max(0, floor(t).int)
-    i1 = min(vals.len - 1, ceil(t).int)
-  interp(vals[i0], vals[i1], t mod 1, fn)
+func lerp*[T](interp: Interpolated[T], t: SomeFloat): T =
+  ## Linearly interpolates between the previous and current value of the
+  ## ``Interpolated[T]``.
+  result = lerp(interp.prev, interp.curr, t)
+
+proc tick*[T](interp: var Interpolated[T]) =
+  ## Updates the given ``Interpolated[T]``'s previous value with the current
+  ## value. This is usually called in ``update``.
+  interp.prev = interp.curr
+
+proc tickInterpolated*[T: tuple | object](rec: var T) =
+  ## Ticks all ``Interpolated[T]`` in the given object.
+
+  for value in fields(rec):
+    when value is Interpolated:
+      value.tick()
+
+proc `<-`*[T](interp: var Interpolated[T], value: T) =
+  ## Shortcut operator for assigning to ``mvalue(interp)``.
+  interp.curr = value
+
+proc `<-+`*[T](interp: var Interpolated[T], x: T) =
+  ## Shortcut for ``mvalue(interp) += x``.
+  interp.curr += x
+
+proc `<--`*[T](interp: var Interpolated[T], x: T) =
+  ## Shortcut for ``mvalue(interp) -= x``.
+  interp.curr -= x
+
+proc `<-*`*[T](interp: var Interpolated[T], x: T) =
+  ## Shortcut for ``mvalue(interp) *= x``.
+  interp.curr *= x
+
+proc `<-/`*[T](interp: var Interpolated[T], x: T) =
+  ## Shortcut for ``mvalue(interp) /= x``.
+  interp.curr /= x
+
+{.pop.}

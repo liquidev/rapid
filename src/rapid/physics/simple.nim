@@ -5,12 +5,19 @@
 ## kinematic bodies are controlled fully by physics/simple, so Chipmunk has no
 ## influence over them.
 
+import std/options
+
 import glm/vec
 
 import ../game/tilemap
+import ../math/interpolation
 import ../math/rectangle
 
 export RectangleSide
+export
+  interpolation.interpolated,
+  interpolation.value,
+  interpolation.mvalue
 
 type
   CollidableTile* {.explain.} = concept t
@@ -22,30 +29,33 @@ type
     csIsColliding
     csJustSeparated
 
+  GoThroughSeamCallback* = proc (body: Body)
+    ## Callback for when a body passes a wrapping seam.
+
   Body* = ref object of RootObj
     ## A physics body.
 
     # physics data
-    position, velocity, force: Vec2f
+    position: Interpolated[Vec2f]
+    velocity, force: Vec2f
     size: Vec2f
     elasticity: float32
 
     # internal data
     indexInSpace: int
     collisionStates: array[RectangleSide, set[CollisionState]]
+    goThroughSeamCallback: GoThroughSeamCallback
 
   UserBody*[U] = ref object of Body
     ## A physics body with user data.
     user*: U
-
-  UpdateBodyPositionCallback* = proc (body: Body)
 
   Space*[M] = ref object
     ## A space. This is what simulates physics on all bodies.
     tilemap: M
     bodies: seq[Body]
     gravity: Vec2f
-    updateBodyX, updateBodyY: UpdateBodyPositionCallback
+    boundsX, boundsY: Option[Slice[float32]]
 
 
 # body
@@ -67,7 +77,7 @@ proc newBody*[U](size: Vec2f, user: U): UserBody[U] =
   result.init(size)
   result.user = user
 
-proc position*(body: Body): var Vec2f =
+proc position*(body: Body): var Interpolated[Vec2f] =
   ## Returns the position of the body.
   body.position
 
@@ -90,6 +100,10 @@ proc force*(body: Body): var Vec2f =
 proc `force=`*(body: Body, newForce: Vec2f) =
   ## Sets the force of the body.
   body.force = newForce
+
+proc size*(body: Body): Vec2f =
+  ## Returns the size of the body.
+  body.size
 
 proc elasticity*(body: Body): var float32 =
   ## Returns the elasticity of the body.
@@ -125,8 +139,35 @@ proc justSeparatedWith*(body: Body, wall: RectangleSide): bool =
   ## Returns whether the body just finished colliding with the given wall.
   csJustSeparated in body.collisionState(wall)
 
+proc onGoThroughSeam*(body: Body, callback: GoThroughSeamCallback) =
+  ## Sets the callback to be called when the body goes through an X or Y
+  ## wrapping seam. This is usually used to tick interpolation to avoid
+  ## janky-looking animations.
+  body.goThroughSeamCallback = callback
+
 
 # space
+
+proc boundsX*(space: Space): var Option[Slice[float32]] =
+  ## Returns the X wrapping boundaries.
+  ## The space is capable of wrapping bodies around some set boundaries.
+  ## Setting this to ``Some(bounds)`` will enable wrapping, setting this to
+  ## ``None`` will disable wrapping.
+  ##
+  ## Wrapping is disabled by default.
+  space.boundsX
+
+proc boundsY*(space: Space): var Option[Slice[float32]] =
+  ## Returns the Y wrapping boundaries.
+  space.boundsY
+
+proc `boundsX=`*(space: Space, bounds: Option[Slice[float32]]) =
+  ## Sets X wrapping boundaries.
+  space.boundsX = bounds
+
+proc `boundsY=`*(space: Space, bounds: Option[Slice[float32]]) =
+  ## Sets Y wrapping boundaries.
+  space.boundsY = bounds
 
 proc addBody*(space: Space, body: Body) =
   ## Adds the given body to the space.
@@ -154,30 +195,12 @@ iterator bodies*(space: Space): Body =
   for body in space.bodies:
     yield body
 
-proc onUpdateBodyX*(space: Space, callback: UpdateBodyPositionCallback) =
-  ## Sets the callback to be called when the X position of the body should
-  ## update. This callback is triggered *before* processing collisions on the
-  ## X axis.
-  space.updateBodyX = callback
-
-proc onUpdateBodyY*(space: Space, callback: UpdateBodyPositionCallback) =
-  ## Sets the callback to be called when the Y position of the body should
-  ## update. This callback is triggered *before* processing collisions on the
-  ## Y axis.
-  space.updateBodyY = callback
-
 proc newSpace*[M](tilemap: M, gravity: Vec2f): Space[M] =
   ## Creates and initializes a new space with the given tilemap and gravity.
 
   new result
   result.tilemap = tilemap
   result.gravity = gravity
-
-  result.onUpdateBodyX proc (body: Body) =
-    body.position.x += body.velocity.x
-
-  result.onUpdateBodyY proc (body: Body) =
-    body.position.y += body.velocity.y
 
 
 # collision resolution
@@ -244,7 +267,7 @@ proc collideWithTilemapX[M](body: Body, tilemap: M) =
         tileHitbox.left + velocity, tileHitbox.bottom - 1,
       )
       if hitbox.intersects(wall):
-        body.position.x = tileHitbox.left - hitbox.width
+        mvalue(body.position).x = tileHitbox.left - hitbox.width
         body.velocity.x = -body.velocity.x * body.elasticity
         collWithLeft = true
     elif velocity < 0.001 and isNotSolid(1, 0):
@@ -253,7 +276,7 @@ proc collideWithTilemapX[M](body: Body, tilemap: M) =
         tileHitbox.right, tileHitbox.bottom - 1,
       )
       if hitbox.intersects(wall):
-        body.position.x = tileHitbox.right
+        mvalue(body.position).x = tileHitbox.right
         body.velocity.x = -body.velocity.x * body.elasticity
         collWithRight = true
 
@@ -292,7 +315,7 @@ proc collideWithTilemapY[M](body: Body, tilemap: M) =
         tileHitbox.right - 1, tileHitbox.top + velocity,
       )
       if hitbox.intersects(wall):
-        body.position.y = tileHitbox.top - hitbox.height
+        mvalue(body.position).y = tileHitbox.top - hitbox.height
         body.velocity.y = -body.velocity.y * body.elasticity
         collWithTop = true
     elif velocity < 0.001 and isNotSolid(0, 1):
@@ -301,7 +324,7 @@ proc collideWithTilemapY[M](body: Body, tilemap: M) =
         tileHitbox.right - 1, tileHitbox.bottom,
       )
       if hitbox.intersects(wall):
-        body.position.y = tileHitbox.bottom
+        mvalue(body.position).y = tileHitbox.bottom
         body.velocity.y = -body.velocity.y * body.elasticity
         collWithBottom = true
 
@@ -317,20 +340,42 @@ proc collideWithTilemapY[M](body: Body, tilemap: M) =
 
 {.pop.}
 
+proc wrapAround[T](a: var T, range: Slice[T]): bool {.inline.} =
+
+  result = true
+  if a < range.a:
+    a = range.b
+  elif a > range.b:
+    a = range.a
+  else:
+    result = false
+
 proc update*[T: CollidableTile; M: AnyTilemap[T]](space: Space[M]) =
   ## Simulates the space for one tick. Keep in mind that the simple space only
   ## supports *fixed timestep.*
 
   for body in space.bodies:
+    body.position.tick()
+
     body.applyForce(space.gravity)
 
     body.velocity += body.force
     body.force *= 0
 
-    space.updateBodyX(body)
-#     body.position.x += body.velocity.x * timestep
+    mvalue(body.position).x += body.velocity.x
+    if space.boundsX.isSome and
+       wrapAround(mvalue(body.position).x, space.boundsX.get):
+      # this is done to prevent weird interpolation when a body passes through
+      # the seam
+      body.position.tick()
+      if not body.goThroughSeamCallback.isNil:
+        body.goThroughSeamCallback(body)
     body.collideWithTilemapX(space.tilemap)
 
-    space.updateBodyY(body)
-#     body.position.y += body.velocity.y * timestep
+    mvalue(body.position).y += body.velocity.y
+    if space.boundsY.isSome and
+       wrapAround(mvalue(body.position).y, space.boundsY.get):
+      body.position.tick()
+      if not body.goThroughSeamCallback.isNil:
+        body.goThroughSeamCallback(body)
     body.collideWithTilemapY(space.tilemap)
