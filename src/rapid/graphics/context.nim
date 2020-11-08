@@ -740,6 +740,8 @@ proc len(batch: Batch): int =
 proc finalizeBatch(graphics: Graphics) =
   ## Finalizes the batch by setting its last index to the index's buffer's last
   ## element.
+
+  if graphics.indexBuffer.len <= 0: return
   graphics.batches[^1].range.b = graphics.indexBuffer.len - 1
   let range = graphics.currentBatch.range
   if range.b - range.a <= 0:

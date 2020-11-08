@@ -35,6 +35,10 @@ type
   ComponentImpl* = object
     ## An object holding all the callbacks a component can implement.
 
+    deleteEntity: bool
+      # this is perhaps not very elegant, but i couldn't find a nicer solution
+      # for deleting entities inside of a component
+
     update*: ComponentUpdate[RootComponent]
       ## Ticks the component once. This runs a fixed amount of times per second
       ## (60 by default, but this can change depending on the game).
@@ -56,6 +60,7 @@ type
   RootEntity* = ref object of RootObj
     ## Empty entity, base for inheriting from.
 
+    delete: bool
     components: seq[ptr RootComponent]
       # ↑ a bit non-idiomatic, but should suffice until lent in object fields is
       # implemented. you don't use this directly anyways.
@@ -84,6 +89,10 @@ proc registerComponents*[T: RootEntity](entity: T) {.inline.} =
   for name, value in fieldPairs(entity[]):
     when value is RootComponent:
       entity.registerComponent(addr value)
+
+proc deleteEntity*(comp: var RootComponent) =
+  ## Marks the parent entity for deletion.
+  comp.impl.deleteEntity = true
 
 
 # callbacks
@@ -140,10 +149,17 @@ proc autoImplement*[T: RootComponent](comp: var T) =
 
 proc update*(entity: RootEntity) =
   ## Tick all of the entity's components update routines once.
+  ## This also checks for deletion flags and updates the entity's deletion flag
+  ## accordingly. If any of the entity's components' deletion flags is set,
+  ## components that have been registered after it are not updated, because the
+  ## entity is about to be deleted in the current tick anyways.
 
   for comp in components(entity):
     if comp.impl.update != nil:
       comp.impl.update(comp)
+    if comp.impl.deleteEntity:
+      entity.delete = true
+      break
 
 proc draw*(entity: RootEntity, target: Target, step: float32) =
   ## aglet-draw all of the entity's components.
@@ -170,11 +186,32 @@ proc shape*(entity: RootEntity, graphics: Graphics, step: float32) =
     if comp.impl.shape != nil:
       comp.impl.shape(comp, graphics, step)
 
+proc cleanup*(entities: var seq[RootEntity]) =
+  ## Cleans up any entities that are marked for deletion.
+
+  var
+    len = entities.len
+    i = 0
+  while i < len:
+    let entity = entities[i]
+    if entity.delete:
+      entities.del(i)
+      dec len
+      continue
+    inc i
+
 proc update*(entities: seq[RootEntity]) =
   ## Ticks all the entities in the sequence.
 
   for entity in entities:
     entity.update()
+
+proc updateAndCleanup*(entities: var seq[RootEntity]) =
+  ## Ticks all the entities in the sequence, then cleans up any entities marked
+  ## for deletion.
+
+  entities.update()
+  entities.cleanup()
 
 proc draw*(entities: seq[RootEntity], target: Target, step: float32) =
   ## aglet-draws all the entities in the sequence.
