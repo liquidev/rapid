@@ -28,7 +28,15 @@ solutions like Godot.
 - `rapid/ec`
   - Minimal [entity-component][gpp component] decoupling pattern implementation
 - `rapid/physics`
-  - General-purpose physics engine, using [Chipmunk2D][chipmunk repo]
+  - `chipmunk` – General-purpose physics engine, using
+    [Chipmunk2D][chipmunk repo]
+  - `simple` – Simple and fast AABB-based physics engine
+- `rapid/input`
+  - Simplified input event distribution using procs like
+    `mouseButtonJustPressed` + callback support
+- `rapid/math`
+  - Common math utilities for vector math, axis-aligned bounding boxes,
+    interpolation, and type-safe units
 
   [gpp component]: https://gameprogrammingpatterns.com/component.html
   [chipmunk repo]: https://github.com/slembcke/Chipmunk2D
