@@ -90,7 +90,7 @@ proc `height=`*(font: Font, newHeight: float32) {.inline.} =
 
 proc pixelHeight*(font: Font): float32 {.inline.} =
   ## Retrieves the design height of the font in pixels.
-  font.face.size.metrics.ascender / 64
+  (font.face.size.metrics.ascender + font.face.size.metrics.descender) / 64 - 1
 
 proc lineSpacing*(font: Font): float32 {.inline.} =
   ## Returns the line spacing multiplier.
@@ -170,7 +170,8 @@ iterator runes(str: seq[Rune]): Rune =
   for rune in str:
     yield rune
 
-iterator typeset(font: Font, text: Text): TypesetGlyph =
+iterator typeset(font: Font, text: Text,
+                 firstGlyphOffset: var Vec2f): TypesetGlyph =
   ## The Iterator That Does The Magic. Renders glyphs if necessary, and returns
   ## their positions. The final position is the complete size of the string.
 
@@ -181,6 +182,7 @@ iterator typeset(font: Font, text: Text): TypesetGlyph =
   var
     pen = vec2f(0)
     previous = Rune(0)
+    i = 0
   for rune in runes(text):
     case rune
     of Rune '\l':  # line feed
@@ -199,19 +201,25 @@ iterator typeset(font: Font, text: Text): TypesetGlyph =
         subpixel = quantize(kernedX - trunc(kernedX), subpixelStep)
         glyph = font.getGlyph(rune, subpixel)
         offset = vec2f(glyph.offset.x.float32, -glyph.offset.y.float32)
+      if i == 0: firstGlyphOffset = offset
       yield TypesetGlyph (glyph, pen + offset + kerning)
       pen += glyph.advance
       previous = rune
+    inc(i)
 
 proc textWidth*(font: Font, text: Text,
                 fontHeight, fontWidth: float32 = 0): float32 =
   ## Returns the width of the given text.
 
+  if text.len == 0: return
+
   let oldSize = font.size
   if fontHeight != 0:
     font.size = vec2f(fontHeight, fontWidth)
-  for (glyph, pen) in font.typeset(text):
+  var firstGlyphOffset: Vec2f
+  for (glyph, pen) in font.typeset(text, firstGlyphOffset):
     result = pen.x + glyph.size.x.float32
+  result += firstGlyphOffset.x
   font.size = oldSize
 
 proc drawGlyph(graphics: Graphics, baselinePosition: Vec2f,
@@ -267,7 +275,8 @@ proc text*(graphics: Graphics, font: Font, position: Vec2f, text: Text,
     of taMiddle: alignBox.y / 2 + position.y + font.pixelHeight / 2
     of taBottom: alignBox.y + position.y
 
-  for (glyph, pen) in font.typeset(text):
+  var firstGlyphOffset: Vec2f
+  for (glyph, pen) in font.typeset(text, firstGlyphOffset):
     if glyph.size.x > 0 and glyph.size.y > 0:
       graphics.drawGlyph(position, glyph, pen, color)
 

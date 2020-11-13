@@ -67,3 +67,19 @@ template hex*(lit: static string): Color =
 
   const compileTimeColor = hex(lit)
   compileTimeColor
+
+proc withRed*(color: Color, red: float32): Color =
+  ## Copies the color with a different red channel.
+  rgba(red, color.g, color.b, color.a)
+
+proc withGreen*(color: Color, green: float32): Color =
+  ## Copies the color with a different green channel.
+  rgba(color.r, green, color.b, color.a)
+
+proc withBlue*(color: Color, blue: float32): Color =
+  ## Copies the color with a different blue channel.
+  rgba(color.r, color.g, blue, color.a)
+
+proc withAlpha*(color: Color, alpha: float32): Color =
+  ## Copies the color with a different alpha channel.
+  rgba(color.r, color.g, color.b, alpha)
