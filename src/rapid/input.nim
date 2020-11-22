@@ -9,6 +9,7 @@ type
     psJustPressed
     psDown
     psJustReleased
+    psJustRepeated
 
   Input* = ref object
     ## Input state manager.
@@ -31,6 +32,7 @@ type
     cWindowScale: seq[WindowScaleCallback]
     cKeyPress: seq[KeyCallback]
     cKeyRelease: seq[KeyCallback]
+    cKeyRepeat: seq[KeyCallback]
     cCharInput: seq[CharInputCallback]
     cMouseButtonPress: seq[MouseButtonCallback]
     cMouseButtonRelease: seq[MouseButtonCallback]
@@ -171,6 +173,10 @@ proc process*(input: Input, event: InputEvent) =
     input.keys[event.key.int].excl(psDown)
     trigger cKeyRelease, it(event.key, event.scancode, event.kMods)
 
+  of iekKeyRepeat:
+    input.keys[event.key.int].incl(psJustRepeated)
+    trigger cKeyRepeat, it(event.key, event.scancode, event.kMods)
+
   of iekKeyChar:
     trigger cCharInput, it(event.rune)
 
@@ -196,12 +202,12 @@ proc process*(input: Input, event: InputEvent) =
     trigger cFileDrop, it(event.filePaths)
 
   of iekWindowResize: discard  # use frameResize
-  of iekKeyRepeat: discard     # redundant
 
 proc finishTick[T](states: var array[T, set[PressState]]) {.inline.} =
   for state in mitems(states):
     state.excl(psJustPressed)
     state.excl(psJustReleased)
+    state.excl(psJustRepeated)
 
 proc finishTick*(input: Input) =
   ## Finishes the current update tick. This should be called at the end of an
@@ -222,29 +228,76 @@ proc keyJustPressed*(input: Input, key: Key): bool =
   ## Returns whether the given key has been pressed in the current input tick.
   psJustPressed in input.keys[key.int]
 
+proc keyJustPressed*(input: Input, keys: set[Key]): bool =
+  ## Returns whether any of the given keys has just been pressed.
+
+  for key in keys:
+    if input.keyJustPressed(key): return true
+
 proc keyIsDown*(input: Input, key: Key): bool =
   ## Returns whether the given key is being held down in the current input tick.
   psDown in input.keys[key.int]
+
+proc keyIsDown*(input: Input, keys: set[Key]): bool =
+  ## Returns whether any of the given keys is down.
+
+  for key in keys:
+    if input.keyIsDown(key): return true
 
 proc keyJustReleased*(input: Input, key: Key): bool =
   ## Returns whether the given key has just been released in the current input
   ## tick.
   psJustReleased in input.keys[key.int]
 
+proc keyJustReleased*(input: Input, keys: set[Key]): bool =
+  ## Returns whether any of the given keys has just been released.
+
+  for key in keys:
+    if input.keyJustReleased(key): return true
+
+proc keyJustRepeated*(input: Input, key: Key): bool =
+  ## Returns whether the given key has just been repeated in the current input
+  ## tick.
+  psJustRepeated in input.keys[key.int]
+
+proc keyJustRepeated*(input: Input, keys: set[Key]): bool =
+  ## Returns whether any of the given keys has just been repeated.
+
+  for key in keys:
+    if input.keyJustRepeated(key): return true
+
 proc mouseButtonJustPressed*(input: Input, button: MouseButton): bool =
   ## Returns whether the given mouse button has been pressed in the current
   ## input tick.
   psJustPressed in input.mouseButtons[button]
+
+proc mouseButtonJustPressed*(input: Input, buttons: set[MouseButton]): bool =
+  ## Returns whether any of the given mouse buttons has just been pressed.
+
+  for button in buttons:
+    if input.mouseButtonJustPressed(button): return true
 
 proc mouseButtonIsDown*(input: Input, button: MouseButton): bool =
   ## Returns whether the given mouse button is being held down in the current
   ## input tick.
   psDown in input.mouseButtons[button]
 
+proc mouseButtonIsDown*(input: Input, buttons: set[MouseButton]): bool =
+  ## Returns whether any of the given mouse buttons has is down.
+
+  for button in buttons:
+    if input.mouseButtonIsDown(button): return true
+
 proc mouseButtonJustReleased*(input: Input, button: MouseButton): bool =
   ## Returns whether the given mouse button has been released in the current
   ## input tick.
   psJustReleased in input.mouseButtons[button]
+
+proc mouseButtonJustReleased*(input: Input, buttons: set[MouseButton]): bool =
+  ## Returns whether any of the given mouse buttons has just been released.
+
+  for button in buttons:
+    if input.mouseButtonJustReleased(button): return true
 
 proc mousePosition*(input: Input): Vec2f =
   ## Returns the position of the mouse in the window.
@@ -295,6 +348,10 @@ proc onKeyPress*(input: Input, callback: KeyCallback) =
 
 proc onKeyRelease*(input: Input, callback: KeyCallback) =
   ## Adds a callback triggered when a key is released.
+  input.cKeyRelease.add(callback)
+
+proc onKeyRepeat*(input: Input, callback: KeyCallback) =
+  ## Adds a callback triggered when a key is repeated.
   input.cKeyRelease.add(callback)
 
 proc onCharInput*(input: Input, callback: CharInputCallback) =

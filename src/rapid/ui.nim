@@ -1,5 +1,7 @@
 ## Simple UI framework inspired by `fidget <https://github.com/treeform/fidget/>`.
 
+import std/unicode
+
 import aglet
 
 import graphics
@@ -42,23 +44,33 @@ type
       layoutPosition*: Vec2f
       spacing*: float32
 
-  Ui* = ref object
+  Ui* = ref object of RootObj
     graphics: Graphics
     input: Input
+
     stack: seq[Box]
+    textInputBuffer: seq[Rune]
 
   LayoutError* = object of FieldDefect
 
-proc newUi*(window: Window, graphics: Graphics = nil): Ui =
-  ## Creates a new UI instance. If ``graphics`` is nil, a new graphics context
+proc init*(ui: Ui, window: Window, graphics: Graphics = nil) =
+  ## Initializes a UI instance. If ``graphics`` is nil, a new graphics context
   ## is created.
 
-  new result
-  result.graphics = graphics
-  result.input = window.newInput()
+  ui.graphics = graphics
+  ui.input = window.newInput()
 
-  if result.graphics == nil:
-    result.graphics = window.newGraphics()
+  if ui.graphics == nil:
+    ui.graphics = window.newGraphics()
+
+  ui.input.onCharInput proc (rune: Rune) =
+    ui.textInputBuffer.add(rune)
+
+proc newUi*(window: Window, graphics: Graphics = nil): Ui =
+  ## Creates and initializes a new UI instance.
+
+  new result
+  result.init(window, graphics)
 
 
 # resources, if you ever need to do some manual drawing
@@ -75,6 +87,22 @@ proc graphics*(ui: Ui): Graphics {.inline.} =
 proc currentBox*(ui: Ui): var Box =
   ## Returns the box at the top of the stack.
   ui.stack[^1]
+
+proc padH*(ui: Ui, padding: float32) =
+  ## Pads the current box with the given amount of horizontal padding.
+
+  var rect = ui.currentBox.rect
+  rect.position += vec2f(padding, 0)
+  rect.size -= vec2f(padding, 0) * 2
+  ui.currentBox.rect = rect
+
+proc padV*(ui: Ui, padding: float32) =
+  ## Pads the current box with the given amount of vertical padding.
+
+  var rect = ui.currentBox.rect
+  rect.position += vec2f(0, padding)
+  rect.size -= vec2f(0, padding) * 2
+  ui.currentBox.rect = rect
 
 proc pad*(ui: Ui, padding: float32) =
   ## Pads the current box with the given amount of padding.
@@ -110,6 +138,14 @@ proc align*(ui: Ui, alignment: Alignment) =
     of apBottom: parent.height - rect.height
 
   ui.currentBox.rect = rect
+
+proc offset*(ui: Ui, v: Vec2f) =
+  ## Offsets the layout position by the given vector.
+  ui.currentBox.layoutPosition += v
+
+proc spacing*(ui: Ui): float32 =
+  ## Returns the current box's spacing.
+  ui.currentBox.spacing
 
 proc `spacing=`*(ui: Ui, newSpacing: float32) =
   ## Sets the spacing between boxes inside of the current box.
@@ -211,6 +247,39 @@ proc outline*(ui: Ui, color: Color = ui.color, thickness: float32 = 1) =
   rect.position -= vec2f(0.5)
   ui.graphics.lineRectangle(rect, thickness, color)
 
+proc rightBorder*(ui: Ui, color: Color = ui.color, thickness: float32 = 1) =
+  ## Draws the right border of the current box.
+
+  var rect = ui.currentBox.rect
+  rect.position -= vec2f(0.5)
+  ui.graphics.line(rect.topRight, rect.bottomRight, thickness,
+                   lcSquare, color, color)
+
+proc bottomBorder*(ui: Ui, color: Color = ui.color, thickness: float32 = 1) =
+  ## Draws the right border of the current box.
+
+  var rect = ui.currentBox.rect
+  rect.position -= vec2f(0.5)
+  ui.graphics.line(rect.bottomLeft, rect.bottomRight, thickness,
+                   lcSquare, color, color)
+
+proc leftBorder*(ui: Ui, color: Color = ui.color, thickness: float32 = 1) =
+  ## Draws the left border of the current box. Note that drawing all four
+  ## borders does not form a perfect rectangle, use ``outline`` instead.
+
+  var rect = ui.currentBox.rect
+  rect.position -= vec2f(0.5)
+  ui.graphics.line(rect.topLeft, rect.bottomLeft, thickness,
+                   lcSquare, color, color)
+
+proc topBorder*(ui: Ui, color: Color = ui.color, thickness: float32 = 1) =
+  ## Draws the top border of the current box.
+
+  var rect = ui.currentBox.rect
+  rect.position -= vec2f(0.5)
+  ui.graphics.line(rect.topLeft, rect.topRight, thickness,
+                   lcSquare, color, color)
+
 proc font*(ui: Ui): Font =
   ## Returns the current box's font.
   ui.currentBox.font
@@ -251,7 +320,7 @@ proc text*(ui: Ui, text: Text, color: Color = ui.color,
   ## Draws text in the current box, with the given color, alignment, and size.
   ## The box's area is used as the text's alignment box.
 
-  assert ui.font != nil, "cannot draw text without a font set"
+  assert not ui.font.isNil, "cannot draw text without a font set"
 
   ui.graphics.text(ui.font, ui.currentBox.rect.position, text,
                    alignment.horizontal.HorzTextAlign,
@@ -290,19 +359,32 @@ proc mouseInBox*(ui: Ui): bool =
   ui.mousePosition.y >= 0 and ui.mousePosition.y < ui.currentBox.rect.height
 
 proc mouseButtonIsDown*(ui: Ui, button: MouseButton): bool =
-  ## Returns whether the mouse is in the current box and the given mouse button
-  ## is held down.
+  ## Returns whether the given mouse button is held down.
   ui.input.mouseButtonIsDown(button)
 
 proc mouseButtonJustPressed*(ui: Ui, button: MouseButton): bool =
-  ## Returns whether the mouse is in the current box and the given mouse button
-  ## has just been pressed.
+  ## Returns whether the given mouse button has just been pressed.
   ui.input.mouseButtonJustPressed(button)
 
 proc mouseButtonJustReleased*(ui: Ui, button: MouseButton): bool =
-  ## Returns whether the mouse is in the current box and the given mouse button
-  ## has just been released.
+  ## Returns whether the given mouse button has just been released.
   ui.input.mouseButtonJustReleased(button)
+
+proc keyIsDown*(ui: Ui, key: Key): bool =
+  ## Returns whether the given key is being held down.
+  ui.input.keyIsDown(key)
+
+proc keyJustPressed*(ui: Ui, key: Key): bool =
+  ## Returns whether the given key has just been pressed.
+  ui.input.keyJustPressed(key)
+
+proc keyJustReleased*(ui: Ui, key: Key): bool =
+  ## Returns whether the given key has just been released.
+  ui.input.keyJustReleased(key)
+
+proc keyJustRepeated*(ui: Ui, key: Key): bool =
+  ## Returns whether the given key has just been repeated.
+  ui.input.keyJustRepeated(key)
 
 template mouseHover*(ui: Ui, body: untyped) =
   ## Convenience/readability template, shortcut for ``if ui.mouseInBox``.
@@ -331,7 +413,37 @@ template mouseReleased*(ui: Ui, button: MouseButton, body: untyped) =
   if ui.mouseInBox and ui.mouseButtonJustReleased(button):
     `body`
 
+template keyPressed*(ui: Ui, key: Key, body: untyped) =
+  ## Convenience/readability template, shortcut for ``if ui.keyJustPressed``.
+
+  if ui.keyJustPressed(key):
+    `body`
+
+template keyReleased*(ui: Ui, key: Key, body: untyped) =
+  ## Convenience/readability template, shortcut for ``if ui.keyJustReleased``.
+
+  if ui.keyJustReleased(key):
+    `body`
+
+template keyTyped*(ui: Ui, key: Key, body: untyped) =
+  ## Convenience/readability template, shortcut for
+  ## ``if ui.keyJustPressed or ui.keyJustRepeated``.
+
+  if ui.keyJustPressed(key) or ui.keyJustRepeated(key):
+    `body`
+
 {.pop.}
+
+iterator textInput*(ui: Ui): Rune =
+  ## Iterates over text input in the current frame.
+
+  for r in ui.textInputBuffer:
+    yield r
+
+proc flushTextInput*(ui: Ui) =
+  ## Flushes the text input buffer (resets it) so that any further calls to
+  ## ``textInput`` will yield no characters.
+  ui.textInputBuffer.setLen(0)
 
 
 # general frameworking
@@ -339,6 +451,7 @@ template mouseReleased*(ui: Ui, button: MouseButton, body: untyped) =
 proc processEvent*(ui: Ui, event: InputEvent) {.inline.} =
   ## Processes the given input event. This should be called from the callback
   ## passed to ``window.pollEvents``.
+
   ui.input.process(event)
 
 proc begin*(ui: Ui, target: Target) =
@@ -354,6 +467,8 @@ proc begin*(ui: Ui, target: Target) =
 
 proc draw*(ui: Ui, target: Target) =
   ## Finishes the input tick, and draws the UI onto the given target.
+  ## This also flushes text input.
 
   ui.input.finishTick()
+  ui.flushTextInput()
   ui.graphics.draw(target)

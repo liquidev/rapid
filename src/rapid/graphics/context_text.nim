@@ -258,9 +258,13 @@ proc text*(graphics: Graphics, font: Font, position: Vec2f, text: Text,
   let
     defaultBatch = graphics.currentBatch
     oldSize = font.size
+    sampler = font.atlas.sampler(
+      minFilter = graphics.spriteMinFilter,
+      magFilter = graphics.spriteMagFilter,
+    )
   if fontHeight != 0:
     font.size = vec2f(fontWidth, fontHeight)
-  graphics.batchNewSampler(font.atlas.sampler)
+  graphics.batchNewSampler(sampler)
 
   var position = position
   position.x =
