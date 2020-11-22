@@ -67,7 +67,7 @@ type
 
 const
   blendAlpha* = blendMode(blendAdd(bfSrcAlpha, bfOneMinusSrcAlpha),
-                          blendAdd(bfSrcAlpha, bfOneMinusSrcAlpha))
+                          blendAdd(bfOne, bfOneMinusSrcAlpha))
   blendAlphaPremult* = blendMode(blendAdd(bfOne, bfOneMinusSrcAlpha),
                                  blendAdd(bfOne, bfOneMinusSrcAlpha))
   blendAdditive* = blendMode(blendAdd(bfOne, bfOne),
