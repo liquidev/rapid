@@ -136,6 +136,7 @@ proc `size=`*(tilemap: FlatTilemap, _: Vec2i)
 type
   UserChunk*[T: TilemapTile, W, H: static int, U] {.byref.} = object
     tiles: array[W * H, T]
+    outOfBounds: T
     filledTiles: uint32
     user*: U
 
@@ -257,6 +258,13 @@ proc `[]=`*[T; CW, CH: static int, U](chunk: var UserChunk[T, CW, CH, U],
   ## **Warning:** The position is not out of bounds-checked for performance
   ## reasons. The global coordinate [] should be preferred over this anyways.
 
+  let oldTile = chunk[position]
+
+  # branchless programming™
+  inc chunk.filledTiles,
+    int(oldTile == chunk.outOfBounds and tile != chunk.outOfBounds) * 1 -
+    int(tile == chunk.outOfBounds and oldTile != chunk.outOfBounds) * 1
+
   chunk.tiles[position.x + position.y * CW] = tile
 
 proc `[]`*[T; CW, CH: static int, U](tilemap: UserChunkTilemap[T, CW, CH, U],
@@ -282,24 +290,17 @@ proc `[]=`*[T; CW, CH: static int, U](tilemap: UserChunkTilemap[T, CW, CH, U],
 
   var chunk: ptr UserChunk[T, CW, CH, U]
   if not tilemap.hasChunk(chunkPosition):
-    var c = UserChunk[T, CW, CH, U]()
+    var c = UserChunk[T, CW, CH, U](outOfBounds: tilemap.outOfBounds)
     for tile in mitems(c.tiles):
       tile = tilemap.outOfBounds
     tilemap.chunks[chunkPosition] = c
   chunk = addr tilemap.chunks[chunkPosition]
 
-  let
-    positionInChunk = tilemap.positionInChunk(position)
-    diff =  # branchless programming™
-      # only diff if the tile changed
-      int(chunk[][positionInChunk] != tile) *
-      # diff -1 if the tile was OOB or 1 if it was IB
-      (2 * int(tile != tilemap.outOfBounds) - 1)
-  chunk.filledTiles.inc diff
+  let positionInChunk = tilemap.positionInChunk(position)
+  chunk[][positionInChunk] = tile
   if chunk.filledTiles == 0:
     # delete empty chunks
     tilemap.chunks.del(chunkPosition)
-  chunk[][positionInChunk] = tile
 
 iterator tiles*[T, CW, CH, U](chunk: UserChunk[T, CW, CH, U]): (Vec2i, lent T) =
   ## Iterates through the chunk's tiles and yields immutable references to them.
