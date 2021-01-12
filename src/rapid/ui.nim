@@ -79,6 +79,10 @@ proc graphics*(ui: Ui): Graphics {.inline.} =
   ## Returns the graphics context of the UI.
   ui.graphics
 
+proc input*(ui: Ui): Input {.inline.} =
+  ## Returns the Input instance of the UI.
+  ui.input
+
 
 # boxes and layout
 
@@ -127,14 +131,14 @@ proc align*(ui: Ui, alignment: Alignment) =
   rect.position.x =
     case alignment.horizontal
     of apLeft: parent.left
-    of apCenter: parent.width / 2 - rect.width / 2
+    of apCenter: parent.left + (parent.width / 2 - rect.width / 2)
     of apRight: parent.right - rect.width
 
   # vertical
   rect.position.y =
     case alignment.vertical
     of apTop: parent.top
-    of apMiddle: parent.height / 2 - rect.height / 2
+    of apMiddle: parent.top + (parent.height / 2 - rect.height / 2)
     of apBottom: parent.height - rect.height
 
   ui.currentBox.rect = rect
@@ -151,6 +155,18 @@ proc `spacing=`*(ui: Ui, newSpacing: float32) =
   ## Sets the spacing between boxes inside of the current box.
   ## This is only applicable for boxes with horizontal or vertical layout.
   ui.currentBox.spacing = newSpacing
+
+proc cursor*(ui: Ui): Vec2f =
+  ## Returns the current box's layout position (aka layout cursor).
+  ui.currentBox.layoutPosition
+
+proc x*(ui: Ui): float32 =
+  ## Returns the X coordinate of the current box's layout cursor.
+  ui.cursor.x
+
+proc y*(ui: Ui): float32 =
+  ## Returns the Y coordinate of the current box's layout cursor.
+  ui.cursor.y
 
 proc size*(ui: Ui): Vec2f =
   ## Returns the size of the current box.
@@ -328,6 +344,9 @@ proc text*(ui: Ui, text: Text, color: Color = ui.color,
                    alignBox = ui.currentBox.rect.size,
                    ui.fontHeight, ui.fontWidth, color)
 
+template scissor*(ui: Ui, body: untyped) =
+  ## Applies scissor testing inside of the current box.
+
 {.pop.}
 
 template drawInBox*(ui: Ui, body: untyped) =
@@ -352,6 +371,11 @@ template drawInBox*(ui: Ui, body: untyped) =
 proc mousePosition*(ui: Ui): Vec2f =
   ## Returns the position of the mouse relative to the current box.
   ui.input.mousePosition - ui.currentBox.rect.position
+
+proc deltaMousePosition*(ui: Ui): Vec2f =
+  ## Returns the change in mouse position between the previous and current
+  ## frame.
+  ui.input.deltaMousePosition
 
 proc mouseInBox*(ui: Ui): bool =
   ## Returns whether the mouse position is in the current box's area.
@@ -385,6 +409,10 @@ proc keyJustReleased*(ui: Ui, key: Key): bool =
 proc keyJustRepeated*(ui: Ui, key: Key): bool =
   ## Returns whether the given key has just been repeated.
   ui.input.keyJustRepeated(key)
+
+proc keyJustTyped*(ui: Ui, key: Key): bool =
+  ## Returns whether the given key has just been pressed or repeated.
+  ui.input.keyJustPressed(key) or ui.input.keyJustRepeated(key)
 
 template mouseHover*(ui: Ui, body: untyped) =
   ## Convenience/readability template, shortcut for ``if ui.mouseInBox``.

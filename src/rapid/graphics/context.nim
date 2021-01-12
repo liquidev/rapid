@@ -12,6 +12,7 @@ import ../math as rmath
 import ../wrappers/freetype
 import atlas_texture
 import color
+import vertex_types
 
 export color
 export rmath
@@ -20,12 +21,6 @@ type
   RawVertexIndex = uint16
   VertexIndex* = distinct RawVertexIndex
     ## Index of a vertex, returned by ``addVertex``.
-
-  Vertex2D* = object
-    ## Vertex data, as represented in graphics memory and shaders.
-    position: Vec2f
-    color: Vec4f
-    uv: Vec2f
 
   Sprite* = object
     ## A mostly opaque sprite handle.
@@ -39,17 +34,20 @@ type
     ## texture mid-draw.
     range: Slice[int]
     sampler: Option[Sampler]
+    colorMask: Option[ColorMask]
+    stencilMode: Option[StencilMode]
+    clearStencil: Option[int32]
 
   Graphics* = ref object
     ## Hardware accelerated 2D vector graphics renderer.
     window: Window
 
-    mesh: Mesh[Vertex2D]
-    vertexBuffer: seq[Vertex2D]
+    mesh: Mesh[Vertex2dColorUv]
+    vertexBuffer: seq[Vertex2dColorUv]
     indexBuffer: seq[RawVertexIndex]
     batches: seq[Batch]
 
-    fDefaultProgram: Program[Vertex2D]
+    fDefaultProgram: Program[Vertex2dColorUv]
     fDefaultDrawParams: DrawParams
 
     transformEnabled: bool
@@ -76,19 +74,15 @@ const
 
 # Vertex
 
-proc position*(vertex: Vertex2D): Vec2f {.inline.} =
-  ## Returns the vertex's position.
-  vertex.position
-
-proc color*(vertex: Vertex2D): Rgba32f {.inline.} =
+proc color*(vertex: Vertex2dColorUv): Rgba32f {.inline.} =
   ## Returns the vertex's tint color.
   vertex.color.Rgba32f
 
 proc vertex*(position: Vec2f,
              color = rgba(1, 1, 1, 1),
-             uv = vec2f(0, 0)): Vertex2D {.inline.} =
+             uv = vec2f(0, 0)): Vertex2dColorUv {.inline.} =
   ## Constructs a 2D vertex.
-  Vertex2D(position: position, color: color.Vec4f, uv: uv)
+  Vertex2dColorUv(position: position, color: color.Vec4f, uv: uv)
 
 
 proc position*(index: VertexIndex, graphics: Graphics): Vec2f {.inline.} =
@@ -114,13 +108,17 @@ proc `$`*(index: VertexIndex): string {.inline.} =
 
 # Graphics
 
-proc defaultProgram*(graphics: Graphics): Program[Vertex2D] {.inline.} =
+proc window*(graphics: Graphics): Window {.inline.} =
+  ## Returns the graphics context's window.
+  graphics.window
+
+proc defaultProgram*(graphics: Graphics): Program[Vertex2dColorUv] {.inline.} =
   ## Returns the default program used for drawing using using the
   ## graphics context.
   graphics.fDefaultProgram
 
 proc `defaultProgram=`*(graphics: Graphics,
-                        newProgram: Program[Vertex2D]) {.inline.} =
+                        newProgram: Program[Vertex2dColorUv]) {.inline.} =
   ## Sets the default program used for drawing using the graphics context.
   ##
   ## Using this to adjust the program on the fly is bad practice. This should
@@ -219,7 +217,7 @@ template transform*(graphics: Graphics, body: untyped) =
     graphics.transformEnabled = enabled
     graphics.fTransformMatrix = matrix
 
-proc addVertex*(graphics: Graphics, vertex: Vertex2D): VertexIndex =
+proc addVertex*(graphics: Graphics, vertex: Vertex2dColorUv): VertexIndex =
   ## Adds a vertex to the graphics context's shape buffer.
 
   var vertex = vertex
@@ -269,7 +267,7 @@ proc triangle*(graphics: Graphics, a, b, c: Vec2f,
   ## Adds a triangle to the graphics context's shape buffer,
   ## tinted with the given color.
 
-  var
+  let
     e = graphics.addVertex(a, color)
     f = graphics.addVertex(b, color)
     g = graphics.addVertex(c, color)
@@ -280,11 +278,24 @@ proc quad*(graphics: Graphics, a, b, c, d: Vec2f,
   ## Adds a quad to the graphics context's shape buffer, tinted with the given
   ## color. The vertices must be wound clockwise.
 
-  var
+  let
     e = graphics.addVertex(a, color)
     f = graphics.addVertex(b, color)
     g = graphics.addVertex(c, color)
     h = graphics.addVertex(d, color)
+  graphics.addIndices([e, f, g, g, h, e])
+
+proc rawRectangle*(graphics: Graphics, rect: Rectf,
+                   uv = rectf(0, 0, 1, 1),
+                   colorTL, colorTR, colorBR, colorBL = rgba(1, 1, 1, 1)) =
+  ## Adds a "raw" rectangle to the graphics context's shape buffer,
+  ## with its respective corners tinted with the given colors.
+
+  let
+    e = graphics.addVertex(rect.topLeft, colorTL, uv.topLeft)
+    f = graphics.addVertex(rect.topRight, colorTR, uv.topRight)
+    g = graphics.addVertex(rect.bottomRight, colorBR, uv.bottomRight)
+    h = graphics.addVertex(rect.bottomLeft, colorBL, uv.bottomLeft)
   graphics.addIndices([e, f, g, g, h, e])
 
 proc rectangle*(graphics: Graphics, rect: Rectf,
@@ -729,7 +740,7 @@ proc sprite*(graphics: Graphics, sprite: Sprite, x, y: float32,
 
   graphics.sprite(sprite, vec2f(x, y), scale, tint)
 
-proc currentBatch*(graphics: Graphics): Batch =
+proc currentBatch*(graphics: Graphics): var Batch =
   ## Returns the currently running batch.
   graphics.batches[^1]
 
@@ -747,6 +758,20 @@ proc finalizeBatch(graphics: Graphics) =
   if range.b - range.a <= 0:
     graphics.batches.setLen(graphics.batches.len - 1)
 
+template batchProperty(graphics: Graphics, property, value: untyped) =
+
+  var batch = graphics.currentBatch
+  graphics.finalizeBatch()
+  if graphics.currentBatch.`property`.isSome and
+     graphics.currentBatch.`property`.get == `value`:
+    return
+  let eboLen = graphics.indexBuffer.len
+  batch.range = eboLen..eboLen
+  batch.`property` = some(value)
+  graphics.batches.add(batch)
+#   graphics.batches.add(Batch(range: eboLen..eboLen,
+#                              `property`: some(`value`)))
+
 proc batchNewSampler*(graphics: Graphics, newSampler: Sampler) =
   ## Temporarily change the sprite atlas sampler. Used for rendering text and
   ## other things that require the use of a separate texture.
@@ -754,13 +779,24 @@ proc batchNewSampler*(graphics: Graphics, newSampler: Sampler) =
   ## This is a low-level detail of how text rendering is implemented. Prefer
   ## higher-level APIs instead.
 
-  graphics.finalizeBatch()
-  if graphics.currentBatch.sampler.isSome and
-     graphics.currentBatch.sampler.get == newSampler:
-    return
-  let eboLen = graphics.indexBuffer.len
-  graphics.batches.add(Batch(range: eboLen..eboLen,
-                             sampler: some(newSampler)))
+  graphics.batchProperty sampler, newSampler
+
+proc batchNewColorMask*(graphics: Graphics, newColorMask: ColorMask) =
+  ## Temporarily change the color mask. This is a low-level procedure used to
+  ## implement stencil operations.
+
+  graphics.batchProperty colorMask, newColorMask
+
+proc batchNewStencil*(graphics: Graphics, newStencil: StencilMode) =
+  ## Temporarily change stencil options. This is a low-level procedure used to
+  ## implement stencil operations.
+
+  graphics.batchProperty stencilMode, newStencil
+
+proc batchClearStencil*(graphics: Graphics, value: int32) =
+  ## Makes the current batch clear the stencil buffer.
+
+  graphics.batchProperty clearStencil, value
 
 proc batchNewCopy*(graphics: Graphics, batch: Batch) =
   ## Copies the given ``batch`` and appends it to the end of the batch buffer.
@@ -772,6 +808,46 @@ proc batchNewCopy*(graphics: Graphics, batch: Batch) =
   graphics.batches.add(copy)
 
 include context_text
+
+template writeStencil*(graphics: Graphics, value: int32, body: untyped) =
+  ## For the duration of the body, disables writing to the color buffer,
+  ## and instead redirects all fragments to the stencil buffer. All fragments
+  ## written to the stencil buffer have the given value.
+
+  let
+    oldBatch = graphics.currentBatch
+    stencilFunc = stencilFunc(sfAlways, value)
+    stencilOp = stencilOp(saReplace, saReplace, saReplace)
+    stencil = stencilMode(stencilFunc, stencilOp)
+
+  graphics.batchNewColorMask((red: off, green: off, blue: off, alpha: off))
+  graphics.batchNewStencil(stencil)
+
+  block:
+    `body`
+
+  graphics.batchNewCopy(oldBatch)
+
+template testStencil*(graphics: Graphics, test: CompareFunc,
+                      reference: int32, body: untyped) =
+  ## For the duration of the body, each color fragment to be drawn will be put
+  ## through the stencil test. This test checks each fragment against the
+  ## given equation, eg. ``test = cfEqual, reference = 255`` will result in the
+  ## following equation: ``reference == stencil``. Fragments that do not pass
+  ## this test are discarded.
+
+  let
+    oldBatch = graphics.currentBatch
+    stencilFunc = stencilFunc(test, reference)
+    stencilOp = stencilOp(saKeep, saKeep, saKeep)
+    stencil = stencilMode(stencilFunc, stencilOp)
+
+  graphics.batchNewStencil(stencil)
+
+  block:
+    `body`
+
+  graphics.batchNewCopy(oldBatch)
 
 const
   DefaultVertexShader* = glsl"""
@@ -844,20 +920,33 @@ proc useBatch(uniforms: var GraphicsUniforms, batch: Batch) =
     uniforms.`?spriteAtlas` = batch.sampler.get
 
 proc applyBatchSettings[U: UniformSource](graphics: Graphics, batch: Batch,
-                                          uniforms: var U) =
-  ## Applies the batch's new settings to the uniform source.
+                                          uniforms: var U,
+                                          params: var DrawParams) =
+  ## Applies the batch's new settings to the uniform source and draw params.
 
-  when U is GraphicsUniforms:
-    useBatch(uniforms, batch)
-  elif U is object | tuple:
-    for name, field in fieldPairs(uniforms):
-      when name.len >= 2 and name[0..1] == "..":
-        when field is GraphicsUniforms:
-          useBatch(field, batch)
-        elif field is object | tuple:
-          graphics.applyBatchSettings(batch, field)
-  else:
-    {.error: "unsupported uniform source. use aglet.uniforms {}".}
+  proc aux[U](graphics: Graphics, batch: Batch, uniforms: var U) {.nimcall.} =
+    when U is GraphicsUniforms:
+      useBatch(uniforms, batch)
+    elif U is EmptyUniforms: discard
+    elif U is object | tuple:
+      for name, field in fieldPairs(uniforms):
+        when name.len >= 2 and name[0..1] == "..":
+          aux(graphics, batch, field)
+    else:
+      {.error: "unsupported uniform source. use aglet.uniforms {}".}
+
+  aux(graphics, batch, uniforms)
+
+  var paramsChanged = false
+  if batch.colorMask.isSome:
+    let (r, g, b, a) = batch.colorMask.get
+    params.colorMask r, g, b, a
+    paramsChanged = true
+  if batch.stencilMode.isSome:
+    params.stencil batch.stencilMode.get
+    paramsChanged = true
+  if paramsChanged:
+    params.finish()
 
 # this proc used to use default parameters but Nim/#11274 prevented me from
 # doing so, so now there's a bajillion overloads to fulfill all the common
@@ -877,12 +966,17 @@ proc draw*[U: UniformSource](graphics: Graphics, target: Target,
   graphics.updateMesh()
   let baseUniforms = graphics.uniforms(target)
   for batch in graphics.batches:
-    var batchUniforms = aglet.uniforms {
-      ..uniforms,
-      ..baseUniforms,
-    }
-    graphics.applyBatchSettings(batch, batchUniforms)
-    target.draw(program, graphics.mesh[batch.range], batchUniforms, drawParams)
+    var
+      batchUniforms = aglet.uniforms {
+        ..uniforms,
+        ..baseUniforms,
+      }
+      batchDrawParams = drawParams
+    graphics.applyBatchSettings(batch, batchUniforms, batchDrawParams)
+    if batch.clearStencil.isSome:
+      target.clearStencil(batch.clearStencil.get)
+    target.draw(program, graphics.mesh[batch.range],
+                batchUniforms, batchDrawParams)
 
 proc draw*[U: UniformSource](graphics: Graphics, target: Target,
                              program: Program, uniforms: U) {.inline.} =
@@ -909,16 +1003,18 @@ proc draw*(graphics: Graphics, target: Target) {.inline.} =
 
 proc newGraphics*(window: Window, spriteAtlasSize = 1024.Positive): Graphics =
   ## Creates a new graphics context.
-  new(result)
+
+  new result
 
   result.window = window
 
   result.mesh =
-    window.newMesh[:Vertex2D](usage = muDynamic, primitive = dpTriangles)
+    window.newMesh[:Vertex2dColorUv](usage = muDynamic, primitive = dpTriangles)
   result.resetShape()
 
   result.fDefaultProgram =
-    window.newProgram[:Vertex2D](DefaultVertexShader, DefaultFragmentShader)
+    window.newProgram[:Vertex2dColorUv](DefaultVertexShader,
+                                        DefaultFragmentShader)
   result.fDefaultDrawParams = defaultDrawParams().derive:
     blend blendAlpha
 

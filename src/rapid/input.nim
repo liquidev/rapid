@@ -41,6 +41,8 @@ type
     cMouseScroll: seq[MouseScrollCallback]
     cFileDrop: seq[FileDropCallback]
 
+    previousMousePosition: Vec2f
+
   WindowMoveCallback* = proc (newPosition: Vec2f)
     ## Triggered when the window is moved.
     ##
@@ -222,6 +224,8 @@ proc finishTick*(input: Input) =
   finishTick(input.keys)
   finishTick(input.mouseButtons)
 
+  input.previousMousePosition = input.window.mouse
+
 {.push inline.}
 
 proc keyJustPressed*(input: Input, key: Key): bool =
@@ -302,6 +306,11 @@ proc mouseButtonJustReleased*(input: Input, buttons: set[MouseButton]): bool =
 proc mousePosition*(input: Input): Vec2f =
   ## Returns the position of the mouse in the window.
   input.window.mouse
+
+proc deltaMousePosition*(input: Input): Vec2f =
+  ## Returns the mouse position difference between the last and current input
+  ## tick.
+  input.previousMousePosition - input.mousePosition
 
 proc osMousePosition*(input: Input): Vec2f =
   ## Returns the position of the mouse on the screen, relative to the window.

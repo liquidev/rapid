@@ -230,11 +230,7 @@ proc drawGlyph(graphics: Graphics, baselinePosition: Vec2f,
     position = floor(baselinePosition + pen)
     rect = rectf(position, glyph.size.vec2f)
     atlasRect = glyph.atlasRect
-    e = graphics.addVertex(rect.topLeft, color, atlasRect.topLeft)
-    f = graphics.addVertex(rect.topRight, color, atlasRect.topRight)
-    g = graphics.addVertex(rect.bottomRight, color, atlasRect.bottomRight)
-    h = graphics.addVertex(rect.bottomLeft, color, atlasRect.bottomLeft)
-  graphics.addIndices([e, f, g, g, h, e])
+  graphics.rawRectangle(rect, atlasRect, color, color, color, color)
 
 proc text*(graphics: Graphics, font: Font, position: Vec2f, text: Text,
            horzAlignment = taLeft, vertAlignment = taTop, alignBox = vec2f(0),
