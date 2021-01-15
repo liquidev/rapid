@@ -18,7 +18,7 @@ func perpCounterClockwise*[T](v: Vec2[T]): Vec2[T] {.inline.} =
 
 func angle*[T: SomeFloat](v: Vec2[T]): Radians {.inline.} =
   ## Returns the angle of the vector from (0, 0) to (v.x, v.y).
-  arctan2(v.y, v.x).radians
+  arctan2(v.y, v.x).Radians
 
 func toVector*(angle: Radians): Vec2f {.inline.} =
   ## Converts an angle to a vector.
@@ -73,7 +73,7 @@ func angleBetweenLines*(a0, b0, a1, b1: Vec2f): Radians {.inline.} =
   let
     da = a1 - a0
     db = b1 - b0
-  result = arctan2(da.x * db.y - da.y * db.x, dot(da, db)).radians
+  result = arctan2(da.x * db.y - da.y * db.x, dot(da, db)).Radians
 
 func bisector*[T](anchor, a, b: Vec2[T]): Vec2[T] {.inline.} =
   ## Calculates the bisector of the angle in the corner ``a, anchor, b``, and

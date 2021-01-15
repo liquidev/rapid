@@ -41,6 +41,7 @@ type
     cMouseScroll: seq[MouseScrollCallback]
     cFileDrop: seq[FileDropCallback]
 
+    deltaScroll: Vec2f
     previousMousePosition: Vec2f
 
   WindowMoveCallback* = proc (newPosition: Vec2f)
@@ -198,6 +199,7 @@ proc process*(input: Input, event: InputEvent) =
     trigger cMouseEnter, it(event.kind == iekMouseEnter)
 
   of iekMouseScroll:
+    input.deltaScroll += event.scrollPos
     trigger cMouseScroll, it(event.scrollPos)
 
   of iekFileDrop:
@@ -225,6 +227,7 @@ proc finishTick*(input: Input) =
   finishTick(input.mouseButtons)
 
   input.previousMousePosition = input.window.mouse
+  reset input.deltaScroll
 
 {.push inline.}
 
@@ -310,7 +313,11 @@ proc mousePosition*(input: Input): Vec2f =
 proc deltaMousePosition*(input: Input): Vec2f =
   ## Returns the mouse position difference between the last and current input
   ## tick.
-  input.previousMousePosition - input.mousePosition
+  input.mousePosition - input.previousMousePosition
+
+proc scroll*(input: Input): Vec2f =
+  ## Returns the scroll vector for the current input tick.
+  input.deltaScroll
 
 proc osMousePosition*(input: Input): Vec2f =
   ## Returns the position of the mouse on the screen, relative to the window.

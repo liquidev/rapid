@@ -104,7 +104,7 @@ proc polyline*(graphics: Graphics, points: openArray[Vec2f],
         let
           angle = float32(pointIndex / max(1, pointCount - 1))
             .mapRange(0, 1, startAngle.float32, endAngle.float32)
-            .radians
+            .Radians
           point = b + angle.toVector * (thickness / 2)
         rimIndices.add(graphics.addVertex(point, color))
       rimIndices.add(bTv)
@@ -156,8 +156,8 @@ proc polyline*(graphics: Graphics, points: openArray[Vec2f],
     let
       direction = cap - next
       angle = direction.angle
-      angleCcw = angle - radians(Pi / 2)
-    graphics.arc(cap, radius, angleCcw, angleCcw + Pi.radians, color,
+      angleCcw = angle - Radians(Pi / 2)
+    graphics.arc(cap, radius, angleCcw, angleCcw + Pi.Radians, color,
                  points = PolygonPoints(max(6, 2 * Pi * radius * 0.25)))
 
   if cap == lcRound:

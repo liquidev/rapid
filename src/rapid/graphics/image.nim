@@ -2,8 +2,7 @@
 
 import aglet/pixeltypes
 import aglet/rect
-from nimPNG import decodePng32
-import nimPNG/results
+import stb_image/read as stbi
 
 import ../math as rmath
 
@@ -88,27 +87,28 @@ proc init*(image: var Image, size: Vec2i) =
   image.height = size.y
   image.data.setLen(image.width * image.height * 4)
 
-proc readPng*(image: var Image, data: string) =
-  ## Reads a PNG image from the given string containing a PNG image.
+proc read*(image: var Image, data: string) =
+  ## Reads an image from the given string containing a pre-loaded image file.
+  ## Supported formats: JPEG, PNG, TGA, BMP, PSD, GIF, PNM.
 
-  let png = decodePng32(data)
-  image.width = png.width.int32
-  image.height = png.height.int32
-  image.data.setLen(png.data.len)
-  copyMem(image.data[0].addr, png.data[0].addr, png.data.len)
+  var width, height, channels: int
+  # i don't like this cast ↓
+  image.data =
+    stbi.loadFromMemory(cast[seq[byte]](data), width, height, channels, 4)
 
-proc loadPng*(image: var Image, filename: string) =
-  ## Loads a PNG image from the given path.
-  image.readPng(readFile(filename))
+proc load*(image: var Image, filename: string) {.inline.} =
+  ## Loads an image from the given path.
+  image.read(readFile(filename))
 
 proc initImage*(size: Vec2i): Image {.inline.} =
   ## Creates and initializes an empty image buffer.
   result.init(size)
 
-proc readPngImage*(data: string): Image {.inline.} =
-  ## Creates and reads a PNG image from the given string containing a PNG image.
-  result.readPng(data)
+proc readImage*(data: string): Image {.inline.} =
+  ## Creates and reads an image from the given string containing an
+  ## in-memory image file.
+  result.read(data)
 
-proc loadPngImage*(filename: string): Image {.inline.} =
-  ## Creates and loads a PNG image from the given path.
-  result.loadPng(filename)
+proc loadImage*(filename: string): Image {.inline.} =
+  ## Creates and loads an image from the given path.
+  result.load(filename)

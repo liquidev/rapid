@@ -377,6 +377,10 @@ proc deltaMousePosition*(ui: Ui): Vec2f =
   ## frame.
   ui.input.deltaMousePosition
 
+proc scroll*(ui: Ui): Vec2f =
+  ## Returns the scroll vector for the current frame.
+  ui.input.scroll
+
 proc mouseInBox*(ui: Ui): bool =
   ## Returns whether the mouse position is in the current box's area.
   ui.mousePosition.x >= 0 and ui.mousePosition.x < ui.currentBox.rect.width and
@@ -436,7 +440,7 @@ template mousePressed*(ui: Ui, button: MouseButton, body: untyped) =
 
 template mouseReleased*(ui: Ui, button: MouseButton, body: untyped) =
   ## Convenience/readability template, shortcut for
-  ## ``if ui.mouseInBox and ui.mouseButtonJustPressed``.
+  ## ``if ui.mouseInBox and ui.mouseButtonJustReleased``.
 
   if ui.mouseInBox and ui.mouseButtonJustReleased(button):
     `body`

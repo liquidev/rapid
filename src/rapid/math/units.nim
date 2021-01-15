@@ -29,21 +29,13 @@ proc `==`*(a, b: Radians): bool {.borrow.}
 proc `<`*(a, b: Radians): bool {.borrow.}
 proc `<=`*(a, b: Radians): bool {.borrow.}
 
-func radians*(value: float32): Radians {.inline.} =
-  ## Marks a float value as radians.
-  value.Radians
-
-func degrees*(value: float32): Degrees {.inline.} =
-  ## Marks a float value as degrees.
-  value.Degrees
-
 converter toRadians*(degrees: Degrees): Radians {.inline.} =
   ## Converter from degrees to radians.
-  radians(degrees.float32.degToRad)
+  Radians(degrees.float32.degToRad)
 
 converter toDegrees*(radians: Radians): Degrees {.inline.} =
   ## Converter from radians to degrees.
-  degrees(radians.float32.radToDeg)
+  Degrees(radians.float32.radToDeg)
 
 macro wrapTrig(): untyped =
   result = newStmtList()

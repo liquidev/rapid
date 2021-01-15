@@ -359,7 +359,7 @@ proc arc*(graphics: Graphics, center, radii: Vec2f,
     let
       angle = float32(pointIndex / (points - pointCountOffset))
         .mapRange(0, 1, startAngle.float32, endAngle.float32)
-        .radians
+        .Radians
       point = center + angle.toVector * radii
     rimIndices.add(graphics.addVertex(point, color))
   case mode
@@ -411,7 +411,7 @@ proc ellipse*(graphics: Graphics, center: Vec2f, radii: Vec2f,
   ## Shortcut for adding an arc from 0° to 360°, with the given center and X/Y
   ## radii, tinted with the given color, with the specified amount of points.
 
-  graphics.arc(center, radii, startAngle = 0.degrees, endAngle = 360.degrees,
+  graphics.arc(center, radii, startAngle = 0.Degrees, endAngle = 360.Degrees,
                color, points)
 
 proc ellipse*(graphics: Graphics, centerX, centerY, radiusX, radiusY: float32,
@@ -477,11 +477,11 @@ proc line*(graphics: Graphics, a, b: Vec2f, thickness: float32 = 1.0,
   if cap == lcRound:
     let
       angle = direction.angle
-      angleCw = angle + radians(Pi / 2)
-      angleCcw = angle - radians(Pi / 2)
-    graphics.arc(a, thickness / 2, angleCw, angleCw + Pi.radians, colorA,
+      angleCw = angle + Radians(Pi / 2)
+      angleCcw = angle - Radians(Pi / 2)
+    graphics.arc(a, thickness / 2, angleCw, angleCw + Pi.Radians, colorA,
                  points = PolygonPoints(max(6, 2 * Pi * thickness * 0.25)))
-    graphics.arc(b, thickness / 2, angleCcw, angleCcw + Pi.radians, colorB,
+    graphics.arc(b, thickness / 2, angleCcw, angleCcw + Pi.Radians, colorB,
                  points = PolygonPoints(max(6, 2 * Pi * thickness * 0.25)))
 
 include context_polyline
@@ -562,7 +562,7 @@ proc lineArc*(graphics: Graphics, center, radii: Vec2f,
     let
       angle = float32(pointIndex / (points - 1))
         .mapRange(0, 1, startAngle.float32, endAngle.float32)
-        .radians
+        .Radians
       point = center + angle.toVector * radii
     rimPositions.add(point)
   if mode == amPie:
@@ -610,7 +610,7 @@ proc lineEllipse*(graphics: Graphics, center: Vec2f, radii: Vec2f,
   ## Shortcut for drawing an arc outline from 0° to 360°.
 
   graphics.lineArc(center, radii,
-                   startAngle = 0.degrees, endAngle = 360.degrees,
+                   startAngle = 0.Degrees, endAngle = 360.Degrees,
                    thickness, color, points)
 
 proc lineEllipse*(graphics: Graphics,
@@ -896,7 +896,7 @@ type
 
 proc uniforms(graphics: Graphics, target: Target): GraphicsUniforms =
   ## Returns some extra uniforms related to the graphics context.
-  result = GraphicsUniforms aglet.uniforms {
+  result = GraphicsUniforms(aglet.uniforms {
     projection: ortho(left = 0'f32, top = 0'f32,
                       right = target.width.float32,
                       bottom = target.height.float32,
@@ -908,7 +908,7 @@ proc uniforms(graphics: Graphics, target: Target): GraphicsUniforms =
       wrapS = twClampToBorder,
       wrapT = twClampToBorder,
     )
-  }
+  })
 
 proc updateMesh(graphics: Graphics) =
   ## Updates the internal mesh with client-side shape data.

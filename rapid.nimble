@@ -19,3 +19,4 @@ srcDir =
 
 requires "nim >= 0.20.0"
 requires "aglet >= 0.4.2"
+requires "stbimage >= 2.5"
