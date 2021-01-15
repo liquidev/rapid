@@ -95,6 +95,8 @@ proc read*(image: var Image, data: string) =
   # i don't like this cast ↓
   image.data =
     stbi.loadFromMemory(cast[seq[byte]](data), width, height, channels, 4)
+  image.width = width.int32
+  image.height = height.int32
 
 proc load*(image: var Image, filename: string) {.inline.} =
   ## Loads an image from the given path.
