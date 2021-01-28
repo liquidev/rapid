@@ -56,11 +56,12 @@ will have to install a specific commit from the master branch. The current
 release version is not supported anymore.
 
 To install rapid, use the following command:
-```
+```bash
 $ nimble install "rapid@#3e831cb"  # change the commit hash to the latest commit
 ```
+
 In your `.nimble` file:
-```
+```nim
 requires "rapid#3e831cb"
 ```
 
