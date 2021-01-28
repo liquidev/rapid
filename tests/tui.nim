@@ -34,11 +34,11 @@ type
 
 converter value(slider: Slider): float32 = slider.value
 
-template slider(ui: Ui, bwidth: float32, slider: var Slider, extra: untyped) =
+template slider(ui: Ui, bwidth: float32, slider: var Slider) =
 
   ui.box(vec2f(bwidth, 24), blFreeform):
     ui.drawInBox:
-      let x = 6 + value * (bwidth - 12)
+      let x = 6 + slider.value * (bwidth - 12)
       let y = ui.height / 2
       ui.graphics.line(vec2f(0, y), vec2f(ui.width, y), thickness = 2,
                        colorA = cherry, colorB = cherry)
@@ -46,7 +46,6 @@ template slider(ui: Ui, bwidth: float32, slider: var Slider, extra: untyped) =
     ui.mouseDown(mbLeft):
       let x = ui.mousePosition.x / (bwidth - 1)
       slider.value = x
-    `extra`
 
 proc main() =
 
@@ -95,7 +94,7 @@ proc main() =
         ui.button(size = vec2f(128, 32), label = "Hello"):
           echo "hello"
 
-        ui.slider(256, sliderValue): discard
+        ui.slider(256, slider)
 
       ui.draw(frame)
 
