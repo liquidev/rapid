@@ -12,7 +12,7 @@ var tileset: seq[Sprite]
 
 proc loadTileset(graphics: Graphics) =
   const TilesetPng = slurp("sampleData/tileset.png")
-  let image = readPngImage(TilesetPng)
+  let image = readImage(TilesetPng)
   template tile(x, y: int32): Image = image[recti(x * 10 + 1, y * 10 + 1, 8, 8)]
   tileset.add graphics.addSprite(tile(0, 1))
   tileset.add graphics.addSprite(tile(1, 1))
@@ -28,11 +28,11 @@ proc shapes(graphics: Graphics, time: float32) =
                 thickness = 10, cap = lcRound,
                 colorA = colMagenta, colorB = colAqua)
   graphics.circle(48, 128, 32)
-  graphics.arc(48, 160, 32, 0.degrees, 180.degrees)
+  graphics.arc(48, 160, 32, 0.Degrees, 180.Degrees)
   graphics.lineCircle(48, 128, 32, thickness = 2, color = colAqua)
-  graphics.lineArc(48, 128, 32, 0.degrees, 270.degrees,
+  graphics.lineArc(48, 128, 32, 0.Degrees, 270.Degrees,
                    thickness = 4, color = colMagenta, mode = amPie, points = 24)
-  graphics.lineArc(48, 160, 32, 0.degrees, 180.degrees,
+  graphics.lineArc(48, 160, 32, 0.Degrees, 180.Degrees,
                    thickness = 4, color = colMagenta)
   graphics.transform:
     graphics.translate(128, 128)
@@ -46,7 +46,7 @@ proc shapes(graphics: Graphics, time: float32) =
   graphics.transform:
     graphics.translate(64, 256)
     let
-      angle = radians(time * (2 * Pi) * 0.10)
+      angle = Radians(time * (2 * Pi) * 0.10)
       points = [
         vec2f(0, -48),
         vec2f(0, 0),
@@ -67,7 +67,7 @@ proc shapes(graphics: Graphics, time: float32) =
                           thickness = 16)
   graphics.transform:
     graphics.translate(32, 32)
-    graphics.rotate(radians(time * Pi))
+    graphics.rotate(Radians(time * Pi))
     graphics.lineRectangle(-16, -16, 32, 32, thickness = 3, color = colGray)
 
 proc tiles(graphics: Graphics) =
