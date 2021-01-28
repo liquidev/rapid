@@ -51,16 +51,23 @@ solutions like Godot.
 
 ## Installing
 
+Note that the new version of rapid (2020) is still under development, so you
+will have to install a specific commit from the master branch. The current
+release version is not supported anymore.
+
 To install rapid, use the following command:
 ```
-$ nimble install rapid
+$ nimble install "rapid@#3e831cb"  # change the commit hash to the latest commit
 ```
-or if you're a Chad using [nimph][nimph repo]:
+In your `.nimble` file:
 ```
-$ nimph clone liquid600pgm/rapid
+requires "rapid#3e831cb"
 ```
 
-  [nimph repo]: https://github.com/disruptek/nimph
+Pinning to a specific commit rather than `#head` is recommended, because `#head`
+doesn't name a specific point in development. This means that two different
+packages may end up requiring `#head`, and the `#head` that's installed locally
+may not match the `#head` that's required by the package.
 
 ### Linux
 
