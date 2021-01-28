@@ -125,13 +125,7 @@ When contributing code, please follow the [coding style guidelines](code_style.m
 
 ### Super Secret Messages hidden in plain sight
 
-#### A message to disruptek
+#### A message to Araq
 
-Incremental compilation when
+Fast incremental compilation when
 
-#### A message to future me reading this
-
-YOU should finish that darned X11/EGL backend in aglet too. GLFW init times
-are a pain because somebody thought it would be a good idea to parse the entire
-SDL game controller database every time on startup. That somebody should be
-fired, in my opinion.
