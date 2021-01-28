@@ -37,17 +37,16 @@ solutions like Godot.
 - `rapid/math`
   - Common math utilities for vector math, axis-aligned bounding boxes,
     interpolation, and type-safe units
+- `rapid/ui` – [Fidget][fidget repo]-style UI framework for games
+  and applications
 
   [gpp component]: https://gameprogrammingpatterns.com/component.html
   [chipmunk repo]: https://github.com/slembcke/Chipmunk2D
+  [fidget repo]: https://github.com/treeform/fidget
 
 ### Coming soon
 
 - `rapid/audio` – Sound mixer with real-time effect support
-- `rapid/ui` – [Fidget][fidget repo]-style UI framework for games
-  and applications
-
-  [fidget repo]: https://github.com/treeform/fidget
 
 ## Installing
 
