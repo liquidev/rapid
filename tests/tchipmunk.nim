@@ -110,8 +110,7 @@ proc main() =
       space.eachBody do (body: Body):
         if body of UserBody[Droplet]:
           var ubody = UserBody[Droplet](body)
-          ubody.user.angle = interp(ubody.user.angle, body.velocity.angle,
-                                    0.5.radians)
+          ubody.user.angle = lerp(ubody.user.angle, body.velocity.angle, 0.5)
         if body.position.y > 500:
           oob.add(body)
       for body in oob:
@@ -132,8 +131,9 @@ proc main() =
             const rs = vec2f(ParticleSize * 10)
             let speed = max(1, body.velocity.length / 180)
             graphics.translate(body.position)
-            graphics.rotate(ubody.user.angle)
+            graphics.rotate(body.velocity.angle)
             graphics.scale(speed, 1)
+            echo body.position
             graphics.sprite(blobSprite, -rs / 2, size = rs,
                             tint = colDarkTurquoise)
       graphics.draw(effect)

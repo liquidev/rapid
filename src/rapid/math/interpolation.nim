@@ -15,7 +15,7 @@ import math
 
 func lerp*[T](a, b: T, t: SomeFloat): T {.inline.} =
   ## Fast linear interpolation. This is faster than ``interp``.
-  t * b + (1 - t) * a
+  t.T * b + T(1 - t) * a
 
 
 # interpolators

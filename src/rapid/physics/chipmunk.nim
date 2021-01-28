@@ -256,7 +256,7 @@ proc `force=`*(body: Body, newForce: Vec2f): Vec2f =
 
 proc angle*(body: Body): Radians =
   ## Returns the angle of the body.
-  cpBodyGetAngle(body.raw).radians
+  cpBodyGetAngle(body.raw).Radians
 
 proc `angle=`*(body: Body, newAngle: Radians) =
   ## Sets the angle of the body.
@@ -268,7 +268,7 @@ proc `angle=`*(body: Body, newAngle: Radians) =
 
 proc angularVelocity*(body: Body): Radians =
   ## Returns the angular velocity of the body's, in radians per second.
-  cpBodyGetAngularVelocity(body.raw).radians
+  cpBodyGetAngularVelocity(body.raw).Radians
 
 proc `angularVelocity=`*(body: Body, newAngularVelocity: Radians) =
   ## Sets the angular velocity of the body in radians per second.
@@ -276,7 +276,7 @@ proc `angularVelocity=`*(body: Body, newAngularVelocity: Radians) =
 
 proc torque*(body: Body): Radians =
   ## Returns the torque applied to the body.
-  cpBodyGetTorque(body.raw).radians
+  cpBodyGetTorque(body.raw).Radians
 
 proc `torque=`*(body: Body, newTorque: Radians) =
   ## Sets the torque applied to the body. This value is reset every time step.
