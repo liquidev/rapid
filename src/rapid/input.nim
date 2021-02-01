@@ -310,6 +310,11 @@ proc mousePosition*(input: Input): Vec2f =
   ## Returns the position of the mouse in the window.
   input.window.mouse
 
+proc previousMousePosition*(input: Input): Vec2f =
+  ## Returns the position of the mouse in the window from the previous
+  ## input tick.
+  input.previousMousePosition
+
 proc deltaMousePosition*(input: Input): Vec2f =
   ## Returns the mouse position difference between the last and current input
   ## tick.
