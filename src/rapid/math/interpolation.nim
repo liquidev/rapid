@@ -9,13 +9,21 @@
 ## Hermite spline curves.
 
 import math
+import glm/vec
 
 
 # basics
 
 func lerp*[T](a, b: T, t: SomeFloat): T {.inline.} =
-  ## Fast linear interpolation. This is faster than ``interp``.
+  ## Fast linear interpolation.
   t.T * b + T(1 - t) * a
+
+func lerp*[T, N](a, b: Vec[N, T], t: SomeFloat): Vec[N, T] {.inline.} =
+  ## Linear interpolation for vectors.
+
+  for i, u in a.arr:
+    let v = b.arr[i]
+    result.arr[i] = lerp(u, v, t)
 
 
 # interpolators

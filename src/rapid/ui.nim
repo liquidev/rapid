@@ -331,6 +331,18 @@ proc `fontHeight=`*(ui: Ui, height: float32) =
   ## Sets the current box's font height.
   ui.currentBox.fontSize.y = height
 
+proc toTextAlign(position: HorizontalAlignmentPosition): HorzTextAlign =
+  case position
+  of apLeft: taLeft
+  of apCenter: taCenter
+  of apRight: taRight
+
+proc toTextAlign(position: VerticalAlignmentPosition): VertTextAlign =
+  case position
+  of apTop: taTop
+  of apMiddle: taMiddle
+  of apBottom: taBottom
+
 proc text*(ui: Ui, text: Text, color: Color = ui.color,
            alignment: Alignment = (apLeft, apTop)) =
   ## Draws text in the current box, with the given color, alignment, and size.
@@ -339,8 +351,8 @@ proc text*(ui: Ui, text: Text, color: Color = ui.color,
   assert not ui.font.isNil, "cannot draw text without a font set"
 
   ui.graphics.text(ui.font, ui.currentBox.rect.position, text,
-                   alignment.horizontal.HorzTextAlign,
-                   alignment.vertical.VertTextAlign,
+                   alignment.horizontal.toTextAlign,
+                   alignment.vertical.toTextAlign,
                    alignBox = ui.currentBox.rect.size,
                    ui.fontHeight, ui.fontWidth, color)
 
