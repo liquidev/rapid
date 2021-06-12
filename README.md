@@ -6,6 +6,12 @@ A game engine written in Nim, optimized for making cool games fast.
 Made for convenience while coding and better performance than all-in-one
 solutions like Godot.
 
+**Note:** As of June 2021, I'm not longer actively working on rapid.
+I'm still going to accept pull requests, but I'm not willing to add
+or fix any code myself.
+If anyone contributes often enough to the repository I can give them
+contributor status to make working on the project easier.
+
 ## Goals
 
 - Be easy to understand,
@@ -67,7 +73,8 @@ requires "rapid#3e831cb"
 Pinning to a specific commit rather than `#head` is recommended, because `#head`
 doesn't name a specific point in development. This means that two different
 packages may end up requiring `#head`, and the `#head` that's installed locally
-may not match the `#head` that's required by the package.
+may not match the `#head` that's required by the package. Thanks nimble,
+you're the best.
 
 ### Linux
 
