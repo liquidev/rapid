@@ -7,11 +7,7 @@ Made for convenience while coding and better performance than all-in-one
 solutions like Godot.
 
 **Note:** As of June 2021, I'm not longer actively working on rapid.
-I'm still going to accept pull requests, but I'm not working towards
-adding anything myself, as I've gotten bored of the project and
-eventually tired of Nim altogether.
-If anyone contributes often enough to the repository I can give them
-contributor status to make working on the project easier.
+Please fork the repository if you want to keep the project alive.
 
 ## Goals
 
